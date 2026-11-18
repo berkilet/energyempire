@@ -1,0 +1,18 @@
+INNERSCENE — CC0 KAYNAK NOTU
+
+Model sayfaları dosyaların Public Domain (CC0) olduğunu, ticari kullanım dahil ücretsiz kullanım/değiştirme/yeniden dağıtımın mümkün olduğunu belirtir.
+
+1) low-poly-nature-terrain-flat-tile.glb
+https://www.innerscene.com/tools/library/3d-parts/low-poly-nature-terrain-flat-tile-4d3d3d4d
+2 x 2 x 0.2 m; GLB, mesh + materials.
+
+2) low-poly-nature-water-tile.glb
+https://www.innerscene.com/tools/library/3d-parts/low-poly-nature-water-tile-609c95e8
+2 x 2 x 0.206 m; GLB, mesh + materials.
+
+3) low-poly-nature-terrain-corner-tile.glb
+https://www.innerscene.com/tools/library/3d-parts/low-poly-nature-terrain-corner-tile-53eaf6dd
+2 x 2 x 1.2 m; GLB, mesh + materials.
+
+CC0 lisans açıklaması: https://creativecommons.org/publicdomain/zero/1.0/
+İndirme tarihi: 2026-11-18.

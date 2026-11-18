@@ -1,0 +1,588 @@
+package com.energytycoon.render;
+
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Mesh;
+import com.badlogic.gdx.graphics.VertexAttribute;
+import com.badlogic.gdx.graphics.VertexAttributes;
+import com.badlogic.gdx.graphics.g3d.Material;
+import com.badlogic.gdx.graphics.g3d.Model;
+import com.badlogic.gdx.graphics.g3d.ModelInstance;
+import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
+import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder;
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.FloatArray;
+import com.badlogic.gdx.utils.ShortArray;
+import com.energytycoon.world.Noise;
+import com.energytycoon.world.WorldMap;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Arazi: tile sutunlari (koselerde AO, katmanli kayaliklar), ayri su yuzeyi (derinlik rengi, kiyi kopugu,
+ * hareketli dalgaciklar) ve parcaya pisirilmis bitki ortusu (Kenney Nature Kit agac/cali/cim/kaya).
+ */
+public final class TerrainRenderer implements Disposable {
+    public enum Layer {
+        NORMAL("Normal"), WIND("Rüzgar"), SUN("Güneş"), COAL("Kömür"), GAS("Doğalgaz"), WATER("Su");
+        public final String label;
+        Layer(String l) { label = l; }
+    }
+
+    private static final int CHUNK = 16;
+    /** Kisa indeksli mesh sinirinin altinda guvenli kose sayisi; asilinca yeni mesh parcasina gecilir. */
+    private static final int MAX_VERTS = 60000;
+    private static final String NAT = "models/nature/";
+
+    private final WorldMap map;
+    private final int[] occ;
+    /** Agac konmayacak kareler (sehir cevresi vb.). */
+    public final boolean[] reserved;
+    private final int chunksX;
+    private final Model[] ground, water, ripples;
+    private final ModelInstance[] groundInst, waterInst, rippleInst;
+    /** Golge ve ana geciste cizilen arazi + su ornekleri. */
+    public final Array<ModelInstance> instances = new Array<>();
+    private Layer layer = Layer.NORMAL;
+    private final int[] occSnapshot;
+    private final boolean[] resSnapshot;
+    private final Noise forest, macro;
+    /** Su kareleri icin en yakin karaya uzaklik (kare). */
+    private final int[] waterDist;
+    /** Bitki ortusu yogunlugu: 0 az, 1 normal, 2 yogun. */
+    private int detail = defaultDetail;
+    /** Yeni olusturulan arazilerin bitki yogunlugu (ayarlardan). */
+    public static int defaultDetail = 1;
+    private final Material waterMat = new Material("water", ColorAttribute.createDiffuse(Color.WHITE));
+    private final Material rippleMat = new Material("ripple", ColorAttribute.createDiffuse(Color.WHITE));
+
+    public TerrainRenderer(WorldMap map, int[] occ) {
+        this.map = map; this.occ = occ;
+        this.reserved = new boolean[map.size * map.size];
+        this.chunksX = (map.size + CHUNK - 1) / CHUNK;
+        int n = chunksX * chunksX;
+        ground = new Model[n]; water = new Model[n]; ripples = new Model[n];
+        groundInst = new ModelInstance[n]; waterInst = new ModelInstance[n]; rippleInst = new ModelInstance[n];
+        this.occSnapshot = new int[occ.length];
+        this.resSnapshot = new boolean[occ.length];
+        this.forest = new Noise(map.seed + 1234);
+        this.macro = new Noise(map.seed + 4321);
+        this.waterDist = computeWaterDistance();
+        rebuild();
+    }
+
+    public Layer layer() { return layer; }
+    public void setLayer(Layer l) { if (l != layer) { layer = l; rebuild(); } }
+    public void setDetail(int d) { d = MathUtils.clamp(d, 0, 2); if (d != detail) { detail = d; rebuild(); } }
+
+    public void rebuild() {
+        for (int c = 0; c < ground.length; c++) buildChunk(c);
+        System.arraycopy(occ, 0, occSnapshot, 0, occ.length);
+        System.arraycopy(reserved, 0, resSnapshot, 0, occ.length);
+        refreshInstances();
+    }
+
+    /** Doluluk/rezerv degisen chunk'lari yeniden kurar. */
+    public void refreshOccupancy() {
+        boolean[] dirty = new boolean[ground.length];
+        boolean any = false;
+        for (int i = 0; i < occ.length; i++) {
+            if ((occ[i] >= 0) != (occSnapshot[i] >= 0) || reserved[i] != resSnapshot[i]) {
+                int x = i % map.size, y = i / map.size;
+                for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+                    int cx = (x + dx) / CHUNK, cy = (y + dy) / CHUNK;
+                    if (x + dx >= 0 && y + dy >= 0 && cx < chunksX && cy < chunksX) dirty[cy * chunksX + cx] = true;
+                }
+                any = true;
+            }
+        }
+        if (!any) return;
+        for (int c = 0; c < ground.length; c++) if (dirty[c]) buildChunk(c);
+        System.arraycopy(occ, 0, occSnapshot, 0, occ.length);
+        System.arraycopy(reserved, 0, resSnapshot, 0, occ.length);
+        refreshInstances();
+    }
+
+    private void refreshInstances() {
+        instances.clear();
+        for (ModelInstance mi : groundInst) if (mi != null) instances.add(mi);
+        for (ModelInstance mi : waterInst) if (mi != null) instances.add(mi);
+        for (ModelInstance mi : rippleInst) if (mi != null) instances.add(mi);
+    }
+
+    /** Su yuzeyi hafifce parlar-soner, dalgaciklar yavasca kayar. */
+    public void animate(float time) {
+        float k = 1f + 0.035f * MathUtils.sin(time * 0.9f);
+        ((ColorAttribute) waterMat.get(ColorAttribute.Diffuse)).color.set(k, k, Math.min(1.2f, k * 1.01f), 1);
+        float ox = 0.05f * MathUtils.sin(time * 0.55f), oz = 0.05f * MathUtils.cos(time * 0.43f);
+        for (ModelInstance mi : rippleInst) if (mi != null) mi.transform.setToTranslation(ox, 0, oz);
+    }
+
+    // ------------------------------------------------------------ mesh biriktirici (otomatik bolme)
+    private static final class Accum {
+        final FloatArray v = new FloatArray();
+        final ShortArray idx = new ShortArray();
+        final List<Mesh> meshes = new ArrayList<>();
+
+        int base() { return v.size / 10; }
+        void reserve(int verts) { if (base() + verts > MAX_VERTS) flush(); }
+        void vert(float x, float y, float z, float nx, float ny, float nz, float r, float g, float b) {
+            v.add(x); v.add(y); v.add(z); v.add(nx); v.add(ny); v.add(nz); v.add(r); v.add(g); v.add(b); v.add(1f);
+        }
+        void flush() {
+            if (v.size == 0) return;
+            VertexAttributes attrs = new VertexAttributes(VertexAttribute.Position(), VertexAttribute.Normal(), VertexAttribute.ColorUnpacked());
+            Mesh mesh = new Mesh(true, v.size / 10, idx.size, attrs);
+            mesh.setVertices(v.items, 0, v.size);
+            mesh.setIndices(idx.items, 0, idx.size);
+            meshes.add(mesh);
+            v.clear(); idx.clear();
+        }
+        Model build(Material mat) {
+            flush();
+            if (meshes.isEmpty()) return null;
+            ModelBuilder mb = new ModelBuilder();
+            mb.begin();
+            for (int i = 0; i < meshes.size(); i++) mb.part("p" + i, meshes.get(i), GL20.GL_TRIANGLES, mat);
+            Model m = mb.end();
+            for (Mesh me : meshes) m.manageDisposable(me);
+            meshes.clear();
+            return m;
+        }
+    }
+
+    private Accum g, w, rp;
+
+    private void buildChunk(int c) {
+        if (ground[c] != null) ground[c].dispose();
+        if (water[c] != null) water[c].dispose();
+        if (ripples[c] != null) ripples[c].dispose();
+        ground[c] = water[c] = ripples[c] = null;
+        groundInst[c] = waterInst[c] = rippleInst[c] = null;
+        int cx0 = (c % chunksX) * CHUNK, cy0 = (c / chunksX) * CHUNK;
+        g = new Accum(); w = new Accum(); rp = new Accum();
+        for (int y = cy0; y < Math.min(map.size, cy0 + CHUNK); y++) {
+            for (int x = cx0; x < Math.min(map.size, cx0 + CHUNK); x++) {
+                int i = map.idx(x, y);
+                float t = map.top[i];
+                Color col = tileColor(x, y);
+                if (map.water[i] && layer == Layer.NORMAL) {
+                    waterTop(x, y, t, col);
+                } else {
+                    float a00 = ao(x, y, -1, -1, t), a01 = ao(x, y, -1, 1, t), a11 = ao(x, y, 1, 1, t), a10 = ao(x, y, 1, -1, t);
+                    g.reserve(4);
+                    quad(g, x, t, y, x, t, y + 1, x + 1, t, y + 1, x + 1, t, y, 0, 1, 0, col, a00, a01, a11, a10);
+                }
+                wall(x, y, 1, 0, t); wall(x, y, -1, 0, t); wall(x, y, 0, 1, t); wall(x, y, 0, -1, t);
+                if (layer == Layer.NORMAL) decorate(x, y, i, t);
+            }
+        }
+        ground[c] = g.build(new Material(ColorAttribute.createDiffuse(Color.WHITE)));
+        water[c] = w.build(waterMat);
+        ripples[c] = rp.build(rippleMat);
+        if (ground[c] != null) groundInst[c] = new ModelInstance(ground[c]);
+        if (water[c] != null) waterInst[c] = new ModelInstance(water[c]);
+        if (ripples[c] != null) rippleInst[c] = new ModelInstance(ripples[c]);
+        g = w = rp = null;
+    }
+
+    // ------------------------------------------------------------ su
+    private int[] computeWaterDistance() {
+        int n = map.size * map.size;
+        int[] d = new int[n];
+        ArrayDeque<Integer> q = new ArrayDeque<>();
+        for (int i = 0; i < n; i++) {
+            if (!map.water[i]) { d[i] = 0; q.add(i); } else d[i] = Integer.MAX_VALUE;
+        }
+        while (!q.isEmpty()) {
+            int i = q.poll(), x = i % map.size, y = i / map.size;
+            int[][] dirs = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+            for (int[] dd : dirs) {
+                int nx = x + dd[0], ny = y + dd[1];
+                if (!map.inBounds(nx, ny)) continue;
+                int j = map.idx(nx, ny);
+                if (d[j] > d[i] + 1) { d[j] = d[i] + 1; q.add(j); }
+            }
+        }
+        return d;
+    }
+
+    private static final Color FOAM = new Color(0.66f, 0.82f, 0.86f, 1);
+
+    /** Su yuzeyi: koselerde karaya bitisiklik varsa kopuk rengi; rastgele karelere dalgacik seridi. */
+    private void waterTop(int x, int y, float t, Color col) {
+        float f00 = foam(x, y), f01 = foam(x, y + 1), f11 = foam(x + 1, y + 1), f10 = foam(x + 1, y);
+        w.reserve(4);
+        int b = w.base();
+        vertC(w, x, t, y, col, f00); vertC(w, x, t, y + 1, col, f01); vertC(w, x + 1, t, y + 1, col, f11); vertC(w, x + 1, t, y, col, f10);
+        w.idx.add(b); w.idx.add(b + 1); w.idx.add(b + 2); w.idx.add(b); w.idx.add(b + 2); w.idx.add(b + 3);
+        float h = hash(x * 5 + 3, y * 7 + 1);
+        if (h < 0.35f && waterDist[map.idx(x, y)] >= 1) {
+            MeshTemplate rip = MeshTemplate.get(NAT + "low-poly-nature-water-tile.obj");
+            // Innerscene su karosu 2x2; 0.5 olcekle tek kareye, yalnizca dalgacik seritleri (Kit_glass).
+            stamp(rp, rip, x + 0.5f, t - 0.2f * 0.5f + 0.003f, y + 0.5f, 90f * (int) (h * 40 % 4), 0.5f, 0.5f, 0.5f,
+                mat -> mat.equals("Kit_glass") ? RIPPLE : null, 1f);
+        }
+    }
+
+    private static final Color RIPPLE = new Color(0.58f, 0.78f, 0.84f, 1);
+
+    private void vertC(Accum a, float x, float y, float z, Color c, float foam) {
+        float r = MathUtils.lerp(c.r, FOAM.r, foam), gg = MathUtils.lerp(c.g, FOAM.g, foam), bb = MathUtils.lerp(c.b, FOAM.b, foam);
+        a.vert(x, y, z, 0, 1, 0, r, gg, bb);
+    }
+
+    /** Kose (cx,cy) kara karesine degiyorsa kopuk miktari. */
+    private float foam(int cx, int cy) {
+        int land = 0;
+        for (int dy = -1; dy <= 0; dy++) for (int dx = -1; dx <= 0; dx++) {
+            int x = cx + dx, y = cy + dy;
+            if (map.inBounds(x, y) && !map.water[map.idx(x, y)]) land++;
+        }
+        return land == 0 ? 0 : 0.14f + 0.06f * land;
+    }
+
+    // ------------------------------------------------------------ kayaliklar
+    /** Kose AO: kosedeki 3 komsudan yuksek olanlar karartir. */
+    private float ao(int x, int y, int sx, int sy, float t) {
+        int n = 0;
+        if (higher(x + sx, y, t)) n++;
+        if (higher(x, y + sy, t)) n++;
+        if (higher(x + sx, y + sy, t)) n++;
+        return 1f - 0.12f * n;
+    }
+
+    private boolean higher(int x, int y, float t) {
+        return map.inBounds(x, y) && map.top[map.idx(x, y)] > t + 0.05f;
+    }
+
+    /** Duvar: arazi kademesi basina bir bant; bantlar hafif farkli tonda (tortul katman gorunumu). */
+    private void wall(int x, int y, int dx, int dy, float t) {
+        int nx = x + dx, ny = y + dy;
+        float nt = map.inBounds(nx, ny) ? map.top[map.idx(nx, ny)] : 0f;
+        if (nt >= t - 0.001f) return;
+        int i = map.idx(x, y);
+        float side = dx != 0 ? 0.80f : 0.90f;
+        float nxn = dx, nzn = dy;
+        float y0 = nt;
+        int band = 0;
+        while (y0 < t - 0.001f) {
+            float bandTop = (float) Math.floor((y0 - WorldMap.LAND_BASE) / WorldMap.LEVEL_H + 1e-4) * WorldMap.LEVEL_H + WorldMap.LAND_BASE + WorldMap.LEVEL_H;
+            if (bandTop <= y0 + 1e-4f) bandTop = y0 + WorldMap.LEVEL_H;
+            float y1 = Math.min(t, Math.max(bandTop, y0 + 0.02f));
+            int lvBand = (int) Math.floor((y0 - WorldMap.LAND_BASE) / WorldMap.LEVEL_H + 0.5f);
+            Color wc = wallColor(i, lvBand, y1 >= t - 0.001f);
+            float lo = 0.72f + 0.26f * ((y0 - nt) / Math.max(0.01f, t - nt));
+            float hi = 0.72f + 0.26f * ((y1 - nt) / Math.max(0.01f, t - nt));
+            lo *= side; hi *= side;
+            g.reserve(4);
+            if (dx == 1) quad(g, x + 1, y0, y, x + 1, y1, y, x + 1, y1, y + 1, x + 1, y0, y + 1, nxn, 0, nzn, wc, lo, hi, hi, lo);
+            else if (dx == -1) quad(g, x, y0, y + 1, x, y1, y + 1, x, y1, y, x, y0, y, nxn, 0, nzn, wc, lo, hi, hi, lo);
+            else if (dy == 1) quad(g, x + 1, y0, y + 1, x + 1, y1, y + 1, x, y1, y + 1, x, y0, y + 1, nxn, 0, nzn, wc, lo, hi, hi, lo);
+            else quad(g, x, y0, y, x, y1, y, x + 1, y1, y, x + 1, y0, y, nxn, 0, nzn, wc, lo, hi, hi, lo);
+            y0 = y1;
+            if (++band > 40) break;
+        }
+    }
+
+    private Color wallColor(int i, int lvBand, boolean topBand) {
+        if (layer != Layer.NORMAL) return new Color(0.18f, 0.19f, 0.20f, 1);
+        if (map.water[i]) return new Color(0.10f, 0.26f, 0.42f, 1);
+        float stripe = (Math.floorMod(lvBand * 7 + (int) (map.seed & 3), 3) == 0) ? 0.90f : (lvBand % 2 == 0 ? 1.0f : 0.95f);
+        float hl = Math.min(1, lvBand / (float) Math.max(8, map.preset.relief));
+        Color c;
+        if (map.preset.desert) c = new Color(0.78f + 0.06f * hl, 0.56f + 0.05f * hl, 0.36f + 0.04f * hl, 1);
+        else if (hl > 0.6f) c = new Color(0.50f, 0.47f, 0.43f, 1);
+        else c = new Color(0.50f + 0.06f * hl, 0.39f + 0.05f * hl, 0.27f + 0.06f * hl, 1);
+        c.mul(stripe, stripe, stripe, 1);
+        // en ust bant: cim saçagi hissi icin hafif yesile
+        if (topBand && !map.preset.desert && hl < 0.7f) c.lerp(0.36f, 0.48f, 0.22f, 1, 0.35f);
+        return c;
+    }
+
+    // ------------------------------------------------------------ zemin renkleri
+    private static float hash(int x, int y) {
+        int h = x * 73856093 ^ y * 19349663;
+        h = (h ^ (h >>> 13)) * 1274126177;
+        return ((h ^ (h >>> 16)) & 0xFFFF) / 65535f;
+    }
+
+    /** Innerscene "Kit grass" ana rengi; genis alanli gurultuyle kuru/canli lekeler. */
+    private static final Color GRASS = new Color(0.47f, 0.62f, 0.24f, 1);
+    private static final Color GRASS_DRY = new Color(0.60f, 0.63f, 0.30f, 1);
+    private static final Color GRASS_LUSH = new Color(0.32f, 0.54f, 0.20f, 1);
+    /** Innerscene su renkleri: sig (Kit glass) ve derin (Kit water, koyulastirilmis). */
+    private static final Color SHALLOW = new Color(0.22f, 0.53f, 0.62f, 1);
+    private static final Color DEEP = new Color(0.05f, 0.22f, 0.42f, 1);
+
+    private Color tileColor(int x, int y) {
+        int i = map.idx(x, y);
+        float n = hash(x, y);
+        if (layer != Layer.NORMAL) return overlayColor(i);
+        if (map.water[i]) {
+            if (map.river[i]) return new Color(0.17f, 0.45f + 0.03f * n, 0.60f, 1);
+            if (!map.isSea(i)) return new Color(0.12f, 0.38f + 0.03f * n, 0.54f, 1);
+            float d = MathUtils.clamp((waterDist[i] - 1) / 6f, 0, 1);
+            Color c = new Color(SHALLOW).lerp(DEEP, d);
+            return c.add(0.015f * n, 0.015f * n, 0.02f * n, 0);
+        }
+        int lv = map.level[i];
+        int relief = Math.max(8, map.preset.relief);
+        float rl = lv / (float) relief;
+        Color c;
+        boolean coast = nearWater(x, y);
+        float m = (float) macro.fbm(x * 0.045, y * 0.045, 3);
+        if (map.preset.desert) {
+            if (coast && lv <= 1) c = new Color(0.90f, 0.84f, 0.62f, 1);
+            else c = new Color(0.86f + 0.04f * n - rl * 0.08f, 0.70f + 0.04f * n - rl * 0.10f, 0.46f + 0.03f * n - rl * 0.08f, 1);
+            c.lerp(0.80f, 0.60f, 0.40f, 1, MathUtils.clamp((m - 0.5f) * 1.5f, 0, 0.4f));
+            if (nearRiver(x, y)) c.lerp(GRASS, 0.65f);
+        } else {
+            if (lv <= 1 && coast && !nearRiver(x, y)) c = new Color(0.88f, 0.82f, 0.60f, 1);
+            else if (rl < 0.55f) {
+                c = new Color(GRASS);
+                if (m > 0.5f) c.lerp(GRASS_DRY, MathUtils.clamp((m - 0.5f) * 3f, 0, 0.8f));
+                else c.lerp(GRASS_LUSH, MathUtils.clamp((0.5f - m) * 3f, 0, 0.8f));
+                c.mul(0.96f + 0.08f * n, 0.96f + 0.08f * n, 0.96f + 0.08f * n, 1).lerp(0.30f, 0.44f, 0.22f, 1, rl * 0.4f);
+            } else if (rl < 0.8f) c = new Color(0.33f + 0.04f * n, 0.45f + 0.04f * n, 0.24f, 1).lerp(0.48f, 0.46f, 0.40f, 1, (rl - 0.55f) * 2f);
+            else if (lv < 19 || rl < 0.95f) c = new Color(0.52f + 0.05f * n, 0.50f + 0.05f * n, 0.45f + 0.04f * n, 1);
+            else c = new Color(0.93f, 0.94f, 0.97f, 1);
+        }
+        float coal = map.coal[i], gas = map.gas[i];
+        // Yataklar normal gorunumde yalnizca hafif ipucu; ayrintisi Komur/Dogalgaz katmanlarinda.
+        if (coal > 0.05f) c.lerp(0.30f, 0.28f, 0.26f, 1, 0.22f * coal);
+        if (gas > 0.05f) c.lerp(0.78f, 0.62f, 0.30f, 1, 0.16f * gas);
+        return c;
+    }
+
+    private boolean nearWater(int x, int y) {
+        for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
+            if (map.inBounds(x + dx, y + dy) && map.water[map.idx(x + dx, y + dy)]) return true;
+        return false;
+    }
+
+    private boolean nearRiver(int x, int y) {
+        for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
+            if (map.inBounds(x + dx, y + dy) && map.river[map.idx(x + dx, y + dy)]) return true;
+        return false;
+    }
+
+    private Color overlayColor(int i) {
+        float val; float r, gg, b;
+        switch (layer) {
+            case WIND: val = (map.wind[i] - 0.4f) / 1.0f; r = 0.25f; gg = 0.85f; b = 0.95f; break;
+            case SUN: val = (map.sun[i] - 0.6f) / 0.5f; r = 1f; gg = 0.85f; b = 0.1f; break;
+            case COAL: val = map.coal[i]; r = 0.75f; gg = 0.5f; b = 0.3f; break;
+            case GAS: val = map.gas[i]; r = 1f; gg = 0.55f; b = 0.1f; break;
+            default: val = map.hydro[i]; r = 0.2f; gg = 0.6f; b = 1f; break;
+        }
+        val = Math.max(0, Math.min(1, val));
+        if (map.water[i] && layer != Layer.WATER) return new Color(0.16f, 0.18f, 0.24f, 1);
+        if (map.water[i]) return new Color(0.2f, 0.45f, 0.9f, 1);
+        return new Color(0.21f, 0.23f, 0.22f, 1).lerp(r, gg, b, 1, val);
+    }
+
+    // ------------------------------------------------------------ bitki ortusu (Kenney Nature Kit)
+    private static final float[] DENSITY = { 0.45f, 1.0f, 1.6f };
+
+    private void decorate(int x, int y, int i, float t) {
+        if (map.water[i] || occ[i] >= 0 || reserved[i]) return;
+        int relief = Math.max(8, map.preset.relief);
+        float rl = map.level[i] / (float) relief;
+        float mult = DENSITY[detail];
+        double f = forest.fbm(x * 0.09, y * 0.09, 3);
+        float n = hash(x * 3 + 1, y * 7 + 2), n2 = hash(x * 11 + 5, y * 3 + 9);
+        if (map.preset.desert) {
+            if (nearRiver(x, y) && n < 0.6f) palm(x + 0.3f + n * 0.4f, t, y + 0.5f);
+            else if (n2 < 0.07f * mult) rock(x, y, t, n, true);
+            return;
+        }
+        if (map.level[i] <= 1 && nearWater(x, y)) {           // kumsal: arada bir kaya
+            if (n2 < 0.05f * mult) rock(x, y, t, n, false);
+            return;
+        }
+        if (rl > 0.82f) {                                       // dag: kayalar
+            if (n2 < 0.22f * mult && map.level[i] < WorldMap.MAX_LEVEL - 1) rock(x, y, t, n, false);
+            return;
+        }
+        double density = (f - 0.48) * 4.0;
+        if (n < density) {                                      // orman
+            int count = 1 + (int) (hash(x, y * 5) * 2 * Math.min(1, density) * Math.min(1.4f, mult));
+            for (int k = 0; k < count; k++) {
+                float ox = 0.22f + hash(x * 11 + k, y) * 0.56f, oz = 0.22f + hash(x, y * 13 + k) * 0.56f;
+                float s = 0.85f + hash(x + k * 7, y + k * 3) * 0.35f;
+                float hn = hash(k + x, y - k);
+                if (rl > 0.5f && hn < 0.65f) conifer(x + ox, t, z(y, oz), s, hn);
+                else kenneyTree(x + ox, t, y + oz, s, hn);
+            }
+            if (n2 < 0.45f * mult) bush(x + 0.15f + n2 * 0.7f, t, y + 0.2f + n * 0.6f, n2);
+        } else {                                                // acik cayir: cim kumeleri, cali, tas
+            if (n2 < 0.32f * mult) grassTuft(x, y, t, n, n2);
+            if (n2 > 1 - 0.05f * mult) bush(x + 0.3f + n * 0.4f, t, y + 0.3f + n2 * 0.4f, n);
+            if (n > 1 - 0.025f * mult) rock(x, y, t, n2, false);
+        }
+    }
+
+    private static float z(int y, float oz) { return y + oz; }
+
+    private final Color tmpC = new Color();
+
+    /** Kenney renkleri pastel turkuaz; malzeme adina gore arazi paletine eslenir. */
+    private Color natureColor(String mat, float n, boolean desert) {
+        switch (mat) {
+            case "leafsGreen": {
+                if (n < 0.06f) return tmpC.set(0.74f, 0.52f, 0.18f, 1);           // seyrek sonbahar agaci
+                return tmpC.set(0.24f + 0.10f * n, 0.46f + 0.10f * n, 0.17f + 0.04f * n, 1);
+            }
+            case "woodBark": return tmpC.set(0.42f, 0.30f, 0.20f, 1);
+            case "grass": return tmpC.set(0.33f + 0.08f * n, 0.55f + 0.08f * n, 0.20f, 1);
+            case "dirt": return desert ? tmpC.set(0.78f, 0.58f, 0.40f, 1) : tmpC.set(0.52f, 0.44f, 0.34f, 1);
+            case "stone": return desert ? tmpC.set(0.82f, 0.66f, 0.48f, 1) : tmpC.set(0.62f, 0.62f, 0.60f, 1);
+            case "stoneDark": return tmpC.set(0.48f, 0.48f, 0.47f, 1);
+            default: return tmpC.set(0.6f, 0.6f, 0.6f, 1);
+        }
+    }
+
+    private void kenneyTree(float x, float y, float z, float s, float n) {
+        MeshTemplate t = MeshTemplate.get(NAT + (n < 0.5f ? "tree_oak.obj" : "tree_default.obj"));
+        float sc = 0.36f * s;
+        stamp(g, t, x, y, z, n * 360f, sc, sc * (0.9f + 0.2f * n), sc, mat -> natureColor(mat, n, false), 0.75f);
+    }
+
+    private void bush(float x, float y, float z, float n) {
+        MeshTemplate t = MeshTemplate.get(NAT + (n < 0.5f ? "plant_bush.obj" : "plant_bushLarge.obj"));
+        float sc = 0.55f + 0.25f * n;
+        stamp(g, t, x, y, z, n * 720f, sc, sc, sc, mat -> natureColor(mat, n * 0.8f + 0.1f, false), 0.8f);
+    }
+
+    private void grassTuft(int x, int y, float t, float n, float n2) {
+        String[] names = { "grass.obj", "grass_large.obj", "grass_leafs.obj", "grass_leafsLarge.obj" };
+        MeshTemplate tm = MeshTemplate.get(NAT + names[(int) (n * 4) % 4]);
+        float sc = 0.45f + 0.25f * n2;
+        stamp(g, tm, x + 0.2f + 0.6f * n2, t, y + 0.2f + 0.6f * n, n * 500f, sc, sc * 0.9f, sc, mat -> natureColor(mat, n2, false), 0.85f);
+    }
+
+    private void rock(int x, int y, float t, float n, boolean desert) {
+        boolean large = n > 0.55f;
+        MeshTemplate tm = MeshTemplate.get(NAT + (large ? "rock_largeA.obj" : "rock_smallA.obj"));
+        float sc = large ? 0.35f + 0.25f * n : 0.6f + 0.4f * n;
+        // Kenney kayalarinin ust kismi "grass" malzemeli; dagda/colde tas rengine boyanir.
+        stamp(g, tm, x + 0.5f, t, y + 0.5f, n * 360f, sc, sc * (0.8f + 0.4f * n), sc,
+            mat -> mat.equals("grass") ? natureColor(desert ? "stone" : (map.preset.relief > 0 && n > 0.3f ? "grass" : "stone"), n, desert)
+                                       : natureColor(desert ? "stone" : mat.equals("dirt") ? "stone" : mat, n, desert), 0.8f);
+    }
+
+    /**
+     * Sablonu donusturup biriktiriciye ekler. color: malzeme adi -> renk (null = o malzemeyi atla).
+     * baseShade: tabandaki koselerin karartma orani (zemine oturma hissi).
+     */
+    private void stamp(Accum a, MeshTemplate t, float x, float y, float z, float yawDeg, float sx, float sy, float sz,
+                       java.util.function.Function<String, Color> color, float baseShade) {
+        int tris = t.triangleCount();
+        a.reserve(tris * 3);
+        float cs = MathUtils.cosDeg(yawDeg), sn = MathUtils.sinDeg(yawDeg);
+        float h = Math.max(0.001f, t.maxY - t.minY);
+        float[] d = t.data;
+        Color[] matColor = new Color[t.materials.size()];
+        for (int m = 0; m < matColor.length; m++) {
+            Color c = color.apply(t.materials.get(m));
+            matColor[m] = c == null ? null : new Color(c);
+        }
+        for (int tri = 0; tri < tris; tri++) {
+            Color c = matColor[t.triMaterial[tri]];
+            if (c == null) continue;
+            int b = a.base();
+            for (int k = 0; k < 3; k++) {
+                int o = (tri * 3 + k) * 6;
+                float lx = d[o] * sx, ly = d[o + 1] * sy, lz = d[o + 2] * sz;
+                float wx = lx * cs + lz * sn, wz = -lx * sn + lz * cs;
+                float nx = d[o + 3] * cs + d[o + 5] * sn, nz = -d[o + 3] * sn + d[o + 5] * cs;
+                float shade = MathUtils.lerp(baseShade, 1f, MathUtils.clamp((d[o + 1] - t.minY) / h * 2.5f, 0, 1));
+                a.vert(x + wx, y + ly, z + wz, nx, d[o + 4], nz, c.r * shade, c.g * shade, c.b * shade);
+            }
+            a.idx.add(b); a.idx.add(b + 1); a.idx.add(b + 2);
+        }
+    }
+
+    // ------------------------------------------------------------ prosedurel (dag koknarlari, palmiye)
+    private void conifer(float x, float y, float z, float s, float n) {
+        Color trunk = new Color(0.36f, 0.26f, 0.16f, 1);
+        prism(x, y, z, 0.025f * s, 0.10f * s, 4, trunk);
+        Color c = new Color(0.12f + 0.04f * n, 0.32f + 0.06f * n, 0.18f, 1);
+        cone(x, y + 0.06f * s, z, 0.13f * s, 0.30f * s, 6, c);
+        cone(x, y + 0.18f * s, z, 0.10f * s, 0.22f * s, 6, c);
+    }
+
+    private void palm(float x, float y, float z) {
+        Color trunk = new Color(0.52f, 0.40f, 0.26f, 1), leaf = new Color(0.30f, 0.55f, 0.22f, 1);
+        prism(x, y, z, 0.02f, 0.28f, 4, trunk);
+        cone(x, y + 0.24f, z, 0.17f, 0.06f, 6, leaf);
+    }
+
+    private void prism(float x, float y, float z, float r, float h, int div, Color side) {
+        g.reserve(div * 4);
+        for (int k = 0; k < div; k++) {
+            float a0 = MathUtils.PI2 * k / div, a1 = MathUtils.PI2 * (k + 1) / div, am = (a0 + a1) / 2;
+            float x0 = x + MathUtils.cos(a0) * r, z0 = z + MathUtils.sin(a0) * r, x1 = x + MathUtils.cos(a1) * r, z1 = z + MathUtils.sin(a1) * r;
+            quad(g, x0, y, z0, x0, y + h, z0, x1, y + h, z1, x1, y, z1, MathUtils.cos(am), 0, MathUtils.sin(am), side, 0.8f, 1f, 1f, 0.8f);
+        }
+    }
+
+    private void cone(float x, float y, float z, float r, float h, int div, Color c) {
+        g.reserve(div * 3);
+        for (int k = 0; k < div; k++) {
+            float a0 = MathUtils.PI2 * k / div, a1 = MathUtils.PI2 * (k + 1) / div, am = (a0 + a1) / 2;
+            float x0 = x + MathUtils.cos(a0) * r, z0 = z + MathUtils.sin(a0) * r, x1 = x + MathUtils.cos(a1) * r, z1 = z + MathUtils.sin(a1) * r;
+            float ny = r / h, len = (float) Math.sqrt(1 + ny * ny);
+            tri(g, x0, y, z0, x1, y, z1, x, y + h, z, MathUtils.cos(am) / len, ny / len, MathUtils.sin(am) / len, c, 0.82f, 1.05f);
+        }
+    }
+
+    private static void tri(Accum a, float x0, float y0, float z0, float x1, float y1, float z1, float x2, float y2, float z2,
+                            float nx, float ny, float nz, Color c, float baseShade, float apexShade) {
+        int base = a.base();
+        a.vert(x0, y0, z0, nx, ny, nz, c.r * baseShade, c.g * baseShade, c.b * baseShade);
+        a.vert(x1, y1, z1, nx, ny, nz, c.r * baseShade, c.g * baseShade, c.b * baseShade);
+        a.vert(x2, y2, z2, nx, ny, nz, Math.min(1, c.r * apexShade), Math.min(1, c.g * apexShade), Math.min(1, c.b * apexShade));
+        float ax = x1 - x0, ay = y1 - y0, az = z1 - z0, bx = x2 - x0, by = y2 - y0, bz = z2 - z0;
+        float cxn = ay * bz - az * by, cyn = az * bx - ax * bz, czn = ax * by - ay * bx;
+        if (cxn * nx + cyn * ny + czn * nz >= 0) { a.idx.add(base); a.idx.add(base + 1); a.idx.add(base + 2); }
+        else { a.idx.add(base); a.idx.add(base + 2); a.idx.add(base + 1); }
+    }
+
+    private static void quad(Accum a, float x0, float y0, float z0, float x1, float y1, float z1,
+                             float x2, float y2, float z2, float x3, float y3, float z3,
+                             float nx, float ny, float nz, Color c, float s0, float s1, float s2, float s3) {
+        int base = a.base();
+        a.vert(x0, y0, z0, nx, ny, nz, c.r * s0, c.g * s0, c.b * s0);
+        a.vert(x1, y1, z1, nx, ny, nz, c.r * s1, c.g * s1, c.b * s1);
+        a.vert(x2, y2, z2, nx, ny, nz, c.r * s2, c.g * s2, c.b * s2);
+        a.vert(x3, y3, z3, nx, ny, nz, c.r * s3, c.g * s3, c.b * s3);
+        float ax = x1 - x0, ay = y1 - y0, az = z1 - z0, bx = x2 - x0, by = y2 - y0, bz = z2 - z0;
+        float cxn = ay * bz - az * by, cyn = az * bx - ax * bz, czn = ax * by - ay * bx;
+        boolean flip = (cxn * nx + cyn * ny + czn * nz) < 0;
+        // AO icin kosegeni daha karanlik kose ciftine gore sec (anizotropiyi azaltir)
+        boolean altDiag = s0 + s2 < s1 + s3;
+        int p = base, q = base + 1, r = base + 2, s = base + 3;
+        if (altDiag) { int t0 = p; p = q; q = r; r = s; s = t0; }
+        if (!flip) { a.idx.add(p); a.idx.add(q); a.idx.add(r); a.idx.add(p); a.idx.add(r); a.idx.add(s); }
+        else { a.idx.add(p); a.idx.add(r); a.idx.add(q); a.idx.add(p); a.idx.add(s); a.idx.add(r); }
+    }
+
+    /** Dogrulama: toplam kose sayisi (arazi + su + dalgacik). */
+    public int vertexCount() {
+        int n = 0;
+        for (Model[] arr : new Model[][] { ground, water, ripples }) for (Model m : arr) if (m != null)
+            for (com.badlogic.gdx.graphics.Mesh me : m.meshes) n += me.getNumVertices();
+        return n;
+    }
+
+    @Override public void dispose() {
+        for (Model[] arr : new Model[][] { ground, water, ripples }) for (Model m : arr) if (m != null) m.dispose();
+        instances.clear();
+    }
+}

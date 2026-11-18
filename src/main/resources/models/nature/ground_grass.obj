@@ -1,0 +1,14 @@
+# ground_grass.glb kaynagindan glb2obj.py ile uretildi
+mtllib ground_grass.mtl
+g ground_grass_grass
+usemtl grass
+v -0.50000 -0.05000 0.50000
+v -0.50000 -0.05000 -0.50000
+v 0.50000 -0.05000 0.50000
+v 0.50000 -0.05000 -0.50000
+vn 0.00000 1.00000 0.00000
+vn 0.00000 1.00000 0.00000
+vn 0.00000 1.00000 0.00000
+vn 0.00000 1.00000 0.00000
+f 3//3 2//2 1//1
+f 2//2 3//3 4//4

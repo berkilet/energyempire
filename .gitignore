@@ -1,0 +1,17 @@
+# Gradle / derleme
+.gradle/
+build/
+out/
+*.class
+
+# Dagitim paketleri (GitHub Releases'e ayri yuklenir)
+dist/
+
+# Oyunun calisirken yazdigi tasinabilir veri (kayit, ayar, kutuphaneler)
+veri/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
