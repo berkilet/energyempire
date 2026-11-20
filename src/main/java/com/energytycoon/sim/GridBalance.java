@@ -75,4 +75,34 @@ public final class GridBalance {
     public static final double CYG_MIN_PLANT_MW = 400;
     /** Rakip YZ erisim bedelini hat maliyetiyle kiyaslarken kullandigi ufuk (yil). */
     public static final double RIVAL_ACCESS_HORIZON_YEARS = 5;
+
+    // ---- Faz 5: hat insaati ve Ulusal Sebeke Isletmesi (UŞİ)
+    /** Kendi hattinda gecikme olasiligi ve gecikme payi (insaat suresinin orani). */
+    public static final double LINE_DELAY_CHANCE = 0.10, LINE_DELAY_MIN = 0.10, LINE_DELAY_MAX = 0.30;
+    public static final double OP_APPLICATION_FEE = 0.5e6;
+    /** Basvuruda pesin katki: hat maliyetinin orani. */
+    public static final double OP_CONTRIBUTION = 0.15;
+    /** Yillik baglanti bedeli: hat maliyetinin orani (aylik tahakkuk). */
+    public static final double OP_ANNUAL_CHARGE = 0.06;
+    public static final int OP_PLANNING_MONTHS = 6;
+    /** Ayni anda insaat slotu: OP_BASE_SLOTS + sehir sayisi / OP_CITIES_PER_SLOT. */
+    public static final int OP_BASE_SLOTS = 2, OP_CITIES_PER_SLOT = 4;
+    /** UŞİ insaati, kendi insaat suresinin bu kati. */
+    public static final double OP_BUILD_MULT = 1.5;
+    /** Planlama/kuyrukta aylik kayma olasiligi (+1 ay). */
+    public static final double OP_SLIP_CHANCE = 0.08;
+    /** Tahmin araligi: en erken + bu kadar ay. */
+    public static final int OP_ETA_SPREAD_MONTHS = 3;
+    /** Hizlandirma: hat maliyetinin orani; planlama en fazla bu kadar aya iner ve kuyruk basina gecer. */
+    public static final double OP_ACCELERATE = 0.35;
+    public static final int OP_ACCELERATE_PLANNING_MONTHS = 2;
+    /** Planlamada iptal: katkinin iade orani. */
+    public static final double OP_CANCEL_REFUND = 0.5;
+    /** Kendi aktif hattini UŞİ'ye devir bedeli: defter degerinin orani. */
+    public static final double OP_TRANSFER_BOOK = 0.6;
+    /** UŞİ kendi plani: yilda en fazla proje, sure araligi (ay), guclendirme esigi (gecen yil doluluk saat orani). */
+    public static final int OP_PLAN_MAX_PER_YEAR = 2, OP_PLAN_MIN_MONTHS = 18, OP_PLAN_MAX_MONTHS = 30;
+    public static final double OP_REINFORCE_SATURATION = 0.25;
+    /** Rakip YZ: yeni santrali kendi kumesine/TM'sine yerlestirmeyi deneme olasiligi. */
+    public static final double RIVAL_CLUSTER_CHANCE = 0.5;
 }

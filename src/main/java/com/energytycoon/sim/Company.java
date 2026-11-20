@@ -21,6 +21,8 @@ public final class Company {
     public double revenue, fuelCost, omCost, carbonCost, interest, fines, capexSpent;
     /** Trafo merkezi erisim bedeli: alinan / odenen (devam eden ay). */
     public double accessIncome, accessCost;
+    /** UŞİ yillik baglanti bedelinin bu aya dusen kismi. */
+    public double connectionCharge, lastConnectionCharge;
     // Gecen ay
     public double lastRevenue, lastFuel, lastOm, lastCarbon, lastInterest, lastFines, lastNet;
     public double lastAccessIncome, lastAccessCost;
@@ -47,7 +49,7 @@ public final class Company {
     }
 
     public double monthNetSoFar() {
-        return revenue - fuelCost - omCost - carbonCost - interest - fines + accessIncome - accessCost;
+        return revenue - fuelCost - omCost - carbonCost - interest - fines + accessIncome - accessCost - connectionCharge;
     }
 
     public double rateAdd;

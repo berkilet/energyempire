@@ -28,6 +28,7 @@ public class SaveData {
         public String tier, status;
         public long builtAtHour; public int buildHoursLeft, requesterId = -1, outageHoursLeft, saturatedHoursThisYear, saturatedHoursLastYear;
         public double annualCharge;
+        /** Faz 5 */ public long appliedAtHour; public double contribution; public boolean accelerated, operatorPlan; public int holdHours;
     }
 
     /** v3: kamu eski filosu (neutral sirket, legacy santral alanlari), rivalsStartWithFleet. v1/v2 okunabilir. */
@@ -38,6 +39,7 @@ public class SaveData {
      */
     public int version = 0;
     public boolean rivalsStartWithFleet;
+    public boolean operatorGrowth = true, legacyFleet = true;
     // v2
     public String preset, difficulty, scenario, companyName;
     public int size, cityCount, rivals;
@@ -68,7 +70,7 @@ public class SaveData {
         d.seed = s.seed; d.hour = s.hour; d.nextId = s.nextId; d.won = s.won;
         d.preset = s.settings.preset.name(); d.difficulty = s.settings.difficulty.name(); d.scenario = s.settings.scenarioId;
         d.companyName = s.settings.companyName; d.size = s.settings.size; d.cityCount = s.settings.cities; d.rivals = s.settings.rivals;
-        d.rivalsStartWithFleet = s.settings.rivalsStartWithFleet;
+        d.rivalsStartWithFleet = s.settings.rivalsStartWithFleet; d.operatorGrowth = s.settings.operatorGrowth; d.legacyFleet = s.settings.legacyFleet;
         d.coalMult = s.markets.coalMult; d.gasMult = s.markets.gasMult; d.uraniumMult = s.markets.uraniumMult;
         d.carbonGrowthMult = s.markets.carbonGrowthMult; d.lastServedRatio = s.lastServedRatio;
         for (Supplier sp : s.catalog.allSuppliers()) d.supplierIndex.put(sp.id, sp.priceIndex);
@@ -112,6 +114,7 @@ public class SaveData {
             ld.tier = l.tier.name(); ld.status = l.status.name(); ld.buildHoursLeft = l.buildHoursLeft; ld.builtAtHour = l.builtAtHour;
             ld.requesterId = l.requester == null ? -1 : s.companies.indexOf(l.requester); ld.annualCharge = l.annualCharge;
             ld.outageHoursLeft = l.outageHoursLeft; ld.saturatedHoursThisYear = l.saturatedHoursThisYear; ld.saturatedHoursLastYear = l.saturatedHoursLastYear;
+            ld.appliedAtHour = l.appliedAtHour; ld.contribution = l.contribution; ld.accelerated = l.accelerated; ld.operatorPlan = l.operatorPlan; ld.holdHours = l.holdHours;
             d.lines.add(ld);
         }
         d.monthlyPrice = s.history.monthlyPrice.stream().mapToDouble(Double::doubleValue).toArray();
@@ -131,6 +134,7 @@ public class SaveData {
         g.rivals = fileVersion >= 2 ? rivals : 2;
         // v1/v2 kayitlarinda rakipler bedava filoyla baslamisti; ayar bu oyunu tarif etsin.
         g.rivalsStartWithFleet = fileVersion >= 3 ? rivalsStartWithFleet : true;
+        g.operatorGrowth = operatorGrowth; g.legacyFleet = legacyFleet;
         GameState s = new GameState(g);
         s.hour = hour; s.nextId = nextId; s.won = won;
         s.markets.coalMult = coalMult; s.markets.gasMult = gasMult; s.markets.uraniumMult = uraniumMult;
@@ -194,6 +198,7 @@ public class SaveData {
             l.buildHoursLeft = ld.buildHoursLeft; l.builtAtHour = ld.builtAtHour; l.annualCharge = ld.annualCharge;
             l.requester = ld.requesterId < 0 ? null : s.companies.get(ld.requesterId);
             l.outageHoursLeft = ld.outageHoursLeft; l.saturatedHoursThisYear = ld.saturatedHoursThisYear; l.saturatedHoursLastYear = ld.saturatedHoursLastYear;
+            l.appliedAtHour = ld.appliedAtHour; l.contribution = ld.contribution; l.accelerated = ld.accelerated; l.operatorPlan = ld.operatorPlan; l.holdHours = ld.holdHours;
             l.lengthTiles = s.lineLength(a, b);
             s.lines.add(l); a.lines.add(l); b.lines.add(l);
         }

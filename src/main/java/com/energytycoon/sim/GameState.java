@@ -38,6 +38,10 @@ public final class GameState {
     public final List<Plant> plants = new ArrayList<>();
     public final List<PowerLine> lines = new ArrayList<>();
     public final List<Substation> substations = new ArrayList<>();
+    /** Ulusal Sebeke Isletmesi (sirket degil). */
+    public final GridOperator operator = new GridOperator(this);
+    /** Test/dogrulama: kendi hatlari insaat beklemeden aktif olur (kayda yazilmaz). */
+    public boolean instantLines;
     public final Map<Integer, GridNode> nodeById = new HashMap<>();
     /** tile -> node id (-1 yok). Sehir 3x3 kaplar. */
     public final int[] occ;
@@ -109,7 +113,7 @@ public final class GameState {
         s.placeCities();
         if (s.settings.rivalsStartWithFleet) s.seedRivals();
         s.scenario.setup.accept(s);
-        s.placeLegacyFleet(s.scenario.legacyCoverage);
+        if (s.settings.legacyFleet) s.placeLegacyFleet(s.scenario.legacyCoverage);
         s.updateValuations();
         s.notify("Hoş geldiniz! Senaryo: " + s.scenario.title);
         return s;
@@ -452,10 +456,32 @@ public final class GameState {
         double cost = lineCost(a, b, tier);
         if (owner.cash < cost) return null;
         owner.cash -= cost; owner.capexSpent += cost;
-        return createLine(owner, a, b, cost, tier);
+        PowerLine l = createLine(owner, a, b, cost, tier);
+        if (instantLines) return l;
+        // Kendi hatti: pesin odenir, insaat suresi (taban + kare basina); %10 olasilikla %10-30 gecikme.
+        l.status = LineStatus.BUILDING;
+        l.buildHoursLeft = tier.buildDays(l.lengthTiles) * 24;
+        if (!suppressDelays && rng.nextDouble() < GridBalance.LINE_DELAY_CHANCE) {
+            int extra = (int) Math.round(l.buildHoursLeft * (GridBalance.LINE_DELAY_MIN + rng.nextDouble() * (GridBalance.LINE_DELAY_MAX - GridBalance.LINE_DELAY_MIN)));
+            l.buildHoursLeft += extra;
+            if (owner.player) notify("Hat inşaatı " + Math.max(1, extra / 24) + " gün gecikecek (" + GridOperator.label(l) + ")");
+        }
+        l.builtAtHour = hour + l.buildHoursLeft;
+        return l;
     }
 
-    private PowerLine createLine(Company owner, GridNode a, GridNode b, double cost, LineTier tier) {
+    /** Insaati/planlamasi biten hatti devreye alir; iki ayri sehirli sebeke parcasi birlesirse duyurur. */
+    void activateLine(PowerLine l) {
+        Component ca = componentOf(l.a), cb = componentOf(l.b);
+        boolean merge = ca != null && cb != null && ca != cb && !ca.cities.isEmpty() && !cb.cities.isEmpty();
+        l.status = LineStatus.ACTIVE; l.buildHoursLeft = 0; l.builtAtHour = hour;
+        topoDirty = true;
+        boolean mine = (l.owner != null && l.owner.player) || (l.requester != null && l.requester.player);
+        if (mine || l.operatorPlan) notify("Hat devreye girdi: " + GridOperator.label(l));
+        if (merge) notify(ca.cities.get(0).name + " ve " + cb.cities.get(0).name + " piyasaları birleşti");
+    }
+
+    PowerLine createLine(Company owner, GridNode a, GridNode b, double cost, LineTier tier) {
         PowerLine l = new PowerLine();
         l.id = nextId++; l.a = a; l.b = b; l.owner = owner; l.buildCost = cost; l.lengthTiles = lineLength(a, b);
         l.tier = tier; l.status = LineStatus.ACTIVE; l.builtAtHour = hour;
@@ -876,11 +902,16 @@ public final class GameState {
             } else if (t.pendingUpgrade != 0 && --t.upgradeHoursLeft <= 0) finishSubstationUpgrade(t);
         }
         if (changed) topoDirty = true;
+        for (int i = 0; i < lines.size(); i++) {
+            PowerLine l = lines.get(i);
+            if (l.status == LineStatus.BUILDING && --l.buildHoursLeft <= 0) activateLine(l);
+        }
+        operator.hourly();
 
         dispatchHour();
 
         for (PowerLine l : lines) {
-            if (l.owner == null || l.status == LineStatus.PLANNED || l.status == LineStatus.QUEUED) continue;
+            if (l.owner == null || l.status != LineStatus.ACTIVE && l.status != LineStatus.UPGRADING) continue;
             double om = l.omPerHour();
             l.owner.cash -= om; l.owner.omCost += om;
         }
@@ -1031,6 +1062,7 @@ public final class GameState {
     // ------------------------------------------------------------ aylik
     private void monthly() {
         refreshComponentStats();
+        operator.monthly();
         if (month() == 0) for (PowerLine l : lines) { l.saturatedHoursLastYear = l.saturatedHoursThisYear; l.saturatedHoursThisYear = 0; }
         for (Supplier s : catalog.allSuppliers()) s.monthly(rng);
         lastServedRatio = monthDemandMWh > 0 ? monthServedMWh / monthDemandMWh : 1;
@@ -1046,6 +1078,7 @@ public final class GameState {
             c.lastRevenue = c.revenue; c.lastFuel = c.fuelCost; c.lastOm = c.omCost; c.lastCarbon = c.carbonCost;
             c.lastInterest = c.interest; c.lastFines = c.fines; c.lastNet = net;
             c.lastAccessIncome = c.accessIncome; c.lastAccessCost = c.accessCost; c.accessIncome = c.accessCost = 0;
+            c.lastConnectionCharge = c.connectionCharge; c.connectionCharge = 0;
             c.lastMwhGenerated = c.mwhGenerated; c.lastCo2 = c.co2Tons; c.lastRenewMwh = c.renewMwh;
             c.revenue = c.fuelCost = c.omCost = c.carbonCost = c.interest = c.fines = c.capexSpent = 0;
             c.mwhGenerated = 0; c.co2Tons = 0; c.renewMwh = 0;

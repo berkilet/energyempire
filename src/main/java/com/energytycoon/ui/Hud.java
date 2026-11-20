@@ -50,7 +50,7 @@ public final class Hud {
     private Tool curTool = Tool.SELECT;
     private LineTier curTier = LineTier.YG;
     /** Faz 4/5 ozellikleri acildiginda true yapilir. */
-    public boolean substationsEnabled = true, operatorEnabled;
+    public boolean substationsEnabled = true, operatorEnabled = true;
     private int curTmLevel;
     private static final Map<PlantType, String> PLANT_ICONS = new EnumMap<>(Map.of(
         PlantType.COAL, "icon_factory", PlantType.GAS, "icon_factory", PlantType.SOLAR, "icon_solar",
@@ -63,7 +63,11 @@ public final class Hud {
     private final Table actions = new Table();
     private String actionsKey = "";
     private final Label scenTitle, scenBody;
-    private final Window finance, market, companies, help, menu, gameOverWin;
+    private final Window finance, market, companies, help, menu, gameOverWin, lineChoice, opWin;
+    private final Table opBody = new Table();
+    private String opKey = "";
+    private final Label lcTitle, lcOwn, lcOp;
+    private final TextButton lcOwnBtn, lcOpBtn;
     private final EquipmentWindow equipWin;
     private final Label gameOverLbl;
     private final FinanceView financeView;
@@ -256,10 +260,35 @@ public final class Hud {
         gameOverWin.add(btn("Ana Menüye Dön", "main", "accent")).width(200).height(36).padBottom(12);
         gameOverWin.pack();
 
+        // ----- hat: kendin kur / UŞİ'ye basvur
+        lineChoice = window("Hat Bağlantısı");
+        lcTitle = l("", "default"); lcTitle.setWrap(true);
+        lineChoice.add(lcTitle).colspan(2).width(560).left().padBottom(8).row();
+        lcOwn = l("", "small"); lcOwn.setWrap(true);
+        lcOp = l("", "small"); lcOp.setWrap(true);
+        Table own = new Table(skin); own.setBackground("card"); own.pad(10);
+        own.add(l("KENDİN KUR", "title")).left().row();
+        own.add(lcOwn).width(250).left().padTop(4).padBottom(8).row();
+        lcOwnBtn = btn("Kendin kur", "lineOwn", "accent");
+        own.add(lcOwnBtn).width(250).height(34);
+        Table op = new Table(skin); op.setBackground("card"); op.pad(10);
+        op.add(l("UŞİ'YE BAŞVUR", "title")).left().row();
+        op.add(lcOp).width(250).left().padTop(4).padBottom(8).row();
+        lcOpBtn = btn("UŞİ'ye başvur", "lineOp", "default");
+        op.add(lcOpBtn).width(250).height(34);
+        lineChoice.add(own).top().padRight(8).growY();
+        lineChoice.add(op).top().growY().row();
+        lineChoice.add(btn("Vazgeç", "lineCancel", "default")).colspan(2).width(160).height(30).padTop(8);
+        lineChoice.pack();
+
+        // ----- UŞİ Basvurularim
+        opWin = window("UŞİ Başvurularım");
+        opWin.add(opBody).width(620).pad(4);
+
         equipWin = new EquipmentWindow(skin);
         skins.decorateWindow(equipWin, () -> equipWin.setVisible(false));
 
-        for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin }) {
+        for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, lineChoice, opWin }) {
             stage.addActor(w);
             w.setVisible(false);
         }
@@ -418,11 +447,13 @@ public final class Hud {
         if (finance.isVisible()) financeView.update(s);
         if (market.isVisible()) marketView.update(s);
         if (companies.isVisible()) companiesView.update(s);
+        if (opWin.isVisible()) updateOperatorWindow(s);
     }
 
     public void toggle(String name) {
         if (name.equals("settings")) { showSettings(); return; }
-        Window w = switch (name) { case "finance" -> finance; case "market" -> market; case "companies" -> companies; case "help" -> help; default -> menu; };
+        Window w = switch (name) { case "finance" -> finance; case "market" -> market; case "companies" -> companies; case "help" -> help; case "operator" -> opWin; default -> menu; };
+        if (w == opWin) opKey = "";
         boolean show = !w.isVisible();
         w.setVisible(show);
         if (show) {
@@ -432,13 +463,68 @@ public final class Hud {
         }
     }
 
+    /** Hat cekerken ikinci uca tiklaninca: iki secenek yan yana. */
+    public void showLineChoice(String title, String own, boolean ownOk, String op, boolean opOk) {
+        lcTitle.setText(title); lcOwn.setText(own); lcOp.setText(op);
+        lcOwnBtn.setDisabled(!ownOk); lcOpBtn.setDisabled(!opOk);
+        lineChoice.pack(); center(lineChoice);
+        lineChoice.setVisible(true); lineChoice.toFront();
+    }
+    public void hideLineChoice() { lineChoice.setVisible(false); }
+    public boolean lineChoiceOpen() { return lineChoice.isVisible(); }
+
+    private void updateOperatorWindow(GameState s) {
+        GridOperator op = s.operator;
+        StringBuilder key = new StringBuilder();
+        List<PowerLine> mine = new ArrayList<>(), plans = new ArrayList<>();
+        for (PowerLine l : s.lines) {
+            if (l.requester == s.player) mine.add(l);
+            else if (l.operatorPlan && l.status != LineStatus.ACTIVE) plans.add(l);
+        }
+        for (PowerLine l : mine) { int[] e = op.eta(l); key.append(l.id).append(l.status).append(e[0]).append(l.accelerated).append(s.player.cash >= op.accelerateCost(l)).append(';'); }
+        for (PowerLine l : plans) key.append(l.id).append(op.eta(l)[0]).append(';');
+        if (key.toString().equals(opKey)) return;
+        opKey = key.toString();
+        opBody.clear();
+        opBody.defaults().left();
+        opBody.add(l("Başvurular planlama (" + GridBalance.OP_PLANNING_MONTHS + " ay) → inşaat kuyruğu (aynı anda " + op.slots()
+            + " hat) → inşaat → aktif. Her ay %" + Math.round(GridBalance.OP_SLIP_CHANCE * 100) + " olasılıkla 1 ay kayabilir.", "dim")).width(610).row();
+        ((Label) opBody.getCells().peek().getActor()).setWrap(true);
+        opBody.add(UiKit.section(skin, "BAŞVURULARIM")).padTop(8).padBottom(4).row();
+        if (mine.isEmpty()) opBody.add(l("Henüz başvurunuz yok. Hat Çek aracında ikinci uca tıklayınca 'UŞİ'ye başvur' seçeneği çıkar.", "small")).row();
+        for (PowerLine l : mine) {
+            Table row = new Table(skin); row.setBackground("card"); row.pad(6, 10, 6, 10);
+            int[] e = op.eta(l);
+            String st = l.status == LineStatus.ACTIVE ? "Aktif" : l.status.label + " · tahmini " + e[0] + "–" + e[1] + " ay";
+            if (l.status == LineStatus.BUILDING) st = "İnşaatta · " + Math.max(1, l.buildHoursLeft / 24) + " gün";
+            Label info = l(GridOperator.label(l) + (l.accelerated ? "  (hızlandırıldı)" : "") + "\n" + st + " · yıllık bedel " + Fmt.money(l.annualCharge), "small");
+            row.add(info).width(370).left();
+            boolean pending = l.status == LineStatus.PLANNED || l.status == LineStatus.QUEUED;
+            TextButton acc = btn("Hızlandır " + Fmt.money(op.accelerateCost(l)), "opacc:" + l.id, "small");
+            acc.setDisabled(!pending || l.accelerated || s.player.cash < op.accelerateCost(l));
+            TextButton can = btn(l.status == LineStatus.PLANNED ? "İptal (+" + Fmt.money(l.contribution * GridBalance.OP_CANCEL_REFUND) + ")" : "İptal", "opcancel:" + l.id, "small");
+            can.setDisabled(!pending);
+            row.add(acc).width(120).height(30).padLeft(6);
+            row.add(can).width(100).height(30).padLeft(4);
+            opBody.add(row).width(610).padBottom(3).row();
+        }
+        opBody.add(UiKit.section(skin, "UŞİ PLANLARI")).padTop(10).padBottom(4).row();
+        if (plans.isEmpty()) opBody.add(l("Açıklanmış plan yok (her ocakta değerlendirilir).", "small")).row();
+        for (PowerLine l : plans) {
+            int[] e = op.eta(l);
+            opBody.add(l(GridOperator.label(l) + " · tahmini " + e[0] + "–" + e[1] + " ay · ücretsiz", "small")).row();
+        }
+        opWin.pack();
+    }
+
     public boolean anyWindowOpen() {
         return finance.isVisible() || market.isVisible() || companies.isVisible() || help.isVisible() || menu.isVisible() || equipWin.isVisible()
+            || lineChoice.isVisible() || opWin.isVisible()
             || (settingsWin != null && settingsWin.isVisible());
     }
     public void closeWindows() {
         finance.setVisible(false); market.setVisible(false); companies.setVisible(false); help.setVisible(false);
-        menu.setVisible(false); equipWin.setVisible(false);
+        menu.setVisible(false); equipWin.setVisible(false); lineChoice.setVisible(false); opWin.setVisible(false);
         if (settingsWin != null) settingsWin.setVisible(false);
     }
     public void hideHelp() { help.setVisible(false); }

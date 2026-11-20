@@ -17,6 +17,7 @@ class SubstationTest {
         GameSettings g = SimHarness.reference(1);
         g.rivals = rivals;
         GameState s = GameState.newGame(g);
+        s.instantLines = true; // Faz 5 hat insaat suresi bu testlerin konusu degil
         for (Plant p : new ArrayList<>(s.plants)) s.demolishPlant(p, false);
         for (PowerLine l : new ArrayList<>(s.lines)) s.removeLine(l, false);
         for (Company c : s.companies) c.cash = 50e9;

@@ -17,6 +17,7 @@ class GridTest {
         GameSettings g = SimHarness.reference(1);
         g.rivals = 0;
         GameState s = GameState.newGame(g);
+        s.instantLines = true; // Faz 5 hat insaat suresi bu testlerin konusu degil
         for (Plant p : new ArrayList<>(s.plants)) s.demolishPlant(p, false);
         for (PowerLine l : new ArrayList<>(s.lines)) s.removeLine(l, false);
         s.player.cash = 50e9;
@@ -24,7 +25,7 @@ class GridTest {
         return s;
     }
 
-    static int[] siteAt(GameState s, PlantType t, City c, double d) {
+    public static int[] siteAt(GameState s, PlantType t, City c, double d) {
         int[] best = null; double bestErr = 1e9;
         for (int x = 0; x < s.map.size; x++) for (int y = 0; y < s.map.size; y++) {
             double err = Math.abs(Math.hypot(x - c.x, y - c.y) - d);
@@ -128,20 +129,26 @@ class GridTest {
         assertTrue(s.lineCost(p, c, LineTier.YG) > s.lineCost(p, c, LineTier.OG));
     }
 
-    /** Faz 1 referansına göre aylık ortalamalar %3 içinde. */
+    /**
+     * Faz 1 referansına göre aylık ortalamalar %3 içinde. Tek tohumda piyasa rastgele yolu (yeni olaylar rng'den çeker)
+     * fiyatı ±%5 oynatabildiği için 5 tohumun toplamı karşılaştırılır (referans: Faz 1 kodu, tohum 1–5).
+     */
     @Test
     void compatibilityWithFaz1Reference() throws Exception {
-        List<String> ref = java.nio.file.Files.readAllLines(java.nio.file.Path.of(
-            getClass().getResource("/baseline/faz1_seed1_free_normal_64_5sehir_2rakip.csv").toURI()));
-        double rs = 0, rp = 0, rm = 0; int n = 0;
-        for (String line : ref.subList(1, ref.size())) {
-            String[] f = line.split(",");
-            rs += Double.parseDouble(f[3]); rp += Double.parseDouble(f[4]); rm += Double.parseDouble(f[7]); n++;
+        double rs = 0, rp = 0, rm = 0, ms = 0, mp = 0, mm = 0;
+        for (long seed = 1; seed <= 5; seed++) {
+            List<String> ref = java.nio.file.Files.readAllLines(java.nio.file.Path.of(
+                getClass().getResource("/baseline/faz1_seed" + seed + "_free_normal_64_5sehir_2rakip.csv").toURI()));
+            int n = 0;
+            for (String line : ref.subList(1, ref.size())) {
+                String[] f = line.split(",");
+                rs += Double.parseDouble(f[3]); rp += Double.parseDouble(f[4]); rm += Double.parseDouble(f[7]); n++;
+            }
+            for (SimHarness.Month x : SimHarness.runMonths(GameState.newGame(SimHarness.reference(seed)), n)) {
+                ms += x.servedRatio; mp += x.avgPrice; mm += x.totalMwh;
+            }
         }
-        List<SimHarness.Month> m = SimHarness.runMonths(GameState.newGame(SimHarness.reference(1)), n);
-        double ms = 0, mp = 0, mm = 0;
-        for (SimHarness.Month x : m) { ms += x.servedRatio; mp += x.avgPrice; mm += x.totalMwh; }
-        System.out.printf("uyum: karşılanan %+.2f%%, fiyat %+.2f%%, üretim %+.2f%%%n",
+        System.out.printf("uyum (5 tohum): karşılanan %+.2f%%, fiyat %+.2f%%, üretim %+.2f%%%n",
             (ms / rs - 1) * 100, (mp / rp - 1) * 100, (mm / rm - 1) * 100);
         assertEquals(1, ms / rs, 0.03);
         assertEquals(1, mp / rp, 0.03);

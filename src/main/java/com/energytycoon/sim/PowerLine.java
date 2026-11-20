@@ -17,6 +17,13 @@ public final class PowerLine {
     public int saturatedHoursThisYear, saturatedHoursLastYear;
     public double lengthTiles;
     public double buildCost;
+    /** UŞİ basvurusu: basvuru saati (kuyruk sirasi), odenen katki, hizlandirildi mi, kuyrukta bekletme (kayma). */
+    public long appliedAtHour;
+    public double contribution;
+    public boolean accelerated;
+    public int holdHours;
+    /** UŞİ'nin kendi plani (ucretsiz, kuyruga girmez). */
+    public boolean operatorPlan;
 
     public GridNode other(GridNode n) { return n == a ? b : a; }
     public boolean operator() { return owner == null; }

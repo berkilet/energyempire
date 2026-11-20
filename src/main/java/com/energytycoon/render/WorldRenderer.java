@@ -46,7 +46,7 @@ public final class WorldRenderer implements Disposable {
         ModelInstance body; int tier;
         final List<ModelInstance> hi = new ArrayList<>(), lo = new ArrayList<>(), parks = new ArrayList<>();
     }
-    private static final class LineVis { Model model; ModelInstance inst; float lastUtil = -1; int sig; }
+    private static final class LineVis { Model model; ModelInstance inst; float lastUtil = -1; int sig; LineStatus status; }
     private static final class Particle { final Vector3 p = new Vector3(); final Vector3 v = new Vector3(); float life, max, size; boolean steam; }
 
     public final GameState state;
@@ -229,6 +229,10 @@ public final class WorldRenderer implements Disposable {
             }
             for (PowerLine l : state.lines) if (!lineVis.containsKey(l.id)) lineVis.put(l.id, buildLineVis(l));
         }
+        for (PowerLine l : state.lines) {
+            LineVis lv = lineVis.get(l.id);
+            if (lv != null && lv.status != l.status) applyLineStatus(l, lv);
+        }
     }
 
     private PlantVis buildPlantVis(Plant p) {
@@ -374,7 +378,19 @@ public final class WorldRenderer implements Disposable {
         }
         lv.model = models.buildLine(pylons, a, b);
         lv.inst = new ModelInstance(lv.model);
+        applyLineStatus(l, lv);
         return lv;
+    }
+
+    /** Insaatta: yari saydam; planlama/kuyruk: model cizilmez, zeminde kesikli cizgi. */
+    private void applyLineStatus(PowerLine l, LineVis lv) {
+        lv.status = l.status;
+        float a = l.status == LineStatus.BUILDING ? 0.4f : 1f;
+        for (Material m : lv.inst.materials) {
+            if (a < 1f) m.set(new BlendingAttribute(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA, a));
+            else m.remove(BlendingAttribute.Type);
+        }
+        lv.lastUtil = -1;
     }
 
     /** Sehir cevresinde nufusa gore banliyo evleri; agaclari bu karelerden kaldirir. */
@@ -547,7 +563,14 @@ public final class WorldRenderer implements Disposable {
             for (ModelInstance mi : cv.parks) drawList.add(mi);
         }
         for (ModelInstance mi : suburbs) drawList.add(mi);
-        for (LineVis lv : lineVis.values()) drawList.add(lv.inst);
+        int dashIdx = 0;
+        for (PowerLine l : state.lines) {
+            LineVis lv = lineVis.get(l.id);
+            if (lv == null) continue;
+            if (l.status == LineStatus.PLANNED || l.status == LineStatus.QUEUED) dashIdx = dashes(dashIdx, l);
+            else if (l.status == LineStatus.BUILDING) overlays.add(lv.inst); // saydam: golge ve opak geciste yok
+            else drawList.add(lv.inst);
+        }
 
         renderGridExtras();
 
@@ -678,6 +701,28 @@ public final class WorldRenderer implements Disposable {
                 ti = tile(ti, x, y, col, dx == 0 && dy == 0 ? 0.45f : 0.18f, 1f);
             }
         }
+    }
+
+    private final List<ModelInstance> dashPool = new ArrayList<>();
+    private static final Color C_PLAN = new Color(0.55f, 0.8f, 1f, 1), C_QUEUE = new Color(1f, 0.8f, 0.35f, 1);
+
+    /** Planlanan/kuyruktaki hat: iki uc arasinda zeminde kesikli cizgi (UŞİ planlari mavi, basvurular sari). */
+    private int dashes(int idx, PowerLine l) {
+        float ax = l.a.x + 0.5f, az = l.a.y + 0.5f, bx = l.b.x + 0.5f, bz = l.b.y + 0.5f;
+        float len = (float) Math.hypot(bx - ax, bz - az);
+        int n = Math.max(2, (int) (len / 0.6f));
+        float yaw = MathUtils.atan2(bx - ax, bz - az) * MathUtils.radiansToDegrees;
+        Color c = l.operatorPlan ? C_PLAN : C_QUEUE;
+        for (int i = 0; i < n; i += 2) {
+            float t = (i + 0.5f) / n;
+            float x = MathUtils.lerp(ax, bx, t), z = MathUtils.lerp(az, bz, t);
+            while (dashPool.size() <= idx) dashPool.add(tinted(models.unitBox, 1, 1, 1, 0.85f));
+            ModelInstance mi = dashPool.get(idx++);
+            setTint(mi, c, 0.85f);
+            mi.transform.setToTranslation(x, topAt(x, z) + 0.03f, z).rotate(Vector3.Y, yaw).translate(-0.06f, 0, -len / n * 0.5f).scale(0.12f, 0.03f, len / n);
+            overlays.add(mi);
+        }
+        return idx;
     }
 
     private int tile(int idx, int x, int y, Color c, float alpha, float scale) {

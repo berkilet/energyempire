@@ -21,7 +21,7 @@ public final class FinanceView {
     private GameState st;
 
     private final Label kCash, kValue, kStock, kNet, kNetSub, kStockSub;
-    private final Label[][] pl = new Label[10][2];          // satir x (gecen ay, bu ay)
+    private final Label[][] pl = new Label[11][2];          // satir x (gecen ay, bu ay)
     private final Label genLast, genNow, avgLast, avgNow, dayNote;
     private final Label debt, limit, rate, monthlyInterest, creditNote;
     private final Label assets, cashB, debtB, equity;
@@ -29,8 +29,8 @@ public final class FinanceView {
     private final TextButton borrowBtn, repayBtn;
     public final LineChart chart;
 
-    private static final String[] PL_ROWS = { "Elektrik satışı", "Erişim geliri", "Yakıt", "İşletme ve bakım", "Karbon vergisi", "Faiz", "Kesinti cezası", "Erişim gideri", "", "Net kâr" };
-    private static final int NET = 9;
+    private static final String[] PL_ROWS = { "Elektrik satışı", "Erişim geliri", "Yakıt", "İşletme ve bakım", "Karbon vergisi", "Faiz", "Kesinti cezası", "Erişim gideri", "Bağlantı bedeli (UŞİ)", "", "Net kâr" };
+    private static final int NET = 10;
 
     public FinanceView(Skins skins, Runnable onBorrow, Runnable onRepay) {
         this.skin = skins.skin;
@@ -143,9 +143,9 @@ public final class FinanceView {
         double yearNet = p.trailingNet();
         kNetSub.setText(anyMonth ? "Son " + p.netHistory.size() + " ay: " + Fmt.money(yearNet) : "Henüz kapanmış ay yok");
 
-        // gelir tablosu: [gelir, erisim geliri, yakit, isletme, karbon, faiz, ceza, erisim gideri, -, net]
-        double[] last = { p.lastRevenue, p.lastAccessIncome, p.lastFuel, p.lastOm, p.lastCarbon, p.lastInterest, p.lastFines, p.lastAccessCost, 0, p.lastNet };
-        double[] now = { p.revenue, p.accessIncome, p.fuelCost, p.omCost, p.carbonCost, p.interest, p.fines, p.accessCost, 0, p.monthNetSoFar() };
+        // gelir tablosu: [gelir, erisim geliri, yakit, isletme, karbon, faiz, ceza, erisim gideri, UŞİ bedeli, -, net]
+        double[] last = { p.lastRevenue, p.lastAccessIncome, p.lastFuel, p.lastOm, p.lastCarbon, p.lastInterest, p.lastFines, p.lastAccessCost, p.lastConnectionCharge, 0, p.lastNet };
+        double[] now = { p.revenue, p.accessIncome, p.fuelCost, p.omCost, p.carbonCost, p.interest, p.fines, p.accessCost, p.connectionCharge, 0, p.monthNetSoFar() };
         for (int r = 0; r < PL_ROWS.length; r++) {
             if (pl[r][0] == null) continue;
             for (int c = 0; c < 2; c++) {

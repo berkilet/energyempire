@@ -180,7 +180,17 @@ public final class MenuScreen implements Screen {
         CheckBox fleet = new CheckBox("  Rakipler kurulu santrallerle başlasın", skin, "toggle");
         fleet.setChecked(settings.rivalsStartWithFleet);
         fleet.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { settings.rivalsStartWithFleet = fleet.isChecked(); dirty = true; } });
-        opts.add(fleet).colspan(3).left().padTop(2).padBottom(4).row();
+        opts.add(fleet).colspan(3).left().padTop(2).row();
+        opts.add();
+        CheckBox grow = new CheckBox("  Ulusal şebeke gelişimi (UŞİ planları)", skin, "toggle");
+        grow.setChecked(settings.operatorGrowth);
+        grow.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { settings.operatorGrowth = grow.isChecked(); } });
+        opts.add(grow).colspan(3).left().padTop(2).row();
+        opts.add();
+        CheckBox legacy = new CheckBox("  Kamu eski filosu", skin, "toggle");
+        legacy.setChecked(settings.legacyFleet);
+        legacy.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { settings.legacyFleet = legacy.isChecked(); dirty = true; } });
+        opts.add(legacy).colspan(3).left().padTop(2).padBottom(4).row();
         opts.add(new Label("Zorluk", skin, "dim")).width(70);
         Table diffs = new Table();
         ButtonGroup<TextButton> dg = new ButtonGroup<>();

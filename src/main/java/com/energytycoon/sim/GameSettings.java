@@ -17,6 +17,10 @@ public final class GameSettings {
     public String companyName = "Yeni Enerji A.Ş.";
     /** true: rakipler eski surumdeki gibi bedava, calisir durumda santrallerle baslar. */
     public boolean rivalsStartWithFleet = false;
+    /** UŞİ her ocak kendi hat planini yapar (ayri sebeke parcalarini baglar, dolu hatlari guclendirir). */
+    public boolean operatorGrowth = true;
+    /** Kamu eski filosu (tarafsiz, takvimle kapanan eski santraller). */
+    public boolean legacyFleet = true;
 
     public GameSettings() {}
 
@@ -24,7 +28,7 @@ public final class GameSettings {
         GameSettings g = new GameSettings();
         g.preset = preset; g.size = size; g.cities = cities; g.rivals = rivals; g.difficulty = difficulty;
         g.seed = seed; g.scenarioId = scenarioId; g.companyName = companyName;
-        g.rivalsStartWithFleet = rivalsStartWithFleet;
+        g.rivalsStartWithFleet = rivalsStartWithFleet; g.operatorGrowth = operatorGrowth; g.legacyFleet = legacyFleet;
         return g;
     }
 

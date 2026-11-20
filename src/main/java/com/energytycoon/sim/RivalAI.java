@@ -1,5 +1,7 @@
 package com.energytycoon.sim;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 /** Basit rakip sirket yapay zekasi. */
@@ -61,6 +63,11 @@ public final class RivalAI {
      */
     public static Plant buildNear(GameState s, Company c, Equipment e, City city, double reserve) {
         if (s.checkEquipment(e) != null) return null;
+        // %50: kendi kumesinin/TM'sinin yanina (bos ihracat kapasitesi varsa hat gerekmez)
+        if (s.rng.nextDouble() < GridBalance.RIVAL_CLUSTER_CHANCE) {
+            Plant p = buildInCluster(s, c, e, city, reserve);
+            if (p != null) return p;
+        }
         int[] site = findSite(s, e, city, 4, 16);
         if (site == null) return null;
         int bx = site[0], by = site[1];
@@ -92,12 +99,51 @@ public final class RivalAI {
             return p;
         }
 
-        if (c.cash < e.capex() + lineCost + reserve) return null;
+        // Kendi hatti mi UŞİ mi: hat + santral + yedek karsilanabiliyor ve santral UŞİ tahmininden once bitiyorsa kendi hatti;
+        // aksi halde (ucuz) UŞİ basvurusu. Oyuncuyla ayni kurallar ve ucretler.
+        double len = s.lineLength(probe, city);
+        int[] eta = s.operator.estimate(tier, len);
+        boolean ownAffordable = c.cash >= e.capex() + lineCost + reserve;
+        boolean plantFirst = e.buildDays() < eta[0] * 30;
+        if (ownAffordable && plantFirst) {
+            Plant p = s.buildPlant(c, e, bx, by);
+            if (p == null) return null;
+            if (s.buildLine(c, p, city, tier) == null) s.buildLine(c, p, city);
+            else if (nLines > 1) s.buildLine(c, p, city, tier);
+            return p;
+        }
+        double opPay = GridOperator.applicationCost(lineCost / nLines);
+        if (c.cash < e.capex() + opPay + reserve) return null;
         Plant p = s.buildPlant(c, e, bx, by);
         if (p == null) return null;
-        if (s.buildLine(c, p, city, tier) == null) s.buildLine(c, p, city);
-        else if (nLines > 1) s.buildLine(c, p, city, tier);
+        if (s.operator.apply(c, p, city, tier) == null) s.operator.apply(c, p, city, LineTier.YG);
         return p;
+    }
+
+    /** Kendi kumesinin yanina veya kendi TM yaricapina, ihracat kapasitesinde yer varsa hatsiz kurar. */
+    private static Plant buildInCluster(GameState s, Company c, Equipment e, City city, double reserve) {
+        if (c.cash < e.capex() + reserve) return null;
+        int[] normal = findSite(s, e, city, 4, 16);
+        double minScore = e.type.renewable && normal != null ? s.siteScore(e, normal[0], normal[1]) * 0.85 : 0;
+        int[] best = null; double bs = -1;
+        for (ConnectionPoint cp : s.connectionPoints()) {
+            Company owner = cp.tm != null ? cp.tm.owner : cp.members.isEmpty() ? null : cp.members.get(0).owner;
+            if (owner != c || cp.exportCapacityMW() - cp.installedMW() < e.capacityMW * 0.8) continue;
+            List<int[]> cand = new ArrayList<>();
+            if (cp.tm != null) {
+                int r = (int) Math.ceil(cp.tm.radius);
+                for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++) if (cp.tm.inRange(cp.tm.x + dx, cp.tm.y + dy)) cand.add(new int[] { cp.tm.x + dx, cp.tm.y + dy });
+            } else for (Plant m : cp.members) {
+                if (Math.hypot(m.x - city.x, m.y - city.y) > 18) continue;
+                for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) cand.add(new int[] { m.x + dx, m.y + dy });
+            }
+            for (int[] t : cand) {
+                if (s.checkPlacement(e.type, t[0], t[1]) != null) continue;
+                double sc = e.type.renewable ? s.siteScore(e, t[0], t[1]) : 1;
+                if (sc >= minScore && sc > bs) { bs = sc; best = t; }
+            }
+        }
+        return best == null ? null : s.buildPlant(c, e, best[0], best[1]);
     }
 
     /** TM yaricapinda uygun yer; yenilenebilirde saha puani normal sahanin %85'inden az olmamali. */

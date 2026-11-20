@@ -118,6 +118,31 @@ public final class GameScreen implements Screen, Hud.Listener {
         wr.iso.target.set(bx + 0.5f, 0, by + 0.5f);
     }
 
+    /** Dogrulama: oyuncu santralinden en yakin sehre hat secim penceresini acar. */
+    public void devLineChoice() {
+        hud.hideHelp();
+        for (Plant p : state.plants) if (p.owner.player) {
+            City best = null; double bd = 1e9;
+            for (City c : state.cities) { double d = Math.hypot(c.x - p.x, c.y - p.y); if (d < bd) { bd = d; best = c; } }
+            lineTier = LineTier.YG; tool(Tool.LINE, null);
+            lineFrom = p; click2(best);
+            return;
+        }
+    }
+    private void click2(GridNode n) { clickNode(n); }
+    /** Dogrulama: iki UŞİ basvurusu yapar ve listeyi acar. */
+    public void devOperatorApps() {
+        hud.hideHelp();
+        int k = 0;
+        for (Plant p : state.plants) if (p.owner.player && k < 2) {
+            City best = null; double bd = 1e9;
+            for (City c : state.cities) { double d = Math.hypot(c.x - p.x, c.y - p.y); if (d < bd) { bd = d; best = c; } }
+            if (state.operator.apply(state.player, p, best, LineTier.YG) != null) k++;
+        }
+        for (int h = 0; h < 24 * 50; h++) state.tick();
+        hud.toggle("operator");
+    }
+
     public void devSubstationTool(int level) { hud.hideHelp(); action("substation:" + level); }
     public String devUiState() {
         return "arac=" + tool + " kademe=" + lineTier.shortLabel + " yatirim=" + (hud.investOpen() ? "acik" : "kapali")
@@ -165,6 +190,15 @@ public final class GameScreen implements Screen, Hud.Listener {
             return;
         }
         if (a.startsWith("tmup:") || a.startsWith("tmfee:") || a.equals("tmaccess")) { substationAction(a); return; }
+        if (a.startsWith("opacc:") || a.startsWith("opcancel:")) {
+            int id = Integer.parseInt(a.substring(a.indexOf(':') + 1));
+            for (PowerLine l : state.lines) if (l.id == id && l.requester == state.player) {
+                if (a.startsWith("opacc:")) { String err = state.operator.accelerate(l); hud.toast(err != null ? err : GridOperator.label(l) + " hızlandırıldı"); }
+                else { double r = state.operator.cancel(l); if (r >= 0) hud.toast("Başvuru iptal edildi" + (r > 0 ? ", iade " + Fmt.money(r) : "")); }
+                break;
+            }
+            return;
+        }
         switch (a) {
             case "finance", "market", "companies", "help", "settings" -> hud.toggle(a);
             case "menu" -> hud.toggle("menu");
@@ -177,6 +211,16 @@ public final class GameScreen implements Screen, Hud.Listener {
             case "exit" -> Gdx.app.exit();
             case "demolish" -> deleteSelected();
             case "removeLine" -> deleteSelected();
+            case "operatorApps" -> hud.toggle("operator");
+            case "lineCancel" -> { hud.hideLineChoice(); pendingA = pendingB = null; }
+            case "lineOwn", "lineOp" -> confirmLine(a.equals("lineOp"));
+            case "optransfer" -> {
+                for (PowerLine l : state.lines) if (l.id == selLine && l.owner == state.player) {
+                    double v = state.operator.transfer(l);
+                    if (v >= 0) hud.toast("Hat UŞİ'ye devredildi: +" + Fmt.money(v) + " (artık bakım gideri yok)");
+                    break;
+                }
+            }
             default -> {}
         }
     }
@@ -185,6 +229,26 @@ public final class GameScreen implements Screen, Hud.Listener {
         if (!(state.nodeById(selNode) instanceof Plant p) || !p.owner.player) return;
         String err = state.startUpgrade(p, u);
         hud.toast(err != null ? err : u.label + " başladı (" + u.days + " gün" + (u.offline ? ", santral bu sürede kapalı" : "") + ")");
+    }
+
+    private GridNode pendingA, pendingB;
+    private LineTier pendingTier;
+
+    private void confirmLine(boolean operator) {
+        hud.hideLineChoice();
+        if (pendingA == null || pendingB == null) return;
+        GridNode a = pendingA, b = pendingB;
+        pendingA = pendingB = null;
+        if (operator) {
+            PowerLine l = state.operator.apply(state.player, a, b, pendingTier);
+            if (l == null) { hud.toast("Başvuru yapılamadı (nakit veya hat kuralı)."); return; }
+            int[] e = state.operator.eta(l);
+            hud.toast("UŞİ başvurusu alındı: " + GridOperator.label(l) + " · tahmini " + e[0] + "–" + e[1] + " ay");
+        } else {
+            PowerLine l = state.buildLine(state.player, a, b, pendingTier);
+            if (l == null) { hud.toast("Hat kurulamadı (nakit veya hat kuralı)."); return; }
+            hud.toast(GridOperator.label(l) + " inşaatı başladı (" + Math.max(1, l.buildHoursLeft / 24) + " gün, " + Fmt.money(l.buildCost) + ")");
+        }
     }
 
     private void substationAction(String a) {
@@ -301,19 +365,38 @@ public final class GameScreen implements Screen, Hud.Listener {
                     selNode = p.id;
                 }
             }
-            case LINE -> {
-                GridNode n = state.nodeAt(x, y);
+            case LINE -> clickNode(state.nodeAt(x, y));
+            case SUBSTATION -> clickSubstation(x, y);
+            case DEMOLISH -> clickDemolish(x, y);
+        }
+    }
+
+    private void clickNode(GridNode n) {
+            {
                 if (n == null) { hud.toast("Hat için bir santrale veya şehre tıklayın."); return; }
                 if (lineFrom == null) { lineFrom = n; return; }
                 String why = state.checkLine(state.player, lineFrom, n, lineTier);
                 if (why != null) { hud.toast(why); return; }
-                double cost = state.lineCost(lineFrom, n, lineTier);
-                if (state.player.cash < cost) { hud.toast("Yetersiz nakit (" + Fmt.money(cost) + " gerekli)."); return; }
-                state.buildLine(state.player, lineFrom, n, lineTier);
-                hud.toast(lineTier.shortLabel + " hat kuruldu: " + lineFrom.name() + " - " + n.name() + " (" + Fmt.money(cost) + ")");
+                // Iki secenek yan yana: kendin kur (hizli, pahali) / UŞİ'ye basvur (ucuz, yavas, belirsiz)
+                pendingA = lineFrom; pendingB = n; pendingTier = lineTier;
+                double cost = state.lineCost(lineFrom, n, lineTier), len = state.lineLength(lineFrom, n);
+                double apply = GridOperator.applicationCost(cost);
+                int[] eta = state.operator.estimate(lineTier, len);
+                int days = lineTier.buildDays(len);
+                hud.showLineChoice(lineTier.label + " hat: " + lineFrom.name() + " – " + n.name() + " · " + Fmt.f1(len) + " kare · "
+                        + Fmt.mw(lineTier.capacityMW) + " · kayıp %" + Fmt.f1(len * lineTier.lossPerTile * 100),
+                    "Kendin kur — " + Fmt.money(cost) + ", " + days + " gün\nHat sizin: bakım gideri sizde, defter değerine girer.\n%"
+                        + Math.round(GridBalance.LINE_DELAY_CHANCE * 100) + " olasılıkla birkaç hafta gecikebilir.",
+                    state.player.cash >= cost,
+                    "UŞİ'ye başvur — " + Fmt.money(GridBalance.OP_APPLICATION_FEE) + " + " + Fmt.money(GridOperator.contribution(cost)) + " katkı, yıllık "
+                        + Fmt.money(GridOperator.annualCharge(cost)) + "\nTahmini " + eta[0] + "–" + eta[1] + " ay (planlama, kuyruk, inşaat). Hat UŞİ'nin; herkese açık.",
+                    state.player.cash >= apply);
                 lineFrom = null;
             }
-            case SUBSTATION -> {
+    }
+
+    private void clickSubstation(int x, int y) {
+            {
                 String why = state.checkSubstation(x, y);
                 if (why != null) { hud.toast(why); return; }
                 double cost = state.substationCost(tmLevel);
@@ -324,7 +407,10 @@ public final class GameScreen implements Screen, Hud.Listener {
                     selNode = sub.id;
                 }
             }
-            case DEMOLISH -> {
+    }
+
+    private void clickDemolish(int x, int y) {
+            {
                 GridNode n = state.nodeAt(x, y);
                 if (n instanceof Substation sub) {
                     if (!sub.owner.player) { hud.toast("Başkasının trafo merkezini yıkamazsınız."); return; }
@@ -341,7 +427,6 @@ public final class GameScreen implements Screen, Hud.Listener {
                     else if (l != null) hud.toast("Bu hat size ait değil.");
                 }
             }
-        }
     }
 
     // ------------------------------------------------------------- dongu
@@ -378,7 +463,8 @@ public final class GameScreen implements Screen, Hud.Listener {
                     double len = state.lineLength(lineFrom, n);
                     wr.lineValid = why == null && state.player.cash >= cost;
                     hud.setPlaceInfo(lineTier.shortLabel + " hat: " + Fmt.f1(len) + " kare  ·  " + Fmt.money(cost) + "  ·  " + Fmt.mw(lineTier.capacityMW)
-                        + "  ·  " + lineTier.buildDays(len) + " gün  ·  kayıp %" + Fmt.f1(len * lineTier.lossPerTile * 100) + (why != null ? "   ✗ " + why : ""));
+                        + "  ·  " + lineTier.buildDays(len) + " gün  ·  kayıp %" + Fmt.f1(len * lineTier.lossPerTile * 100)
+                        + "  ·  UŞİ: " + Fmt.money(GridOperator.applicationCost(cost)) + ", " + state.operator.estimate(lineTier, len)[0] + "+ ay" + (why != null ? "   ✗ " + why : ""));
                 } else {
                     wr.lineValid = n != null;
                     hud.setPlaceInfo(lineTier.label + " · " + (lineFrom == null ? "Hat başlangıcı için bir santrale/şehre tıklayın" : "Hat bitişi için bir santrale/şehre tıklayın") + " · Tab: kademe");
@@ -459,7 +545,7 @@ public final class GameScreen implements Screen, Hud.Listener {
         }
         if (selLine >= 0) for (PowerLine l : state.lines) if (l.id == selLine) {
             return "İletim hattı · " + l.tier.label + "\n" + l.a.name() + " ↔ " + l.b.name() + "\nSahibi: " + l.ownerName()
-                + "\nDurum: " + l.status.label
+                + "\nDurum: " + lineStatusText(l)
                 + "\nUzunluk: " + Fmt.f1(l.lengthTiles) + " kare\nKapasite: " + Fmt.mw(l.capacityMW()) + "\nYük: " + Fmt.pct(l.utilization())
                 + "\nKayıp: %" + Fmt.f1(l.lossFraction() * 100) + "  ·  doluluk (geçen yıl) " + l.saturatedHoursLastYear + " saat";
         }
@@ -484,11 +570,45 @@ public final class GameScreen implements Screen, Hud.Listener {
         return sb.toString();
     }
 
+    private String lineStatusText(PowerLine l) {
+        return switch (l.status) {
+            case BUILDING -> {
+                double total = l.owner == null ? GridOperator.buildHours(l.tier, l.lengthTiles) : l.tier.buildDays(l.lengthTiles) * 24.0;
+                yield "İnşaatta · %" + Math.round(100 * Math.max(0, Math.min(1, 1 - l.buildHoursLeft / total))) + " · " + Math.max(1, l.buildHoursLeft / 24) + " gün kaldı";
+            }
+            case PLANNED, QUEUED -> { int[] e = state.operator.eta(l); yield l.status.label + (l.operatorPlan ? " (UŞİ planı)" : "") + " · tahmini " + e[0] + "–" + e[1] + " ay"; }
+            default -> l.status.label;
+        } + (l.requester != null ? "\nBaşvuran: " + l.requester.name + " · yıllık bedel " + Fmt.money(l.annualCharge) : "");
+    }
+
+    /** Santralin bekleyen (insaat/UŞİ) baglanti hatti; yoksa null. */
+    private String pendingConnection(Plant p) {
+        state.components();
+        List<GridNode> nodes = new ArrayList<>();
+        if (p.cp != null) { nodes.addAll(p.cp.members); if (p.cp.tm != null) nodes.add(p.cp.tm); } else nodes.add(p);
+        String best = null; int bestDays = Integer.MAX_VALUE;
+        for (GridNode n : nodes) for (PowerLine l : n.lines) {
+            if (l.status == LineStatus.ACTIVE) continue;
+            if (l.status == LineStatus.BUILDING) {
+                int d = Math.max(1, l.buildHoursLeft / 24);
+                if (d < bestDays) { bestDays = d; best = "Bağlantı hattı inşaatta (" + d + " gün)"; }
+            } else if (l.status == LineStatus.PLANNED || l.status == LineStatus.QUEUED) {
+                int[] e = state.operator.eta(l);
+                if (e[0] * 30 < bestDays) { bestDays = e[0] * 30; best = "UŞİ " + (l.status == LineStatus.QUEUED ? "kuyruğunda" : "planlamasında") + " (tahmini " + e[0] + "–" + e[1] + " ay)"; }
+            }
+        }
+        return best;
+    }
+
     private String whyIdle(Plant p) {
         if (!p.operational()) return "İnşaat sürüyor (" + p.buildHoursLeft / 24 + " gün)";
         if (p.outageHoursLeft > 0) return "Arıza (" + Math.max(1, p.outageHoursLeft / 24) + " gün)";
         if (p.upgrading() && !p.online()) return "Yükseltme (" + p.upgradeHoursLeft / 24 + " gün)";
         if (p.outputMW > 0.05) return null;
+        if (p.idleReason != null && (p.idleReason.startsWith("Şehre bağlı değil") || p.idleReason.startsWith("Bağlantı hattı yok"))) {
+            String pc = pendingConnection(p);
+            if (pc != null) return pc;
+        }
         return p.idleReason;
     }
 
@@ -543,7 +663,16 @@ public final class GameScreen implements Screen, Hud.Listener {
             a.add(new String[] { "Erişim bedeli +$1/MWh", "tmfee:1", t.accessFeePerMWh < GridBalance.ACCESS_FEE_MAX ? "1" : "0" });
             a.add(new String[] { "Yık (iade %" + (int) (Balance.DEMOLISH_REFUND * 100) + ", bağlı hatlar kalkar)", "demolish", "1" });
         } else if (selLine >= 0) {
-            for (PowerLine l : state.lines) if (l.id == selLine && l.owner != null && l.owner.player) a.add(new String[] { "Hattı kaldır", "removeLine", "1" });
+            for (PowerLine l : state.lines) if (l.id == selLine) {
+                if (l.owner != null && l.owner.player) {
+                    if (l.status == LineStatus.ACTIVE) a.add(new String[] { "UŞİ'ye devret (+" + Fmt.money(state.operator.transferValue(l)) + ", bakım gideri biter)", "optransfer", "1" });
+                    a.add(new String[] { "Hattı kaldır", "removeLine", "1" });
+                }
+                if (l.requester == state.player && (l.status == LineStatus.PLANNED || l.status == LineStatus.QUEUED)) {
+                    a.add(new String[] { "Hızlandır — " + Fmt.money(state.operator.accelerateCost(l)), "opacc:" + l.id, !l.accelerated && state.player.cash >= state.operator.accelerateCost(l) ? "1" : "0" });
+                    a.add(new String[] { "Başvuruyu iptal et", "opcancel:" + l.id, "1" });
+                }
+            }
         }
         return a;
     }
