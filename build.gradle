@@ -34,6 +34,7 @@ application {
 
 test {
     useJUnitPlatform()
+    jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
     testLogging { events 'passed', 'failed'; showStandardStreams = true }
 }
 
@@ -47,4 +48,14 @@ tasks.register('fatJar', Jar) {
     from sourceSets.main.output
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/INDEX.LIST', 'module-info.class'
+}
+
+// Headless simulasyon kontrolu: ./gradlew simCheck --args="--months 24 --seed 1"
+tasks.register('simCheck', JavaExec) {
+    group = 'verification'
+    description = 'Oyunu render olmadan koşturur ve aylık ölçümleri yazar.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.energytycoon.harness.SimCheck'
+    workingDir = projectDir
+    jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
 }
