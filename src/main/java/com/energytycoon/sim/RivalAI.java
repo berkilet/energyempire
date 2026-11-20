@@ -68,11 +68,50 @@ public final class RivalAI {
         // Kademe: santral gucunu tasiyan en ucuz kademe (oyuncuyla ayni kurallar).
         LineTier tier = GameState.tierFor(e.capacityMW, s.lineLength(probe, city));
         double lineCost = s.map.inBounds(bx, by) ? s.lineCost(probe, city, tier) : 0;
+        int nLines = e.capacityMW > tier.capacityMW ? 2 : 1;
+        lineCost *= nLines;
+
+        // Erisime acik (veya kendi) trafo merkezi: bos kapasitesi varsa ve erisim bedeli hattan ucuzsa oraya baglan.
+        double cfGuess = e.type.renewable ? 0.3 : 0.6;
+        Substation bestTm = null; int[] tmSite = null; double bestCost = lineCost;
+        for (Substation t : s.substations) {
+            if (!t.operational() || t.cp == null || (t.owner != c && !t.openAccess)) continue;
+            if (Math.hypot(t.x - city.x, t.y - city.y) > 18) continue;
+            double headroom = t.cp.exportCapacityMW() - t.cp.installedMW();
+            if (headroom < e.capacityMW * 0.8) continue;
+            double access = t.owner == c ? 0 : e.capacityMW * cfGuess * Balance.HOURS_PER_YEAR * GridBalance.RIVAL_ACCESS_HORIZON_YEARS * t.accessFeePerMWh;
+            if (access >= bestCost) continue;
+            int[] st = siteInRadius(s, e, t, site);
+            if (st == null) continue;
+            bestTm = t; tmSite = st; bestCost = access;
+        }
+        if (bestTm != null) {
+            if (c.cash < e.capex() + reserve) return null;
+            Plant p = s.buildPlant(c, e, tmSite[0], tmSite[1]);
+            if (p != null && bestTm.owner != c) s.setPreferredSubstation(p, bestTm.id);
+            return p;
+        }
+
         if (c.cash < e.capex() + lineCost + reserve) return null;
         Plant p = s.buildPlant(c, e, bx, by);
         if (p == null) return null;
         if (s.buildLine(c, p, city, tier) == null) s.buildLine(c, p, city);
+        else if (nLines > 1) s.buildLine(c, p, city, tier);
         return p;
+    }
+
+    /** TM yaricapinda uygun yer; yenilenebilirde saha puani normal sahanin %85'inden az olmamali. */
+    private static int[] siteInRadius(GameState s, Equipment e, Substation t, int[] normal) {
+        double minScore = e.type.renewable ? s.siteScore(e, normal[0], normal[1]) * 0.85 : 0;
+        int r = (int) Math.ceil(t.radius);
+        int[] best = null; double bs = -1;
+        for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++) {
+            int x = t.x + dx, y = t.y + dy;
+            if (!t.inRange(x, y) || s.checkPlacement(e.type, x, y) != null) continue;
+            double sc = e.type.renewable ? s.siteScore(e, x, y) : 1 - Math.hypot(dx, dy) * 0.01;
+            if (sc >= minScore && sc > bs) { bs = sc; best = new int[] { x, y }; }
+        }
+        return best;
     }
 
     /** Hat maliyeti hesabi icin gecici konum dugumu. */

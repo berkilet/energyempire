@@ -37,6 +37,7 @@ public final class GameState {
     public final List<City> cities = new ArrayList<>();
     public final List<Plant> plants = new ArrayList<>();
     public final List<PowerLine> lines = new ArrayList<>();
+    public final List<Substation> substations = new ArrayList<>();
     public final Map<Integer, GridNode> nodeById = new HashMap<>();
     /** tile -> node id (-1 yok). Sehir 3x3 kaplar. */
     public final int[] occ;
@@ -202,6 +203,7 @@ public final class GameState {
         Company lineOwner = owner.neutral ? null : owner;
         LineTier tier = owner.neutral ? LineTier.YG : tierFor(p.capacityMW(), lineLength(p, city));
         if (checkLine(p, city, tier) == null) createLine(lineOwner, p, city, lineCost(p, city, tier), tier);
+        if (!owner.neutral && p.capacityMW() > tier.capacityMW && checkLine(p, city, tier) == null) createLine(lineOwner, p, city, lineCost(p, city, tier), tier);
         return p;
     }
 
@@ -282,6 +284,7 @@ public final class GameState {
         double v = 0;
         for (Plant p : plants) if (p.owner == c) v += p.bookValue(hour);
         for (PowerLine l : lines) if (l.owner == c && l.status != LineStatus.PLANNED && l.status != LineStatus.QUEUED) v += l.bookValue(hour);
+        for (Substation t : substations) if (t.owner == c) v += t.bookValue(hour);
         return v;
     }
 
@@ -380,8 +383,12 @@ public final class GameState {
 
     /** Santral gucunu tasiyabilen en ucuz kademe (uzunluk sinirina uyan). */
     public static LineTier tierFor(double mw, double length) {
-        for (LineTier t : LineTier.values()) if (t.capacityMW >= mw && length <= t.maxLength) return t;
-        return length <= LineTier.YG.maxLength && mw <= LineTier.YG.capacityMW ? LineTier.YG : LineTier.CYG;
+        // ÇYG yalnizca CYG_MIN_PLANT_MW ustu santrale; arada kalan santral YG ile (gerekirse ikinci hatla) baglanir.
+        for (LineTier t : LineTier.values()) {
+            if (t == LineTier.CYG && mw < GridBalance.CYG_MIN_PLANT_MW) continue;
+            if (t.capacityMW >= mw && length <= t.maxLength) return t;
+        }
+        return mw >= GridBalance.CYG_MIN_PLANT_MW && length <= LineTier.CYG.maxLength ? LineTier.CYG : LineTier.YG;
     }
 
     public double lineCost(GridNode a, GridNode b, LineTier tier) {
@@ -407,13 +414,41 @@ public final class GameState {
         int dup = 0;
         for (PowerLine l : a.lines) if (l.other(a) == b) dup++;
         if (dup >= 3) return "Bu iki nokta arası en fazla 3 hat";
+        if (tier == LineTier.CYG && (!cygEndpoint(a) || !cygEndpoint(b)))
+            return "ÇYG yalnızca TM380, şehir veya " + (int) GridBalance.CYG_MIN_PLANT_MW + " MW üstü tekil santrale bağlanır";
         return null;
+    }
+
+    /** Sahip bilgisiyle: rakip trafo merkezine yalnizca erisime aciksa hat cekilebilir. */
+    public String checkLine(Company owner, GridNode a, GridNode b, LineTier tier) {
+        String why = checkLine(a, b, tier);
+        if (why != null) return why;
+        for (GridNode n : new GridNode[] { a, b })
+            if (n instanceof Substation t && t.owner != owner && !t.openAccess) return t.name() + " üçüncü taraf erişimine kapalı";
+        return null;
+    }
+
+    private boolean cygEndpoint(GridNode n) {
+        if (n instanceof City) return true;
+        if (n instanceof Substation t) return t.level >= 2;
+        if (n instanceof Plant p) return p.capacityMW() >= GridBalance.CYG_MIN_PLANT_MW && !inBara(p);
+        return false;
+    }
+
+    /** Ayni sirketin bitisik (Chebyshev <= BARA_DISTANCE) baska bir santrali var mi. */
+    public boolean inBara(Plant p) {
+        int r = GridBalance.BARA_DISTANCE;
+        for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++) {
+            if (dx == 0 && dy == 0) continue;
+            if (nodeAt(p.x + dx, p.y + dy) instanceof Plant o && o.owner == p.owner) return true;
+        }
+        return false;
     }
 
     public PowerLine buildLine(Company owner, GridNode a, GridNode b) { return buildLine(owner, a, b, LineTier.YG); }
 
     public PowerLine buildLine(Company owner, GridNode a, GridNode b, LineTier tier) {
-        if (checkLine(a, b, tier) != null) return null;
+        if (checkLine(owner, a, b, tier) != null) return null;
         double cost = lineCost(a, b, tier);
         if (owner.cash < cost) return null;
         owner.cash -= cost; owner.capexSpent += cost;
@@ -446,6 +481,85 @@ public final class GameState {
         topoDirty = true;
     }
 
+    // ------------------------------------------------------------ trafo merkezi
+    public double substationCost(int level) { return level >= 2 ? GridBalance.TM380_COST : GridBalance.TM154_COST; }
+    public int substationDays(int level) { return level >= 2 ? GridBalance.TM380_DAYS : GridBalance.TM154_DAYS; }
+
+    public String checkSubstation(int x, int y) {
+        if (!map.inBounds(x, y)) return "Harita dışı";
+        if (map.isWater(x, y)) return "Suya kurulamaz";
+        if (occ[map.idx(x, y)] >= 0) return "Alan dolu";
+        return null;
+    }
+
+    public Substation buildSubstation(Company owner, int level, int x, int y) {
+        if (checkSubstation(x, y) != null) return null;
+        double cost = substationCost(level);
+        if (owner.cash < cost) return null;
+        owner.cash -= cost; owner.capexSpent += cost;
+        Substation t = new Substation();
+        t.id = nextId++; t.x = x; t.y = y; t.owner = owner; t.level = level;
+        t.transformerMW = level >= 2 ? GridBalance.TM380_MW : GridBalance.TM154_MW;
+        t.buildHoursLeft = substationDays(level) * 24; t.buildCost = cost; t.builtAtHour = hour + t.buildHoursLeft;
+        substations.add(t); nodeById.put(t.id, t); occ[map.idx(x, y)] = t.id;
+        topoDirty = true;
+        return t;
+    }
+
+    /** kind 1 = +600 MW trafo, 2 = TM154 -> TM380. Null: basladi; aksi halde sebep. TM calismaya devam eder. */
+    public String upgradeSubstation(Substation t, int kind) {
+        if (!t.operational()) return "Trafo merkezi henüz inşa halinde";
+        if (t.pendingUpgrade != 0) return "Devam eden bir yükseltme var";
+        if (kind == 2 && t.level >= 2) return "Zaten TM380";
+        double cost = kind == 1 ? GridBalance.TM_PLUS_COST : GridBalance.TM380_UPGRADE_COST;
+        if (t.owner.cash < cost) return "Yetersiz nakit (" + Math.round(cost / 1e6) + "M $ gerekli)";
+        t.owner.cash -= cost; t.owner.capexSpent += cost; t.buildCost += cost;
+        t.pendingUpgrade = kind;
+        t.upgradeHoursLeft = (kind == 1 ? GridBalance.TM_PLUS_DAYS : GridBalance.TM380_UPGRADE_DAYS) * 24;
+        return null;
+    }
+
+    private void finishSubstationUpgrade(Substation t) {
+        if (t.pendingUpgrade == 1) t.transformerMW += GridBalance.TM_PLUS_MW;
+        else { t.level = 2; t.transformerMW = Math.max(t.transformerMW, GridBalance.TM380_MW); }
+        if (t.owner.player) notify(t.name() + ": yükseltme tamamlandı (" + Math.round(t.transformerMW) + " MW)");
+        t.pendingUpgrade = 0; t.upgradeHoursLeft = 0;
+        topoDirty = true;
+    }
+
+    public void demolishSubstation(Substation t, boolean refund) {
+        if (!substations.remove(t)) return;
+        for (PowerLine l : new ArrayList<>(t.lines)) removeLine(l, refund);
+        for (Plant p : plants) if (p.preferredTm == t.id) p.preferredTm = 0;
+        if (refund) t.owner.cash += t.bookValue(hour) * Balance.DEMOLISH_REFUND;
+        nodeById.remove(t.id); occ[map.idx(t.x, t.y)] = -1;
+        topoDirty = true;
+    }
+
+    /** Santralin baglanabilecegi trafo merkezleri: yaricap icinde, calisan; kendi TM'si ya da erisime acik. */
+    public List<Substation> substationsFor(Plant p) {
+        List<Substation> r = new ArrayList<>();
+        for (Substation t : substations)
+            if (t.operational() && t.inRange(p.x, p.y) && (t.owner == p.owner || t.openAccess)) r.add(t);
+        return r;
+    }
+
+    /** Santrali bir TM'ye aktarir (0: otomatik). */
+    public void setPreferredSubstation(Plant p, int tmId) { p.preferredTm = tmId; topoDirty = true; }
+
+    /** Santralin bu topolojide uyesi olacagi TM (yoksa null -> bara/tek). */
+    private Substation substationOf(Plant p) {
+        if (p.preferredTm != 0 && nodeById.get(p.preferredTm) instanceof Substation t
+            && t.operational() && t.inRange(p.x, p.y) && (t.owner == p.owner || t.openAccess)) return t;
+        Substation best = null; double bd = Double.MAX_VALUE;
+        for (Substation t : substations) {
+            if (t.owner != p.owner || !t.operational() || !t.inRange(p.x, p.y)) continue;
+            double d = Math.hypot(t.x - p.x, t.y - p.y);
+            if (d < bd) { bd = d; best = t; }
+        }
+        return best;
+    }
+
     public boolean borrow(Company c) {
         double limit = creditLimit(c);
         if (c.debt + Balance.LOAN_STEP > limit) return false;
@@ -472,8 +586,9 @@ public final class GameState {
     private void rebuildComponents() {
         components.clear();
         buildConnectionPoints();
-        List<GridNode> nodes = new ArrayList<>(cities.size() + plants.size());
+        List<GridNode> nodes = new ArrayList<>(cities.size() + plants.size() + substations.size());
         nodes.addAll(cities); nodes.addAll(plants);
+        for (Substation t : substations) if (t.operational()) nodes.add(t);
         Map<GridNode, Component> comp = new HashMap<>();
         for (GridNode start : nodes) {
             if (comp.containsKey(start)) continue;
@@ -483,12 +598,16 @@ public final class GameState {
             while (!q.isEmpty()) {
                 GridNode n = q.poll();
                 if (n instanceof City ct) c.cities.add(ct); else if (n instanceof Plant pl) c.plants.add(pl);
+                else if (n instanceof Substation t && t.cp != null && !c.points.contains(t.cp)) c.points.add(t.cp);
                 // Yalnizca ACTIVE ve arizada olmayan hatlar sebekeyi olusturur.
                 for (PowerLine l : n.lines) {
-                    if (!l.usable()) continue;
+                    if (!passable(l)) continue;
                     GridNode o = l.other(n);
                     if (!comp.containsKey(o)) { comp.put(o, c); q.add(o); }
                 }
+                // Ayni baglanti noktasinin uyeleri (bara/TM) kayipsiz bagli sayilir.
+                ConnectionPoint cp = cpOf(n);
+                if (cp != null) for (GridNode o : cpNodes(cp)) if (!comp.containsKey(o)) { comp.put(o, c); q.add(o); }
             }
             for (Plant p : c.plants) if (p.cp != null && !c.points.contains(p.cp)) c.points.add(p.cp);
             components.add(c);
@@ -498,21 +617,74 @@ public final class GameState {
         refreshComponentStats();
     }
 
-    /** Faz 2: her santral kendi baglanti noktasidir. (Kume/TM gelince burada birlestirilir.) */
+    /** Hat sebekede guc tasiyabilir mi (aktif, arizasiz, uclari calisir durumda). */
+    private static boolean passable(PowerLine l) {
+        if (!l.usable()) return false;
+        if (l.a instanceof Substation t && !t.operational()) return false;
+        if (l.b instanceof Substation t && !t.operational()) return false;
+        return true;
+    }
+
+    private static ConnectionPoint cpOf(GridNode n) {
+        return n instanceof Plant p ? p.cp : n instanceof Substation t ? t.cp : null;
+    }
+
+    private static List<GridNode> cpNodes(ConnectionPoint cp) {
+        List<GridNode> r = new ArrayList<>(cp.members.size() + 1);
+        r.addAll(cp.members);
+        if (cp.tm != null) r.add(cp.tm);
+        return r;
+    }
+
+    /**
+     * Baglanti noktalari: once calisan trafo merkezleri (yaricaptaki kendi santralleri + aktarilanlar),
+     * kalan santraller ayni sirketin bitisik santralleriyle "bara" kumesi (union-find), yalniz kalan tek basina.
+     * Bir santral yalnizca bir noktaya uyedir; insaattaki santral uye olur ama uretmez.
+     */
     private void buildConnectionPoints() {
         points.clear();
-        for (Plant p : plants) {
+        for (Substation t : substations) {
+            t.cp = null;
+            if (!t.operational()) continue;
             ConnectionPoint cp = new ConnectionPoint();
-            cp.members.add(p);
-            p.cp = cp;
+            cp.tm = t; cp.transformerMW = t.transformerMW;
+            t.cp = cp;
             points.add(cp);
+        }
+        List<Plant> free = new ArrayList<>();
+        for (Plant p : plants) {
+            p.cp = null;
+            Substation t = substationOf(p);
+            if (t != null) { t.cp.members.add(p); p.cp = t.cp; } else free.add(p);
+        }
+        // bara: union-find (komsuluk occ ile bulunur)
+        Map<Plant, Plant> parent = new HashMap<>();
+        for (Plant p : free) parent.put(p, p);
+        int r = GridBalance.BARA_DISTANCE;
+        for (Plant p : free) for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++) {
+            if ((dx == 0 && dy == 0) || !(nodeAt(p.x + dx, p.y + dy) instanceof Plant o)) continue;
+            if (o.owner != p.owner || !parent.containsKey(o)) continue;
+            Plant ra = find(parent, p), rb = find(parent, o);
+            if (ra != rb) { if (ra.id < rb.id) parent.put(rb, ra); else parent.put(ra, rb); }
+        }
+        Map<Plant, ConnectionPoint> byRoot = new HashMap<>();
+        for (Plant p : free) {
+            ConnectionPoint cp = byRoot.computeIfAbsent(find(parent, p), k -> { ConnectionPoint n = new ConnectionPoint(); points.add(n); return n; });
+            cp.members.add(p); p.cp = cp;
         }
         for (ConnectionPoint cp : points) collectExportLines(cp);
     }
 
+    private static Plant find(Map<Plant, Plant> parent, Plant p) {
+        Plant q = p;
+        while (parent.get(q) != q) q = parent.get(q);
+        while (parent.get(p) != q) { Plant n = parent.get(p); parent.put(p, q); p = n; }
+        return q;
+    }
+
     static void collectExportLines(ConnectionPoint cp) {
         cp.exportLines.clear();
-        for (Plant m : cp.members)
+        for (GridNode m : cpNodes(cp))
             for (PowerLine l : m.lines)
                 if (!cp.contains(l.other(m)) && !cp.exportLines.contains(l)) cp.exportLines.add(l);
     }
@@ -533,15 +705,18 @@ public final class GameState {
             double d = (Double) top[1];
             if (d > dist.getOrDefault(n, Double.MAX_VALUE)) continue;
             for (PowerLine l : n.lines) {
-                if (!l.usable()) continue;
+                if (!passable(l)) continue;
                 GridNode o = l.other(n);
                 double nd = d + l.lossFraction();
                 if (nd < dist.getOrDefault(o, Double.MAX_VALUE)) { dist.put(o, nd); pq.add(new Object[] { o, nd }); }
             }
+            ConnectionPoint cp = cpOf(n);
+            if (cp != null) for (GridNode o : cpNodes(cp))
+                if (d < dist.getOrDefault(o, Double.MAX_VALUE)) { dist.put(o, d); pq.add(new Object[] { o, d }); }
         }
         for (ConnectionPoint cp : points) {
             double best = Double.MAX_VALUE;
-            for (Plant m : cp.members) best = Math.min(best, dist.getOrDefault(m, Double.MAX_VALUE));
+            for (GridNode m : cpNodes(cp)) best = Math.min(best, dist.getOrDefault(m, Double.MAX_VALUE));
             cp.lossFraction = Math.min(GridBalance.MAX_PATH_LOSS, best);
         }
     }
@@ -565,7 +740,7 @@ public final class GameState {
 
     public Component componentOf(GridNode n) {
         for (Component c : components()) {
-            if (n instanceof City ct ? c.cities.contains(ct) : c.plants.contains(n)) return c;
+            if (n instanceof City ct ? c.cities.contains(ct) : n instanceof Substation t ? t.cp != null && c.points.contains(t.cp) : c.plants.contains(n)) return c;
         }
         return null;
     }
@@ -692,6 +867,14 @@ public final class GameState {
                 }
             }
         }
+        for (Substation t : substations) {
+            if (t.buildHoursLeft > 0) {
+                if (--t.buildHoursLeft == 0) {
+                    changed = true; t.builtAtHour = hour;
+                    if (t.owner.player) notify(t.name() + " devreye girdi (" + Math.round(t.transformerMW) + " MW trafo)");
+                }
+            } else if (t.pendingUpgrade != 0 && --t.upgradeHoursLeft <= 0) finishSubstationUpgrade(t);
+        }
         if (changed) topoDirty = true;
 
         dispatchHour();
@@ -718,7 +901,7 @@ public final class GameState {
         double weekend = (day % 7 >= 5) ? 0.93 : 1.0;
         double dmult = HOUR_CURVE[hod] * season * weekend * markets.demandNoise;
         for (City c : cities) { c.demandMW = c.peakMW() * dmult; c.servedMW = 0; c.flowMW = 0; }
-        for (Plant p : plants) { p.outputMW = 0; p.flowMW = 0; p.availableMW = 0; }
+        for (Plant p : plants) { p.outputMW = 0; p.flowMW = 0; p.availableMW = 0; p.curtailedMW = 0; p.idleReason = null; }
 
         double totDemand = 0, totServed = 0, priceWeighted = 0, priceDemand = 0, playerMW = 0, rivalMW = 0, renew = 0, co2 = 0;
         double fineMult = settings.difficulty.fineMult;
@@ -737,10 +920,12 @@ public final class GameState {
                 // Hat siniri artik santral bazinda degil, baglanti noktasinin kalan ihracat kapasitesiyle uygulanir.
                 double avail = p.capacityMW() * capacityFactorNow(p);
                 p.availableMW = avail;
-                if (avail > 0.01) cand.add(p);
+                if (avail > 0.01) cand.add(p); else p.idleReason = "Kaynak yok (rüzgar/güneş/su yetersiz)";
             }
             for (ConnectionPoint cp : comp.points) { cp.remainingMW = cp.exportCapacityMW(); cp.exportedMWThisHour = 0; }
             if (cand.isEmpty() || demand <= 0) {
+                String why = comp.cities.isEmpty() ? "Şehre bağlı değil (hat yok)" : "Talep yok";
+                for (Plant p : cand) p.idleReason = why;
                 comp.price = demand > 0 ? Balance.SCARCITY_PRICE : Math.max(Balance.MIN_PRICE, comp.price * 0.98);
                 if (demand > 0) fineOwners(comp, demand * fineMult);
                 continue;
@@ -760,14 +945,17 @@ public final class GameState {
                 if (remaining <= 1e-6) break;
                 ConnectionPoint cp = p.cp;
                 double keep = 1 - cp.lossFraction;
-                double out = Math.min(p.availableMW, Math.min(remaining / keep, cp.remainingMW));
-                if (out <= 1e-9) continue;
+                double want = Math.min(p.availableMW, remaining / keep);
+                double out = Math.min(want, cp.remainingMW);
+                if (want - out > 1e-6) p.curtailedMW = want - out;
+                if (out <= 1e-9) { p.idleReason = cp.exportCapacityMW() <= 0 ? "Bağlantı hattı yok" : "Bağlantı dolu"; continue; }
                 p.outputMW = out;
                 cp.remainingMW -= out;
                 cp.exportedMWThisHour += out;
                 remaining -= out * keep;
                 price = Math.max(Balance.MIN_PRICE, mc.get(p));
             }
+            for (Plant p : cand) if (p.outputMW <= 0 && p.idleReason == null) p.idleReason = "Liyakat sırası dışında (talep daha ucuz santrallerle karşılandı)";
             double delivered = demand - Math.max(0, remaining);
             double ratio = demand > 0 ? Math.min(1, delivered / demand) : 1;
             boolean shortage = remaining > 1e-3;
@@ -798,6 +986,13 @@ public final class GameState {
                 o.mwhGenerated += out; o.co2Tons += out * pco2;
                 if (p.type.renewable) { o.renewMwh += out; renew += out; }
                 p.monthProfit += rev - fuelC - var - carb;
+                // Ucuncu taraf TM: teslim edilen MWh basina erisim bedeli TM sahibine.
+                Substation tm = p.cp.tm;
+                if (tm != null && tm.owner != o && tm.accessFeePerMWh > 0) {
+                    double fee = out * (1 - p.cp.lossFraction) * tm.accessFeePerMWh;
+                    o.cash -= fee; o.accessCost += fee; p.monthProfit -= fee;
+                    tm.owner.cash += fee; tm.owner.accessIncome += fee; tm.accessIncomeMonth += fee;
+                }
                 p.lifetimeMWh += out;
                 co2 += out * pco2;
                 if (o.player) playerMW += out; else rivalMW += out;
@@ -850,6 +1045,7 @@ public final class GameState {
             double net = c.monthNetSoFar();
             c.lastRevenue = c.revenue; c.lastFuel = c.fuelCost; c.lastOm = c.omCost; c.lastCarbon = c.carbonCost;
             c.lastInterest = c.interest; c.lastFines = c.fines; c.lastNet = net;
+            c.lastAccessIncome = c.accessIncome; c.lastAccessCost = c.accessCost; c.accessIncome = c.accessCost = 0;
             c.lastMwhGenerated = c.mwhGenerated; c.lastCo2 = c.co2Tons; c.lastRenewMwh = c.renewMwh;
             c.revenue = c.fuelCost = c.omCost = c.carbonCost = c.interest = c.fines = c.capexSpent = 0;
             c.mwhGenerated = 0; c.co2Tons = 0; c.renewMwh = 0;
@@ -857,6 +1053,7 @@ public final class GameState {
             while (c.netHistory.size() > 12) c.netHistory.pollFirst();
         }
         for (Plant p : plants) { p.lastMonthProfit = p.monthProfit; p.monthProfit = 0; }
+        for (Substation t : substations) { t.lastAccessIncome = t.accessIncomeMonth; t.accessIncomeMonth = 0; }
 
         for (City c : cities) {
             double g = c.satisfaction > 0.97 ? 0.0035 : c.satisfaction > 0.85 ? 0.0008 : c.satisfaction > 0.6 ? -0.002 : -0.006;

@@ -147,4 +147,35 @@ class GridTest {
         assertEquals(1, mp / rp, 0.03);
         assertEquals(1, mm / rm, 0.03);
     }
+
+    /** Performans hedefi: 96×96, 12 şehir, ~200 santral, ~300 hat; ortalama tick < 2 ms. */
+    @Test
+    void performanceTarget() {
+        GameSettings g = SimHarness.reference(3);
+        g.size = 96; g.cities = 12;
+        GameState s = GameState.newGame(g);
+        String[] ids = { "at-cc", "nw-45", "hx-topcon", "fk-sc", "at-oc" };
+        int k = 0;
+        while (s.plants.size() < 200 && k < 2000) {
+            City c = s.cities.get(k % s.cities.size());
+            s.placeLegacy(s.companies.get(k % 3), s.catalog.get(ids[k % ids.length]), c, 1, 3, 14);
+            k++;
+        }
+        // ek hatlar: komsu santralden sehre ikinci hat
+        for (Plant p : new java.util.ArrayList<>(s.plants)) {
+            if (s.lines.size() >= 300) break;
+            if (p.lines.isEmpty() || !(p.lines.get(0).other(p) instanceof City c)) continue;
+            if (p.owner.neutral) continue;
+            p.owner.cash = Math.max(p.owner.cash, 1e9);
+            s.buildLine(p.owner, p, c, LineTier.YG);
+        }
+        for (int h = 0; h < 200; h++) s.tick(); // isinma
+        int hours = 24 * 60;
+        long t0 = System.nanoTime();
+        for (int h = 0; h < hours; h++) s.tick();
+        double ms = (System.nanoTime() - t0) / 1e6 / hours;
+        System.out.printf("performans: %d santral, %d hat, %d TM → ortalama tick %.3f ms%n", s.plants.size(), s.lines.size(), s.substations.size(), ms);
+        assertTrue(s.plants.size() >= 180);
+        assertTrue(ms < 2.0, "ortalama tick " + ms + " ms");
+    }
 }

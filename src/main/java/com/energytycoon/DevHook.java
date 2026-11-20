@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * Gelistirici dogrulama kancasi; yalnizca ET_SHOT ortam degiskeni varsa calisir (normal oyunda etkisiz).
  * ET_SHOT=png yolu, ET_SCENARIO=menu|setup|game, ET_PRESET=MapPreset, ET_SIM=senaryo id, ET_HOUR=saat,
- * ET_OPEN=equip:TYPE|market|select|invest|invest2|line|closed, ET_ZOOM=px/birim, ET_FOCUS=plant|overview, ET_SHADOW=0..2, ET_FRAMES=n
+ * ET_OPEN=equip:TYPE|market|select|invest|invest2|line|closed|tm|tmfinance, ET_ZOOM=px/birim, ET_FOCUS=plant|overview, ET_SHADOW=0..2, ET_FRAMES=n
  */
 final class DevHook {
     private final EnergyGame game;
@@ -50,6 +50,8 @@ final class DevHook {
             else if (open.equals("invest2")) gs.devShowInvest("Bağlantı Yatırımları");
             else if (open.equals("line")) gs.devLineTool(LineTier.valueOf(get("ET_TIER", "YG")));
             else if (open.equals("closed")) gs.devHideHelp();
+            else if (open.equals("tm")) gs.devBuildSubstation();
+            else if (open.equals("tmfinance")) { gs.devBuildSubstation(); gs.devToggle("finance"); }
             else if (open.equals("select")) {
                 for (Plant p : gameState().plants) if (p.owner.player && p.type == PlantType.SOLAR) { gs.devSelect(p.id); break; }
             }

@@ -25,6 +25,11 @@ public final class Plant extends GridNode {
     public int retireYear, retireMonth;
     /** Haritada gosterilen ozel ad (ör. "Bozova Termik"); null ise tur adi. */
     public String customName;
+    /** Kullanicinin sectigi trafo merkezi (0 = otomatik: en yakin kendi TM'si, yoksa bara). */
+    public int preferredTm;
+    /** Son saatte baglanti dolulugu yuzunden uretemedigi MW ve uretmeme nedeni (gosterim). */
+    public transient double curtailedMW;
+    public transient String idleReason;
 
     /** Santralin bagli oldugu nokta (topoloji kurulunca atanir). */
     public transient ConnectionPoint cp;

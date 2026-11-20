@@ -21,7 +21,7 @@ import java.util.Map;
 
 /** Scene2D arayuz: ust cubuk, sol alt arac cubugu + yatirim menusu, bilgi paneli, senaryo paneli, pencereler, bildirimler. */
 public final class Hud {
-    public enum Tool { SELECT, PLANT, LINE, DEMOLISH }
+    public enum Tool { SELECT, PLANT, LINE, DEMOLISH, SUBSTATION }
 
     public interface Listener {
         void tool(Tool t, Equipment e);
@@ -50,7 +50,8 @@ public final class Hud {
     private Tool curTool = Tool.SELECT;
     private LineTier curTier = LineTier.YG;
     /** Faz 4/5 ozellikleri acildiginda true yapilir. */
-    public boolean substationsEnabled, operatorEnabled;
+    public boolean substationsEnabled = true, operatorEnabled;
+    private int curTmLevel;
     private static final Map<PlantType, String> PLANT_ICONS = new EnumMap<>(Map.of(
         PlantType.COAL, "icon_factory", PlantType.GAS, "icon_factory", PlantType.SOLAR, "icon_solar",
         PlantType.WIND, "icon_wind", PlantType.HYDRO, "icon_hydro", PlantType.NUCLEAR, "icon_bolt"));
@@ -166,8 +167,8 @@ public final class Hud {
             () -> { cb.action("line:" + t.name()); if (!invest.pinned()) hideInvest(); }));
         // Faz 4/5'te gorunur olacak kalemler: veri tabanli; gorunur satiri olmayan grup/kategori cizilmez.
         InvestMenu.Group tmGroup = new InvestMenu.Group("Trafo Merkezi")
-            .add(new InvestMenu.Item("icon_factory", "TM154", () -> "", () -> substationsEnabled, () -> true, () -> false, () -> cb.action("substation:1")))
-            .add(new InvestMenu.Item("icon_factory", "TM380", () -> "", () -> substationsEnabled, () -> true, () -> false, () -> cb.action("substation:2")));
+            .add(tmItem(1, "TM154  (yarıçap " + (int) GridBalance.TM_RADIUS + ")", Fmt.mw(GridBalance.TM154_MW) + " trafo · " + Fmt.money(GridBalance.TM154_COST) + " · " + GridBalance.TM154_DAYS + " gün"))
+            .add(tmItem(2, "TM380  (ÇYG bağlanabilir)", Fmt.mw(GridBalance.TM380_MW) + " trafo · " + Fmt.money(GridBalance.TM380_COST) + " · " + GridBalance.TM380_DAYS + " gün"));
         InvestMenu.Group opGroup = new InvestMenu.Group(null)
             .add(new InvestMenu.Item("icon_city", "UŞİ Başvurularım", () -> "", () -> operatorEnabled, () -> true, () -> false, () -> cb.action("operatorApps")));
         invest.add(plantsCat).add(new InvestMenu.Category("Bağlantı Yatırımları", false).add(lineGroup).add(tmGroup).add(opGroup));
@@ -273,6 +274,8 @@ public final class Hud {
       + "2) Modeli seçtikten sonra haritaya tıklayın. Yeşil kutu = uygun yer. Alttaki çubuk o sahada beklenen performansı gösterir.\n"
       + "3) Yatırım → Bağlantı Yatırımları → Hat Çek (OG/YG/ÇYG) seçip önce santrale, sonra şehre tıklayın. Tab kademeyi değiştirir. "
       + "Hattın kapasitesi santralin satabileceği gücü sınırlar; uzun hatta kayıp artar. Hatsız santral elektrik satamaz.\n"
+      + "Bitişik kendi santralleriniz tek bağlantı noktasıdır (küme): tek hattı paylaşırlar. Trafo merkezi (Yatırım → Bağlantı) "
+      + "yarıçapındaki santrallerinizi toplar; ihracatı trafo gücü ve hatlarla sınırlıdır. Başkasının açık TM'sine bağlanınca MWh başına erişim bedeli ödersiniz.\n"
       + "4) Her saat talep en ucuz santralden başlayarak karşılanır (merit order). Fiyat son devreye giren santralin maliyetidir.\n"
       + "5) Kendi santralinizi seçince yükseltme butonları çıkar: güneşte tracker ve robotik temizlik, rüzgarda repowering, "
       + "kömür/gazda karbon yakalama, nükleerde ömür uzatma vb.\n"
@@ -314,6 +317,15 @@ public final class Hud {
         b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { r.run(); } });
         return tip(b, tipText);
     }
+
+    private InvestMenu.Item tmItem(int level, String title, String sub) {
+        double cost = level >= 2 ? GridBalance.TM380_COST : GridBalance.TM154_COST;
+        return new InvestMenu.Item("icon_pylon", title, () -> sub, () -> substationsEnabled, () -> st == null || st.player.cash >= cost,
+            () -> curTool == Tool.SUBSTATION && curTmLevel == level,
+            () -> { cb.action("substation:" + level); if (!invest.pinned()) hideInvest(); });
+    }
+
+    public void setTmLevel(int level) { curTmLevel = level; }
 
     private InvestMenu.Group plantGroup(String title, PlantType... types) {
         InvestMenu.Group g = new InvestMenu.Group(title);
@@ -475,7 +487,9 @@ public final class Hud {
                 + " · Sol tık: yerleştir · Esc: iptal";
             case LINE -> "Hat Çek · " + tier.label + " · " + Fmt.mw(tier.capacityMW) + " · " + Fmt.money(tier.costPerTile) + "/kare"
                 + " · Sol tık: başlangıç, sonra bitiş · Tab: kademe · Esc: iptal";
-            case DEMOLISH -> "Yık / Hat Kaldır · Sol tık: kendi santraliniz veya hattınız · Esc: iptal";
+            case DEMOLISH -> "Yık / Hat Kaldır · Sol tık: kendi santraliniz, trafo merkeziniz veya hattınız · Esc: iptal";
+            case SUBSTATION -> (curTmLevel >= 2 ? "TM380" : "TM154") + " trafo merkezi · " + Fmt.money(curTmLevel >= 2 ? GridBalance.TM380_COST : GridBalance.TM154_COST)
+                + " · yarıçap " + (int) GridBalance.TM_RADIUS + " · Sol tık: kur · Esc: iptal";
             default -> "";
         };
     }
@@ -539,7 +553,7 @@ public final class Hud {
         if (speedBtns[0].getStyle() != ps) speedBtns[0].setStyle(ps);
         speedLbl.setText(speed == 0 ? "" : SPEED_TEXT[speed]);
         if (speed == 0) date.setColor(Skins.WARN); else date.setColor(Color.WHITE);
-        investBtn.setChecked(investOpen() || tool == Tool.PLANT || tool == Tool.LINE);
+        investBtn.setChecked(investOpen() || tool == Tool.PLANT || tool == Tool.LINE || tool == Tool.SUBSTATION);
         selectBtn.setChecked(tool == Tool.SELECT && !investOpen());
         demBtn.setChecked(tool == Tool.DEMOLISH);
         layerBtn.setChecked(layerPop.isVisible());

@@ -14,7 +14,14 @@ public class SaveData {
     public static class CityD { public int id, x, y; public String name; public double pop, sat; }
     public static class PlantD { public int id, x, y, owner, buildLeft, outage; public String type; public long builtAt; public double lifetimeMWh, lastMonthProfit, monthProfit;
         public String equipment, pendingUpgrade; public String[] upgrades; public int upgradeLeft; public long ageStart = Long.MIN_VALUE;
-        /** v3 */ public boolean legacy; public int retireYear, retireMonth; public String customName; }
+        /** v3 */ public boolean legacy; public int retireYear, retireMonth; public String customName;
+        /** v3 Faz 4 */ public int preferredTm; }
+    /** Trafo merkezi (v3, Faz 4). */
+    public static class SubstationD {
+        public int id, x, y, owner, level = 1, buildHoursLeft, pendingUpgrade, upgradeHoursLeft;
+        public long builtAtHour; public double transformerMW = GridBalance.TM154_MW, buildCost, accessFee = GridBalance.ACCESS_FEE_DEFAULT;
+        public boolean openAccess = true;
+    }
     /** owner: sirket indeksi, -1 = isletmeci (UŞİ). tier/status null ise YG/ACTIVE (v2 kayitlari). */
     public static class LineD {
         public int id, a, b, owner; public double cost;
@@ -44,6 +51,7 @@ public class SaveData {
     public List<CityD> cities = new ArrayList<>();
     public List<PlantD> plants = new ArrayList<>();
     public List<LineD> lines = new ArrayList<>();
+    public List<SubstationD> substations = new ArrayList<>();
     public double[] monthlyPrice;
 
     public SaveData() {}
@@ -86,11 +94,18 @@ public class SaveData {
             PlantD pd = new PlantD(); pd.id = p.id; pd.x = p.x; pd.y = p.y; pd.type = p.type.name();
             pd.owner = s.companies.indexOf(p.owner); pd.buildLeft = p.buildHoursLeft; pd.outage = p.outageHoursLeft;
             pd.builtAt = p.builtAtHour; pd.lifetimeMWh = p.lifetimeMWh; pd.lastMonthProfit = p.lastMonthProfit; pd.monthProfit = p.monthProfit;
-            pd.legacy = p.legacy; pd.retireYear = p.retireYear; pd.retireMonth = p.retireMonth; pd.customName = p.customName;
+            pd.legacy = p.legacy; pd.retireYear = p.retireYear; pd.retireMonth = p.retireMonth; pd.customName = p.customName; pd.preferredTm = p.preferredTm;
             pd.equipment = p.equipment.id; pd.ageStart = p.ageStartHour; pd.upgradeLeft = p.upgradeHoursLeft;
             pd.pendingUpgrade = p.pendingUpgrade == null ? null : p.pendingUpgrade.name();
             pd.upgrades = p.upgrades.stream().map(Enum::name).toArray(String[]::new);
             d.plants.add(pd);
+        }
+        for (Substation t : s.substations) {
+            SubstationD td = new SubstationD(); td.id = t.id; td.x = t.x; td.y = t.y; td.owner = s.companies.indexOf(t.owner);
+            td.level = t.level; td.buildHoursLeft = t.buildHoursLeft; td.pendingUpgrade = t.pendingUpgrade; td.upgradeHoursLeft = t.upgradeHoursLeft;
+            td.builtAtHour = t.builtAtHour; td.transformerMW = t.transformerMW; td.buildCost = t.buildCost; td.accessFee = t.accessFeePerMWh;
+            td.openAccess = t.openAccess;
+            d.substations.add(td);
         }
         for (PowerLine l : s.lines) {
             LineD ld = new LineD(); ld.id = l.id; ld.a = l.a.id; ld.b = l.b.id; ld.owner = l.owner == null ? -1 : s.companies.indexOf(l.owner); ld.cost = l.buildCost;
@@ -157,9 +172,17 @@ public class SaveData {
             p.ageStartHour = pd.ageStart == Long.MIN_VALUE ? p.builtAtHour : pd.ageStart;
             if (pd.upgrades != null) for (String u : pd.upgrades) p.upgrades.add(Upgrade.valueOf(u));
             if (pd.pendingUpgrade != null) { p.pendingUpgrade = Upgrade.valueOf(pd.pendingUpgrade); p.upgradeHoursLeft = pd.upgradeLeft; }
-            p.legacy = pd.legacy; p.retireYear = pd.retireYear; p.retireMonth = pd.retireMonth; p.customName = pd.customName;
+            p.legacy = pd.legacy; p.retireYear = pd.retireYear; p.retireMonth = pd.retireMonth; p.customName = pd.customName; p.preferredTm = pd.preferredTm;
             s.map.ensureLand(p.x, p.y);
             s.plants.add(p); s.nodeById.put(p.id, p); s.occ[s.map.idx(p.x, p.y)] = p.id;
+        }
+        if (substations != null) for (SubstationD td : substations) {
+            Substation t = new Substation(); t.id = td.id; t.x = td.x; t.y = td.y; t.owner = s.companies.get(td.owner);
+            t.level = td.level; t.buildHoursLeft = td.buildHoursLeft; t.pendingUpgrade = td.pendingUpgrade; t.upgradeHoursLeft = td.upgradeHoursLeft;
+            t.builtAtHour = td.builtAtHour; t.transformerMW = td.transformerMW; t.buildCost = td.buildCost; t.accessFeePerMWh = td.accessFee;
+            t.openAccess = td.openAccess;
+            s.map.ensureLand(t.x, t.y);
+            s.substations.add(t); s.nodeById.put(t.id, t); s.occ[s.map.idx(t.x, t.y)] = t.id;
         }
         for (LineD ld : lines) {
             GridNode a = s.nodeById.get(ld.a), b = s.nodeById.get(ld.b);

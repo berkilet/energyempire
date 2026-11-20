@@ -63,6 +63,12 @@ public final class WorldRenderer implements Disposable {
     private final Map<Integer, PlantVis> plantVis = new HashMap<>();
     private final Map<Integer, CityVis> cityVis = new HashMap<>();
     private final Map<Integer, LineVis> lineVis = new HashMap<>();
+    private static final class SubVis { ModelInstance body, flag; int level; }
+    private final Map<Integer, SubVis> subVis = new HashMap<>();
+    /** Toplayici hatlar (TM -> uye santral), anahtar "tm-santral". */
+    private final Map<String, LineVis> collectorVis = new HashMap<>();
+    private final List<ModelInstance> tilePool = new ArrayList<>();
+    private int collectorSig = -1;
     private final List<ModelInstance> suburbs = new ArrayList<>();
     private final Array<ModelInstance> drawList = new Array<>();
     private final Array<ModelInstance> overlays = new Array<>();
@@ -81,6 +87,10 @@ public final class WorldRenderer implements Disposable {
     public boolean ghostValid;
     public GridNode lineFrom, lineHover;
     public boolean lineValid;
+    /** Yaricap gosterimi (TM araci veya secili TM): merkez kare, yaricap; radiusX < 0 ise yok. */
+    public int radiusX = -1, radiusY;
+    public float radius;
+    public boolean radiusValid = true;
     public float hourFloat = 12f;
 
     private ModelInstance ghostBody, highlight, selectBox;
@@ -144,6 +154,7 @@ public final class WorldRenderer implements Disposable {
     /** Hat baglanti noktasi: santralde trafo, sehirde merkez. */
     private Vector3 attach(GridNode n, Vector3 out) {
         if (n instanceof City) return out.set(n.x + 0.5f, topAt(n.x + 0.5f, n.y + 0.5f) + 0.5f, n.y + 0.5f);
+        if (n instanceof Substation t) return out.set(n.x + 0.5f, topAt(n.x + 0.5f, n.y + 0.5f) + (t.level >= 2 ? 0.48f : 0.36f), n.y + 0.36f);
         PlantVis pv = plantVis.get(n.id);
         float yaw = pv == null ? 0 : pv.yaw;
         tmpV.set(0.33f, 0, 0.36f).rotate(Vector3.Y, yaw);
@@ -180,6 +191,7 @@ public final class WorldRenderer implements Disposable {
         int sig = state.plants.size() * 31 + state.lines.size() * 17 + state.cities.size();
         for (Plant p : state.plants) sig = sig * 31 + p.id;
         for (PowerLine l : state.lines) sig = sig * 31 + l.id;
+        for (Substation t : state.substations) sig = sig * 31 + t.id * 7 + t.level;
         return sig;
     }
 
@@ -191,6 +203,17 @@ public final class WorldRenderer implements Disposable {
         boolean topo = sig != lastSig;
         lastSig = sig; lastCitySig = citySig;
         plantVis.keySet().removeIf(id -> !(state.nodeById(id) instanceof Plant));
+        subVis.keySet().removeIf(id -> !(state.nodeById(id) instanceof Substation));
+        for (Substation t : state.substations) {
+            SubVis sv = subVis.get(t.id);
+            if (sv == null || sv.level != t.level) {
+                sv = new SubVis(); sv.level = t.level;
+                sv.body = new ModelInstance(models.substation(t.level));
+                sv.flag = new ModelInstance(models.flag);
+                sv.flag.materials.get(0).set(ColorAttribute.createDiffuse(new Color((t.owner.colorRgb << 8) | 0xFF)));
+                subVis.put(t.id, sv);
+            }
+        }
         for (Plant p : state.plants) if (!plantVis.containsKey(p.id)) plantVis.put(p.id, buildPlantVis(p));
         for (City c : state.cities) {
             CityVis cv = cityVis.computeIfAbsent(c.id, k -> new CityVis());
@@ -526,6 +549,8 @@ public final class WorldRenderer implements Disposable {
         for (ModelInstance mi : suburbs) drawList.add(mi);
         for (LineVis lv : lineVis.values()) drawList.add(lv.inst);
 
+        renderGridExtras();
+
         // secim ve hover
         if (selectedNodeId >= 0) {
             GridNode n = state.nodeById(selectedNodeId);
@@ -601,6 +626,68 @@ public final class WorldRenderer implements Disposable {
         batch.render(overlays, env);
         batch.render(glows, env);
         batch.end();
+    }
+
+    /** Trafo merkezleri, toplayici hatlar, kume cercevesi ve yaricap gosterimi. */
+    private void renderGridExtras() {
+        for (Substation t : state.substations) {
+            SubVis sv = subVis.get(t.id);
+            if (sv == null) continue;
+            float top = state.map.topAt(t.x, t.y);
+            float prog = t.operational() ? 1f : Math.max(0.15f, 1f - t.buildHoursLeft / (state.substationDays(t.level) * 24f));
+            sv.body.transform.setToTranslation(t.x + 0.5f, top, t.y + 0.5f).scale(1, prog, 1);
+            drawList.add(sv.body);
+            sv.flag.transform.setToTranslation(t.x + 0.08f, top, t.y + 0.92f);
+            drawList.add(sv.flag);
+        }
+        // toplayici hatlar: topoloji degistikce yeniden
+        int sig = 0;
+        for (ConnectionPoint cp : state.connectionPoints()) if (cp.tm != null) for (Plant m : cp.members) sig = sig * 31 + cp.tm.id * 1009 + m.id;
+        if (sig != collectorSig) {
+            collectorSig = sig;
+            for (LineVis lv : collectorVis.values()) models.untrack(lv.model);
+            collectorVis.clear();
+            for (ConnectionPoint cp : state.connectionPoints()) if (cp.tm != null) for (Plant m : cp.members) {
+                LineVis lv = new LineVis();
+                Vector3 a = attach(cp.tm, new Vector3()).add(0, -0.18f, 0), b = attach(m, new Vector3());
+                lv.model = models.buildLine(new ArrayList<>(), a, b);
+                lv.inst = new ModelInstance(lv.model);
+                Material mat = lv.inst.getMaterial("cable");
+                if (mat != null) ((ColorAttribute) mat.get(ColorAttribute.Diffuse)).color.set(m.owner == cp.tm.owner ? new Color(0.35f, 0.6f, 0.9f, 1) : new Color(0.95f, 0.6f, 0.2f, 1));
+                collectorVis.put(cp.tm.id + "-" + m.id, lv);
+            }
+        }
+        for (LineVis lv : collectorVis.values()) drawList.add(lv.inst);
+
+        // ince kume cercevesi: oyuncunun bara/TM uyeleri altinda soluk renkli taban
+        int ti = 0;
+        for (ConnectionPoint cp : state.connectionPoints()) {
+            if (cp.members.size() < 2 && cp.tm == null) continue;
+            Company owner = cp.tm != null ? cp.tm.owner : cp.members.get(0).owner;
+            if (!owner.player) continue;
+            Color col = cp.tm != null ? new Color(0.35f, 0.6f, 0.9f, 1) : new Color(1f, 0.85f, 0.3f, 1);
+            for (Plant m : cp.members) ti = tile(ti, m.x, m.y, col, 0.22f, 1.06f);
+        }
+        // yaricap
+        if (radiusX >= 0) {
+            int r = (int) Math.ceil(radius);
+            Color col = radiusValid ? new Color(0.35f, 0.75f, 1f, 1) : C_HI;
+            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++) {
+                int x = radiusX + dx, y = radiusY + dy;
+                if (!state.map.inBounds(x, y) || Math.hypot(dx, dy) > radius + 1e-6) continue;
+                ti = tile(ti, x, y, col, dx == 0 && dy == 0 ? 0.45f : 0.18f, 1f);
+            }
+        }
+    }
+
+    private int tile(int idx, int x, int y, Color c, float alpha, float scale) {
+        while (tilePool.size() <= idx) tilePool.add(tinted(models.unitBox, 1, 1, 1, 0.2f));
+        ModelInstance mi = tilePool.get(idx);
+        setTint(mi, c, alpha);
+        float o = (1 - scale) / 2;
+        mi.transform.setToTranslation(x + o, state.map.topAt(x, y) + 0.012f, y + o).scale(scale, 0.03f, scale);
+        overlays.add(mi);
+        return idx + 1;
     }
 
     private int addGlow(int idx, float x, float y, float z, Color c, float size, float k) {

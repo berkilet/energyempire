@@ -120,6 +120,50 @@ public final class ModelFactory implements Disposable {
 
     public Model city(int tier) { return cityModels[Math.max(1, Math.min(6, tier))]; }
 
+    private final Model[] substationModels = new Model[3];
+
+    /** Trafo merkezi: beton saha, trafolar, portal direkleri, cit. level 2 (TM380) daha buyuk ve yuksek. */
+    public Model substation(int level) {
+        int lv = Math.max(1, Math.min(2, level));
+        if (substationModels[lv] != null) return substationModels[lv];
+        return substationModels[lv] = build(b -> {
+            Color pad = c(0.60f, 0.59f, 0.55f), gravel = c(0.47f, 0.46f, 0.44f), tr = c(0.30f, 0.34f, 0.32f), fin = c(0.24f, 0.27f, 0.26f),
+                  steel = c(0.62f, 0.64f, 0.67f), ins = c(0.75f, 0.62f, 0.45f), house = c(0.80f, 0.78f, 0.72f), roof = c(0.42f, 0.22f, 0.18f);
+            float big = lv == 2 ? 1.25f : 1f;
+            box(b, 0, 0, 0, 0.96f, 0.03f, 0.96f, pad);
+            box(b, 0.05f, 0.03f, 0.05f, 0.80f, 0.006f, 0.70f, gravel);
+            int nTr = lv == 2 ? 3 : 2;
+            for (int i = 0; i < nTr; i++) {
+                float x = -0.25f + i * (0.5f / Math.max(1, nTr - 1));
+                box(b, x, 0.036f, 0.12f, 0.13f * big, 0.12f * big, 0.16f * big, tr);
+                box(b, x + 0.075f * big, 0.05f, 0.12f, 0.02f, 0.09f * big, 0.14f * big, fin);
+                for (int k = 0; k < 3; k++) cyl(b, x - 0.04f + k * 0.04f, 0.036f + 0.12f * big, 0.12f, 0.014f, 0.07f * big, 0.014f, 6, ins);
+            }
+            // portal direkleri (gantry)
+            float gh = lv == 2 ? 0.48f : 0.36f;
+            for (int i = -1; i <= 1; i += 2) {
+                box(b, i * 0.36f, 0.03f, -0.22f, 0.025f, gh, 0.025f, steel);
+                box(b, i * 0.36f, 0.03f, -0.08f, 0.025f, gh, 0.025f, steel);
+            }
+            box(b, 0, 0.03f + gh - 0.02f, -0.22f, 0.76f, 0.025f, 0.025f, steel);
+            box(b, 0, 0.03f + gh - 0.02f, -0.08f, 0.76f, 0.025f, 0.025f, steel);
+            for (int k = -1; k <= 1; k++) cyl(b, k * 0.2f, 0.03f + gh - 0.09f, -0.15f, 0.012f, 0.07f, 0.012f, 6, ins);
+            // kontrol binasi
+            box(b, 0.32f, 0.03f, 0.33f, 0.20f, 0.10f, 0.14f, house);
+            box(b, 0.32f, 0.13f, 0.33f, 0.22f, 0.02f, 0.16f, roof);
+            // cit
+            for (int i = 0; i <= 8; i++) {
+                float t = -0.44f + i * 0.11f;
+                box(b, t, 0.03f, -0.44f, 0.008f, 0.07f, 0.008f, steel);
+                box(b, t, 0.03f, 0.44f, 0.008f, 0.07f, 0.008f, steel);
+                box(b, -0.44f, 0.03f, t, 0.008f, 0.07f, 0.008f, steel);
+                box(b, 0.44f, 0.03f, t, 0.008f, 0.07f, 0.008f, steel);
+            }
+            box(b, 0, 0.09f, -0.44f, 0.88f, 0.006f, 0.006f, steel); box(b, 0, 0.09f, 0.44f, 0.88f, 0.006f, 0.006f, steel);
+            box(b, -0.44f, 0.09f, 0, 0.006f, 0.006f, 0.88f, steel); box(b, 0.44f, 0.09f, 0, 0.006f, 0.006f, 0.88f, steel);
+        });
+    }
+
     private final Map<String, Model> plantBases = new HashMap<>();
     private Model cityBase, park;
 

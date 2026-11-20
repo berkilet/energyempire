@@ -21,7 +21,7 @@ public final class FinanceView {
     private GameState st;
 
     private final Label kCash, kValue, kStock, kNet, kNetSub, kStockSub;
-    private final Label[][] pl = new Label[8][2];          // satir x (gecen ay, bu ay)
+    private final Label[][] pl = new Label[10][2];          // satir x (gecen ay, bu ay)
     private final Label genLast, genNow, avgLast, avgNow, dayNote;
     private final Label debt, limit, rate, monthlyInterest, creditNote;
     private final Label assets, cashB, debtB, equity;
@@ -29,7 +29,8 @@ public final class FinanceView {
     private final TextButton borrowBtn, repayBtn;
     public final LineChart chart;
 
-    private static final String[] PL_ROWS = { "Elektrik satışı", "Yakıt", "İşletme ve bakım", "Karbon vergisi", "Faiz", "Kesinti cezası", "", "Net kâr" };
+    private static final String[] PL_ROWS = { "Elektrik satışı", "Erişim geliri", "Yakıt", "İşletme ve bakım", "Karbon vergisi", "Faiz", "Kesinti cezası", "Erişim gideri", "", "Net kâr" };
+    private static final int NET = 9;
 
     public FinanceView(Skins skins, Runnable onBorrow, Runnable onRepay) {
         this.skin = skins.skin;
@@ -57,7 +58,7 @@ public final class FinanceView {
                 inc.add(line).colspan(3).height(1).growX().padTop(2).padBottom(4).row();
                 continue;
             }
-            inc.add(new Label(PL_ROWS[r], skin, r == 7 ? "title" : "default")).left();
+            inc.add(new Label(PL_ROWS[r], skin, r == NET ? "title" : "default")).left();
             for (int c = 0; c < 2; c++) { pl[r][c] = UiKit.money(skin); inc.add(pl[r][c]).width(90).right(); }
             inc.row();
         }
@@ -142,16 +143,17 @@ public final class FinanceView {
         double yearNet = p.trailingNet();
         kNetSub.setText(anyMonth ? "Son " + p.netHistory.size() + " ay: " + Fmt.money(yearNet) : "Henüz kapanmış ay yok");
 
-        // gelir tablosu: [gelir, yakit, isletme, karbon, faiz, ceza, -, net]
-        double[] last = { p.lastRevenue, p.lastFuel, p.lastOm, p.lastCarbon, p.lastInterest, p.lastFines, 0, p.lastNet };
-        double[] now = { p.revenue, p.fuelCost, p.omCost, p.carbonCost, p.interest, p.fines, 0, p.monthNetSoFar() };
+        // gelir tablosu: [gelir, erisim geliri, yakit, isletme, karbon, faiz, ceza, erisim gideri, -, net]
+        double[] last = { p.lastRevenue, p.lastAccessIncome, p.lastFuel, p.lastOm, p.lastCarbon, p.lastInterest, p.lastFines, p.lastAccessCost, 0, p.lastNet };
+        double[] now = { p.revenue, p.accessIncome, p.fuelCost, p.omCost, p.carbonCost, p.interest, p.fines, p.accessCost, 0, p.monthNetSoFar() };
         for (int r = 0; r < PL_ROWS.length; r++) {
             if (pl[r][0] == null) continue;
             for (int c = 0; c < 2; c++) {
                 double v = c == 0 ? last[r] : now[r];
                 Label l = pl[r][c];
                 if (r == 0) UiKit.setMoney(skin, l, v, false);
-                else if (r == 7) UiKit.setMoney(skin, l, v, true);
+                else if (r == 1) { if (v < 1) UiKit.setCost(skin, l, 0); else UiKit.setMoney(skin, l, v, true); }
+                else if (r == NET) UiKit.setMoney(skin, l, v, true);
                 else UiKit.setCost(skin, l, v);
                 if (c == 0 && !anyMonth) { l.setText("—"); l.setStyle(skin.get("dimValue", Label.LabelStyle.class)); }
             }

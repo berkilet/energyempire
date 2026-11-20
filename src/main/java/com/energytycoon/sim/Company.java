@@ -19,8 +19,11 @@ public final class Company {
 
     // Aylik P&L (devam eden ay)
     public double revenue, fuelCost, omCost, carbonCost, interest, fines, capexSpent;
+    /** Trafo merkezi erisim bedeli: alinan / odenen (devam eden ay). */
+    public double accessIncome, accessCost;
     // Gecen ay
     public double lastRevenue, lastFuel, lastOm, lastCarbon, lastInterest, lastFines, lastNet;
+    public double lastAccessIncome, lastAccessCost;
     public double mwhGenerated, lastMwhGenerated;
     public double co2Tons, lastCo2;
     public double renewMwh, lastRenewMwh;
@@ -44,7 +47,7 @@ public final class Company {
     }
 
     public double monthNetSoFar() {
-        return revenue - fuelCost - omCost - carbonCost - interest - fines;
+        return revenue - fuelCost - omCost - carbonCost - interest - fines + accessIncome - accessCost;
     }
 
     public double rateAdd;

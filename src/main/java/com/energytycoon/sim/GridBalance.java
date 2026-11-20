@@ -52,4 +52,27 @@ public final class GridBalance {
     /** Isletmeci (owner == null) hatlarinin gosterilen sahibi. */
     public static final String OPERATOR_NAME = "Ulusal Şebeke İşletmesi (UŞİ)";
     public static final String OPERATOR_SHORT = "UŞİ";
+
+    // ---- Faz 4: kume (bara) ve trafo merkezi
+    /** Bara: ayni sirket santralleri arasi en fazla Chebyshev mesafesi. */
+    public static final int BARA_DISTANCE = 1;
+    public static final double TM_RADIUS = 3;
+    public static final double TM154_COST = 9e6;
+    public static final int TM154_DAYS = 45;
+    public static final double TM154_MW = 600;
+    public static final double TM_PLUS_COST = 6e6;
+    public static final int TM_PLUS_DAYS = 30;
+    public static final double TM_PLUS_MW = 600;
+    public static final double TM380_COST = 25e6;
+    public static final int TM380_DAYS = 90;
+    public static final double TM380_MW = 1500;
+    public static final double TM380_UPGRADE_COST = 18e6;
+    public static final int TM380_UPGRADE_DAYS = 60;
+    /** Ucuncu taraf erisim bedeli ($/MWh, teslim edilen). */
+    public static final double ACCESS_FEE_DEFAULT = 3;
+    public static final double ACCESS_FEE_MIN = 0, ACCESS_FEE_MAX = 10;
+    /** ÇYG hattinin santral ucu icin en kucuk santral gucu. */
+    public static final double CYG_MIN_PLANT_MW = 400;
+    /** Rakip YZ erisim bedelini hat maliyetiyle kiyaslarken kullandigi ufuk (yil). */
+    public static final double RIVAL_ACCESS_HORIZON_YEARS = 5;
 }
