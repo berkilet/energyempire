@@ -18,7 +18,12 @@ public class SaveData {
     public static class LineD { public int id, a, b, owner; public double cost; }
 
     /** v3: kamu eski filosu (neutral sirket, legacy santral alanlari), rivalsStartWithFleet. v1/v2 okunabilir. */
-    public int version = 3;
+    public static final int CURRENT_VERSION = 3;
+    /**
+     * 0 = alan yok (eski kayit). LibGDX Json varsayilan degere esit alanlari yazmadigi icin v1/v2 kayitlarinda
+     * bu alan dosyada bulunmaz; v1 ile v2, v2'ye ozgu 'preset' alaniyla ayirt edilir.
+     */
+    public int version = 0;
     public boolean rivalsStartWithFleet;
     // v2
     public String preset, difficulty, scenario, companyName;
@@ -37,8 +42,15 @@ public class SaveData {
 
     public SaveData() {}
 
+    /** Dosyadaki surum; alan yoksa v2 alanlarina bakarak 1 ya da 2. */
+    public int effectiveVersion() {
+        if (version > 0) return version;
+        return preset != null ? 2 : 1;
+    }
+
     public static SaveData from(GameState s) {
         SaveData d = new SaveData();
+        d.version = CURRENT_VERSION;
         d.seed = s.seed; d.hour = s.hour; d.nextId = s.nextId; d.won = s.won;
         d.preset = s.settings.preset.name(); d.difficulty = s.settings.difficulty.name(); d.scenario = s.settings.scenarioId;
         d.companyName = s.settings.companyName; d.size = s.settings.size; d.cityCount = s.settings.cities; d.rivals = s.settings.rivals;
@@ -91,9 +103,10 @@ public class SaveData {
         if (companyName != null) g.companyName = companyName;
         if (size > 0) g.size = size;
         if (cityCount > 0) g.cities = cityCount;
-        g.rivals = version >= 2 ? rivals : 2;
+        int fileVersion = effectiveVersion();
+        g.rivals = fileVersion >= 2 ? rivals : 2;
         // v1/v2 kayitlarinda rakipler bedava filoyla baslamisti; ayar bu oyunu tarif etsin.
-        g.rivalsStartWithFleet = version >= 3 ? rivalsStartWithFleet : true;
+        g.rivalsStartWithFleet = fileVersion >= 3 ? rivalsStartWithFleet : true;
         GameState s = new GameState(g);
         s.hour = hour; s.nextId = nextId; s.won = won;
         s.markets.coalMult = coalMult; s.markets.gasMult = gasMult; s.markets.uraniumMult = uraniumMult;
