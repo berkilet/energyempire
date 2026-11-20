@@ -320,7 +320,7 @@ public final class GameScreen implements Screen, Hud.Listener {
                           : p.upgrading() ? p.pendingUpgrade.label + ": " + p.upgradeHoursLeft / 24 + " gün" : "Çalışıyor";
             Equipment e = p.equipment;
             StringBuilder sb = new StringBuilder();
-            sb.append(p.type.label).append("  —  ").append(p.owner.name).append('\n')
+            sb.append(p.customName != null ? p.customName + " (" + p.type.label + ")" : p.type.label).append("  —  ").append(p.owner.name).append('\n')
               .append(e.supplier.name).append(" ").append(e.model).append(" (").append(e.tech).append(")\n")
               .append("Durum: ").append(status).append('\n')
               .append("Üretim: ").append(Fmt.mw(p.outputMW)).append(" / ").append(Fmt.mw(p.capacityMW())).append('\n');

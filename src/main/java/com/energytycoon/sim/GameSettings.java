@@ -15,6 +15,8 @@ public final class GameSettings {
     public long seed = 1;
     public String scenarioId = "free";
     public String companyName = "Yeni Enerji A.Ş.";
+    /** true: rakipler eski surumdeki gibi bedava, calisir durumda santrallerle baslar. */
+    public boolean rivalsStartWithFleet = false;
 
     public GameSettings() {}
 
@@ -22,6 +24,7 @@ public final class GameSettings {
         GameSettings g = new GameSettings();
         g.preset = preset; g.size = size; g.cities = cities; g.rivals = rivals; g.difficulty = difficulty;
         g.seed = seed; g.scenarioId = scenarioId; g.companyName = companyName;
+        g.rivalsStartWithFleet = rivalsStartWithFleet;
         return g;
     }
 

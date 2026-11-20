@@ -32,6 +32,8 @@ public final class GameState {
 
     public final List<Company> companies = new ArrayList<>();
     public Company player;
+    /** Tarafsiz kamu sirketi (eski filo); yoksa null. */
+    public Company neutral;
     public final List<City> cities = new ArrayList<>();
     public final List<Plant> plants = new ArrayList<>();
     public final List<PowerLine> lines = new ArrayList<>();
@@ -96,15 +98,17 @@ public final class GameState {
         s.player = new Company(s.settings.companyName, true, 0x2ecc71, Balance.START_CASH * d.cashMult);
         s.player.rateAdd = d.rateAdd;
         s.companies.add(s.player);
+        // Esit baslangic: tum ozel sirketler ayni nakitle baslar; zorluk rakiplerin kaynagini degil davranisini belirler.
         for (int i = 0; i < s.settings.rivals; i++) {
-            Company r = new Company(RIVALS[i][0], false, Integer.parseInt(RIVALS[i][1], 16), 420e6 * d.rivalMult);
+            Company r = new Company(RIVALS[i][0], false, Integer.parseInt(RIVALS[i][1], 16), Balance.START_CASH * d.cashMult);
             r.aiStyle = RIVALS[i][2];
             s.companies.add(r);
         }
         s.hour = 8;
         s.placeCities();
-        s.seedRivals();
+        if (s.settings.rivalsStartWithFleet) s.seedRivals();
         s.scenario.setup.accept(s);
+        s.placeLegacyFleet(s.scenario.legacyCoverage);
         s.updateValuations();
         s.notify("Hoş geldiniz! Senaryo: " + s.scenario.title);
         return s;
@@ -151,13 +155,109 @@ public final class GameState {
         for (Company r : companies) {
             if (r.player || cities.isEmpty()) continue;
             City c = cities.get(ci++ % cities.size());
-            double cash = r.cash;
+            // Eski davranis (secenek): bedava, hemen calisan santral + hat.
             switch (r.aiStyle) {
-                case "fossil" -> RivalAI.buildNear(this, r, PlantType.COAL, c, true);
-                case "green" -> { RivalAI.buildNear(this, r, PlantType.WIND, c, true); RivalAI.buildNear(this, r, PlantType.GAS, c, true); }
-                default -> { RivalAI.buildNear(this, r, PlantType.GAS, c, true); RivalAI.buildNear(this, r, PlantType.SOLAR, c, true); }
+                case "fossil" -> placeLegacy(r, catalog.defaultFor(PlantType.COAL), c, 0);
+                case "green" -> { placeLegacy(r, catalog.defaultFor(PlantType.WIND), c, 0); placeLegacy(r, catalog.defaultFor(PlantType.GAS), c, 0); }
+                default -> { placeLegacy(r, catalog.defaultFor(PlantType.GAS), c, 0); placeLegacy(r, catalog.defaultFor(PlantType.SOLAR), c, 0); }
             }
-            r.cash = cash;
+        }
+    }
+
+    // ------------------------------------------------------------ kamu eski filosu
+    /**
+     * Gunluk/mevsimlik talep egrisinin en yuksek carpani: sehrin gercek tepe talebi = peakMW() * bu deger
+     * (en yuksek saat x en yuksek mevsim; dispatchHour ile ayni formul, gurultu haric).
+     */
+    public static double maxDemandMult() {
+        double m = 0;
+        for (double v : HOUR_CURVE) m = Math.max(m, v);
+        return m * (1.07 + 0.05);
+    }
+
+    static final String[] MONTH_NAMES = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
+    /** "Mart'ta" gibi bulunma hali. */
+    static final String[] MONTH_LOC = { "Ocak'ta", "Şubat'ta", "Mart'ta", "Nisan'da", "Mayıs'ta", "Haziran'da", "Temmuz'da", "Ağustos'ta", "Eylül'de", "Ekim'de", "Kasım'da", "Aralık'ta" };
+
+    /**
+     * Odeme yapmadan, hemen calisir durumda santral + sehre hat kurar (hat sahibi ayni sirket).
+     * Kullanim: kamu eski filosu, senaryo baslangic filolari, "rakipler kurulu santrallerle baslasin" secenegi.
+     * Konum bulunamazsa veya ekipman henuz piyasada degilse null.
+     */
+    public Plant placeLegacy(Company owner, Equipment eq, City city, int ageYears) {
+        return placeLegacy(owner, eq, city, ageYears, 4, 16);
+    }
+
+    public Plant placeLegacy(Company owner, Equipment eq, City city, int ageYears, double minDist, double maxDist) {
+        if (checkEquipment(eq) != null) return null;
+        int[] site = RivalAI.findSite(this, eq, city, minDist, maxDist);
+        if (site == null) return null;
+        suppressDelays = true;
+        Plant p = createPlant(owner, eq, site[0], site[1]);
+        suppressDelays = false;
+        p.buildHoursLeft = 0;
+        p.builtAtHour = hour - (long) ageYears * Balance.HOURS_PER_YEAR;
+        p.ageStartHour = p.builtAtHour;
+        if (checkLine(p, city) == null) createLine(owner, p, city, lineCost(p, city));
+        return p;
+    }
+
+    /**
+     * Her sehrin yakinina, gercek tepe talebinin coverage kati kadar eski komur/gaz kapasitesi kurar
+     * (sehre zaten bagli santrallerin kapasitesi dusulur). Kapanislar LEGACY_RETIRE_FROM..TO arasina esit dagitilir.
+     */
+    void placeLegacyFleet(double coverage) {
+        if (coverage <= 0 || cities.isEmpty()) return;
+        neutral = new Company(GridBalance.NEUTRAL_NAME, false, GridBalance.NEUTRAL_COLOR, 0);
+        neutral.neutral = true;
+        companies.add(neutral);
+        Equipment coal = catalog.get(GridBalance.LEGACY_COAL_ID), gas = catalog.get(GridBalance.LEGACY_GAS_ID);
+        List<Plant> fleet = new ArrayList<>();
+        for (City c : cities) {
+            double need = c.peakMW() * maxDemandMult() * coverage;
+            for (PowerLine l : c.lines) if (l.other(c) instanceof Plant p) need -= p.capacityMW();
+            int unit = 0, termik = 0, dg = 0, guard = 0;
+            while (need > 1 && guard++ < 20) {
+                // Buyuk acik varsa komur, kalan kucuk acik icin gaz; sira esitse donusumlu.
+                boolean useCoal = need >= coal.capacityMW * 0.75 && (unit % 2 == 0 || need >= coal.capacityMW + gas.capacityMW);
+                Equipment e = useCoal ? coal : gas;
+                int age = GridBalance.LEGACY_AGE_MIN + rng.nextInt(GridBalance.LEGACY_AGE_MAX - GridBalance.LEGACY_AGE_MIN + 1);
+                Plant p = placeLegacy(neutral, e, c, age, GridBalance.LEGACY_MIN_DIST, GridBalance.LEGACY_MAX_DIST);
+                if (p == null) p = placeLegacy(neutral, e, c, age, GridBalance.LEGACY_MIN_DIST, GridBalance.LEGACY_MAX_DIST + 6);
+                if (p == null) break;
+                p.legacy = true;
+                int k = useCoal ? ++termik : ++dg;
+                p.customName = c.name + (useCoal ? " Termik" : " Doğalgaz") + (k > 1 ? " " + k : "");
+                need -= p.capacityMW();
+                fleet.add(p);
+                unit++;
+            }
+        }
+        // Kapanis tarihleri: karisik sirayla, aralik boyunca esit aralikli.
+        java.util.Collections.shuffle(fleet, rng);
+        int from = (GridBalance.LEGACY_RETIRE_FROM - Balance.START_YEAR) * 12;
+        int span = (GridBalance.LEGACY_RETIRE_TO - GridBalance.LEGACY_RETIRE_FROM + 1) * 12 - 1;
+        for (int i = 0; i < fleet.size(); i++) {
+            int off = fleet.size() == 1 ? span / 2 : (int) Math.round(i * span / (double) (fleet.size() - 1));
+            int abs = from + off;
+            fleet.get(i).retireYear = Balance.START_YEAR + abs / 12;
+            fleet.get(i).retireMonth = abs % 12;
+        }
+        topoDirty = true;
+    }
+
+    /** Ay basinda: kapanisa LEGACY_NOTICE_MONTHS kalan santraller icin haber, suresi dolanlari iadesiz kapat. */
+    private void retireLegacy() {
+        int now = (int) (hour / Balance.HOURS_PER_MONTH);
+        for (Plant p : new ArrayList<>(plants)) {
+            if (p.retireYear <= 0) continue;
+            int at = (p.retireYear - Balance.START_YEAR) * 12 + p.retireMonth;
+            if (at - now == GridBalance.LEGACY_NOTICE_MONTHS)
+                notify("Kamu: " + p.name() + " " + p.retireYear + " " + MONTH_LOC[p.retireMonth] + " kapanacak");
+            if (at <= now) {
+                notify("Kamu: " + p.name() + " kapatıldı (" + (int) p.capacityMW() + " MW)");
+                demolishPlant(p, false);
+            }
         }
     }
 
@@ -228,8 +328,14 @@ public final class GameState {
     public Plant buildPlant(Company owner, Equipment eq, int x, int y) {
         if (checkPlacement(eq.type, x, y) != null || checkEquipment(eq) != null) return null;
         double cost = eq.capex();
-        if (owner.cash < cost - 1 && owner.player) return null;
+        // Ayni kural herkese: nakdi yetmeyen sirket insa edemez.
+        if (owner.cash < cost - 1) return null;
         owner.cash -= cost; owner.capexSpent += cost;
+        return createPlant(owner, eq, x, y);
+    }
+
+    /** Odeme kontrolu yapmadan santral nesnesini olusturur (buildPlant ve placeLegacy ortak yolu). */
+    private Plant createPlant(Company owner, Equipment eq, int x, int y) {
         Plant p = new Plant();
         p.id = nextId++; p.type = eq.type; p.equipment = eq; p.x = x; p.y = y; p.owner = owner;
         p.buildHoursLeft = eq.buildDays() * 24;
@@ -294,8 +400,12 @@ public final class GameState {
     public PowerLine buildLine(Company owner, GridNode a, GridNode b) {
         if (checkLine(a, b) != null) return null;
         double cost = lineCost(a, b);
-        if (owner.player && owner.cash < cost) return null;
+        if (owner.cash < cost) return null;
         owner.cash -= cost; owner.capexSpent += cost;
+        return createLine(owner, a, b, cost);
+    }
+
+    private PowerLine createLine(Company owner, GridNode a, GridNode b, double cost) {
         PowerLine l = new PowerLine();
         l.id = nextId++; l.a = a; l.b = b; l.owner = owner; l.buildCost = cost; l.lengthTiles = lineLength(a, b);
         lines.add(l); a.lines.add(l); b.lines.add(l);
@@ -303,10 +413,12 @@ public final class GameState {
         return l;
     }
 
-    public void demolishPlant(Plant p) {
+    public void demolishPlant(Plant p) { demolishPlant(p, true); }
+
+    public void demolishPlant(Plant p, boolean refund) {
         if (!plants.contains(p)) return;
         for (PowerLine l : new ArrayList<>(p.lines)) removeLine(l, false);
-        p.owner.cash += p.bookValue(hour) * Balance.DEMOLISH_REFUND;
+        if (refund) p.owner.cash += p.bookValue(hour) * Balance.DEMOLISH_REFUND;
         plants.remove(p); nodeById.remove(p.id); occ[map.idx(p.x, p.y)] = -1;
         topoDirty = true;
     }
@@ -403,7 +515,8 @@ public final class GameState {
 
     public double fuelCostPerMWh(Plant p) {
         if (p.type.fuel == PlantType.Fuel.NONE) return 0;
-        return markets.fuelPrice(p.type.fuel) * fuelMult(p) * p.fuelPriceMult() / p.efficiency(hour);
+        double legacy = p.legacy ? GridBalance.LEGACY_FUEL_MULT : 1.0;
+        return markets.fuelPrice(p.type.fuel) * fuelMult(p) * p.fuelPriceMult() * legacy / p.efficiency(hour);
     }
 
     public double marginalCost(Plant p) {
@@ -642,8 +755,8 @@ public final class GameState {
         for (Company c : companies) {
             double assets = assetValue(c);
             double rate = c.interestRate(assets);
-            double intr = c.debt * rate / 12;
-            if (c.cash < 0) intr += -c.cash * Balance.OVERDRAFT_RATE / 12;
+            double intr = c.neutral ? 0 : c.debt * rate / 12;
+            if (c.cash < 0 && !c.neutral) intr += -c.cash * Balance.OVERDRAFT_RATE / 12;
             c.cash -= intr; c.interest += intr;
 
             double net = c.monthNetSoFar();
@@ -668,8 +781,9 @@ public final class GameState {
         }
         history.monthly(statPrice);
 
+        retireLegacy();
         for (Company c : companies) {
-            if (c.bankrupt) continue;
+            if (c.bankrupt || c.neutral) continue;
             if (c.cash < Balance.BANKRUPT_CASH) c.negativeMonths++; else c.negativeMonths = 0;
             if (c.negativeMonths >= 2) {
                 c.bankrupt = true;
@@ -684,7 +798,7 @@ public final class GameState {
             }
         }
         evaluateScenario();
-        for (Company c : companies) if (!c.player && !c.bankrupt) RivalAI.monthly(this, c);
+        for (Company c : companies) if (!c.player && !c.neutral && !c.bankrupt) RivalAI.monthly(this, c);
         if ((hour / Balance.HOURS_PER_MONTH) % 12 == 0) notify("Yeni yıl: " + year());
         for (Equipment e : catalog.equipment.values())
             if (e.availableYear == year() && month() == 0) notify("YENİ TEKNOLOJİ: " + e.fullName() + " (" + e.tech + ") piyasada!");

@@ -19,8 +19,14 @@ public final class Plant extends GridNode {
     /** Bu aydaki net kar (gelir - degisken - sabit). */
     public double monthProfit, lastMonthProfit;
     public double lifetimeMWh;
+    /** Kamu eski filosu: yakit maliyeti GridBalance.LEGACY_FUEL_MULT ile carpilir, retireYear'da kapanir. */
+    public boolean legacy;
+    /** Kapanis yili/ayi (0 = kapanis yok); ay 0..11. */
+    public int retireYear, retireMonth;
+    /** Haritada gosterilen ozel ad (ör. "Bozova Termik"); null ise tur adi. */
+    public String customName;
 
-    @Override public String name() { return type.label; }
+    @Override public String name() { return customName != null ? customName : type.label; }
 
     public boolean operational() { return buildHoursLeft <= 0; }
     public boolean upgrading() { return pendingUpgrade != null && upgradeHoursLeft > 0; }

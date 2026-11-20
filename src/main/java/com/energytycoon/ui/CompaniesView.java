@@ -24,6 +24,7 @@ public final class CompaniesView {
     private static final float[] T_W = { 140, 80, 90, 80, 130, 50, 50 };
 
     private final List<Label[]> compRows = new ArrayList<>();
+    private final List<Company> rowOrder = new ArrayList<>();
     private final List<Label[]> cityRows = new ArrayList<>();
     private final List<UiKit.Meter> cityMeters = new ArrayList<>();
 
@@ -44,7 +45,15 @@ public final class CompaniesView {
         Table ct = new Table();
         for (int i = 0; i < C_HEAD.length; i++) ct.add(head(C_HEAD[i], i == 0 ? Align.left : Align.right)).width(C_W[i]).padBottom(4);
         ct.row();
-        for (Company c : s.companies) {
+        // Ozel sirketler once; tarafsiz kamu sirketi siralamanin disinda, ayri baslik altinda.
+        rowOrder.clear();
+        for (Company c : s.companies) if (!c.neutral) rowOrder.add(c);
+        for (Company c : s.companies) if (c.neutral) rowOrder.add(c);
+        for (Company c : rowOrder) {
+            if (c.neutral) {
+                Label sep = new Label("Kamu (tarafsız, rakip değil; kapanış takvimiyle devreden çıkar)", skin, "dim");
+                ct.add(sep).colspan(C_HEAD.length).left().padTop(6).padBottom(2).row();
+            }
             Table row = new Table(skin);
             if (c.player) row.setBackground("card");
             Label[] cells = new Label[C_HEAD.length];
@@ -96,8 +105,8 @@ public final class CompaniesView {
         if (!built) build(s);
         double totalGen = 0;
         for (Company c : s.companies) totalGen += c.lastMwhGenerated;
-        for (int k = 0; k < s.companies.size() && k < compRows.size(); k++) {
-            Company c = s.companies.get(k);
+        for (int k = 0; k < rowOrder.size() && k < compRows.size(); k++) {
+            Company c = rowOrder.get(k);
             Label[] r = compRows.get(k);
             double cap = 0; int n = 0;
             for (Plant p : s.plants) if (p.owner == c && p.operational()) { cap += p.capacityMW(); n++; }

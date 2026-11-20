@@ -12,6 +12,8 @@ public final class Scenario {
     public final int deadlineYear;
     public final List<Objective> objectives;
     final Consumer<GameState> setup;
+    /** Kamu eski filosunun kapsama orani (sehrin gercek tepe talebine gore). */
+    public double legacyCoverage = GridBalance.LEGACY_COVERAGE;
 
     Scenario(String id, String title, String desc, MapPreset forced, int deadline, List<Objective> obj, Consumer<GameState> setup) {
         this.id = id; this.title = title; this.desc = desc; this.forcedPreset = forced; this.deadlineYear = deadline;

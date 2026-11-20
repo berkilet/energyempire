@@ -9,13 +9,17 @@ public class SaveData {
         public boolean bankrupt; public int negativeMonths;
         public double lastRevenue, lastFuel, lastOm, lastCarbon, lastInterest, lastFines, lastNet, lastMwh, lastCo2;
         public double[] netHistory; public double[] valHist, cashHist;
-        public String aiStyle; public double rateAdd, lastRenew; }
+        public String aiStyle; public double rateAdd, lastRenew;
+        /** v3 */ public boolean neutral; }
     public static class CityD { public int id, x, y; public String name; public double pop, sat; }
     public static class PlantD { public int id, x, y, owner, buildLeft, outage; public String type; public long builtAt; public double lifetimeMWh, lastMonthProfit, monthProfit;
-        public String equipment, pendingUpgrade; public String[] upgrades; public int upgradeLeft; public long ageStart = Long.MIN_VALUE; }
+        public String equipment, pendingUpgrade; public String[] upgrades; public int upgradeLeft; public long ageStart = Long.MIN_VALUE;
+        /** v3 */ public boolean legacy; public int retireYear, retireMonth; public String customName; }
     public static class LineD { public int id, a, b, owner; public double cost; }
 
-    public int version = 2;
+    /** v3: kamu eski filosu (neutral sirket, legacy santral alanlari), rivalsStartWithFleet. v1/v2 okunabilir. */
+    public int version = 3;
+    public boolean rivalsStartWithFleet;
     // v2
     public String preset, difficulty, scenario, companyName;
     public int size, cityCount, rivals;
@@ -38,6 +42,7 @@ public class SaveData {
         d.seed = s.seed; d.hour = s.hour; d.nextId = s.nextId; d.won = s.won;
         d.preset = s.settings.preset.name(); d.difficulty = s.settings.difficulty.name(); d.scenario = s.settings.scenarioId;
         d.companyName = s.settings.companyName; d.size = s.settings.size; d.cityCount = s.settings.cities; d.rivals = s.settings.rivals;
+        d.rivalsStartWithFleet = s.settings.rivalsStartWithFleet;
         d.coalMult = s.markets.coalMult; d.gasMult = s.markets.gasMult; d.uraniumMult = s.markets.uraniumMult;
         d.carbonGrowthMult = s.markets.carbonGrowthMult; d.lastServedRatio = s.lastServedRatio;
         for (Supplier sp : s.catalog.allSuppliers()) d.supplierIndex.put(sp.id, sp.priceIndex);
@@ -52,7 +57,7 @@ public class SaveData {
             cd.netHistory = c.netHistory.stream().mapToDouble(Double::doubleValue).toArray();
             cd.valHist = c.valuationHistory.stream().mapToDouble(Double::doubleValue).toArray();
             cd.cashHist = c.cashHistory.stream().mapToDouble(Double::doubleValue).toArray();
-            cd.aiStyle = c.aiStyle; cd.rateAdd = c.rateAdd; cd.lastRenew = c.lastRenewMwh;
+            cd.aiStyle = c.aiStyle; cd.rateAdd = c.rateAdd; cd.lastRenew = c.lastRenewMwh; cd.neutral = c.neutral;
             d.companies.add(cd);
         }
         for (City c : s.cities) {
@@ -63,6 +68,7 @@ public class SaveData {
             PlantD pd = new PlantD(); pd.id = p.id; pd.x = p.x; pd.y = p.y; pd.type = p.type.name();
             pd.owner = s.companies.indexOf(p.owner); pd.buildLeft = p.buildHoursLeft; pd.outage = p.outageHoursLeft;
             pd.builtAt = p.builtAtHour; pd.lifetimeMWh = p.lifetimeMWh; pd.lastMonthProfit = p.lastMonthProfit; pd.monthProfit = p.monthProfit;
+            pd.legacy = p.legacy; pd.retireYear = p.retireYear; pd.retireMonth = p.retireMonth; pd.customName = p.customName;
             pd.equipment = p.equipment.id; pd.ageStart = p.ageStartHour; pd.upgradeLeft = p.upgradeHoursLeft;
             pd.pendingUpgrade = p.pendingUpgrade == null ? null : p.pendingUpgrade.name();
             pd.upgrades = p.upgrades.stream().map(Enum::name).toArray(String[]::new);
@@ -86,6 +92,8 @@ public class SaveData {
         if (size > 0) g.size = size;
         if (cityCount > 0) g.cities = cityCount;
         g.rivals = version >= 2 ? rivals : 2;
+        // v1/v2 kayitlarinda rakipler bedava filoyla baslamisti; ayar bu oyunu tarif etsin.
+        g.rivalsStartWithFleet = version >= 3 ? rivalsStartWithFleet : true;
         GameState s = new GameState(g);
         s.hour = hour; s.nextId = nextId; s.won = won;
         s.markets.coalMult = coalMult; s.markets.gasMult = gasMult; s.markets.uraniumMult = uraniumMult;
@@ -106,9 +114,11 @@ public class SaveData {
             if (cd.cashHist != null) for (double v : cd.cashHist) c.cashHistory.add(v);
             if (cd.aiStyle != null) c.aiStyle = cd.aiStyle;
             else if (!c.player) c.aiStyle = c.name.startsWith("Yeşil") ? "green" : "fossil";
+            c.neutral = cd.neutral;
             c.rateAdd = cd.rateAdd; c.lastRenewMwh = cd.lastRenew;
             s.companies.add(c);
             if (c.player) s.player = c;
+            if (c.neutral) s.neutral = c;
         }
         for (CityD cd : cities) {
             City c = new City(); c.id = cd.id; c.x = cd.x; c.y = cd.y; c.name = cd.name; c.population = cd.pop; c.satisfaction = cd.sat;
@@ -125,6 +135,7 @@ public class SaveData {
             p.ageStartHour = pd.ageStart == Long.MIN_VALUE ? p.builtAtHour : pd.ageStart;
             if (pd.upgrades != null) for (String u : pd.upgrades) p.upgrades.add(Upgrade.valueOf(u));
             if (pd.pendingUpgrade != null) { p.pendingUpgrade = Upgrade.valueOf(pd.pendingUpgrade); p.upgradeHoursLeft = pd.upgradeLeft; }
+            p.legacy = pd.legacy; p.retireYear = pd.retireYear; p.retireMonth = pd.retireMonth; p.customName = pd.customName;
             s.map.ensureLand(p.x, p.y);
             s.plants.add(p); s.nodeById.put(p.id, p); s.occ[s.map.idx(p.x, p.y)] = p.id;
         }

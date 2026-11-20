@@ -10,7 +10,7 @@ class SimTest {
     /** Oyuncu stratejisi: her sehre yakin bir santral + hat. */
     static void playerBuild(GameState s, PlantType t, int cityIdx) {
         City c = s.cities.get(cityIdx);
-        Plant p = RivalAI.buildNear(s, s.player, t, c, false);
+        Plant p = RivalAI.buildNear(s, s.player, t, c);
         assertNotNull(p, "yer bulunamadi " + t);
     }
 
@@ -37,7 +37,7 @@ class SimTest {
     void buildAndDispatch() {
         GameState s = GameState.newGame(7, "Test");
         double cash0 = s.player.cash;
-        Plant p = RivalAI.buildNear(s, s.player, PlantType.GAS, s.cities.get(2), false);
+        Plant p = RivalAI.buildNear(s, s.player, PlantType.GAS, s.cities.get(2));
         assertNotNull(p);
         assertTrue(s.player.cash < cash0);
         run(s, 1);
@@ -52,7 +52,7 @@ class SimTest {
             GameState s = GameState.newGame(seed, "Test");
             for (int i = 0; i < s.cities.size(); i++) {
                 PlantType t = i % 2 == 0 ? PlantType.GAS : PlantType.WIND;
-                if (s.player.cash > s.catalog.defaultFor(t).capex() + 120e6) RivalAI.buildNear(s, s.player, t, s.cities.get(i), false);
+                if (s.player.cash > s.catalog.defaultFor(t).capex() + 120e6) RivalAI.buildNear(s, s.player, t, s.cities.get(i));
             }
             for (int y = 0; y < 10; y++) {
                 run(s, 1);
@@ -71,7 +71,7 @@ class SimTest {
         GameState s = GameState.newGame(5, "Test");
         // sadece kucuk bir santral, buyuk sehre bagli
         City big = s.cities.get(0);
-        Plant p = RivalAI.buildNear(s, s.player, PlantType.WIND, big, true);
+        Plant p = s.placeLegacy(s.player, s.catalog.defaultFor(PlantType.WIND), big, 0);
         assertNotNull(p);
         double before = s.player.cash;
         run(s, 1);

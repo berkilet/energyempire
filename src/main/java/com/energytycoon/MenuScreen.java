@@ -176,6 +176,11 @@ public final class MenuScreen implements Screen {
         opts.add(button("-", "small", () -> { settings.rivals = Math.max(0, settings.rivals - 1); refreshLabels(); dirty = true; })).size(28, 28);
         opts.add(rivalLbl).width(30).center();
         opts.add(button("+", "small", () -> { settings.rivals = Math.min(3, settings.rivals + 1); refreshLabels(); dirty = true; })).size(28, 28).row();
+        opts.add();
+        CheckBox fleet = new CheckBox("  Rakipler kurulu santrallerle başlasın", skin, "toggle");
+        fleet.setChecked(settings.rivalsStartWithFleet);
+        fleet.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { settings.rivalsStartWithFleet = fleet.isChecked(); dirty = true; } });
+        opts.add(fleet).colspan(3).left().padTop(2).padBottom(4).row();
         opts.add(new Label("Zorluk", skin, "dim")).width(70);
         Table diffs = new Table();
         ButtonGroup<TextButton> dg = new ButtonGroup<>();
@@ -247,7 +252,7 @@ public final class MenuScreen implements Screen {
         int land = 0;
         for (boolean w : s.map.water) if (!w) land++;
         previewInfo.setText(s.map.preset.label + " · " + s.map.size + "×" + s.map.size + " · %" + Math.round(100.0 * land / s.map.water.length)
-            + " kara · " + s.cities.size() + " şehir · " + (s.companies.size() - 1) + " rakip\nBeyaz: şehirler, renkli noktalar: rakip santralleri.");
+            + " kara · " + s.cities.size() + " şehir · " + s.companies.stream().filter(c -> !c.player && !c.neutral).count() + " rakip\nBeyaz: şehirler · gri: kamu santralleri (eski filo) · renkli: rakip santralleri.");
     }
 
     @Override public void show() { Gdx.input.setInputProcessor(stage); }

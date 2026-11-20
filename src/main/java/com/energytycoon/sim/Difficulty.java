@@ -6,7 +6,13 @@ public enum Difficulty {
     HARD("Zor", 0.70, 0.02, 1.5, 1.35);
 
     public final String label;
-    public final double cashMult, rateAdd, fineMult, rivalMult;
+    /** cashMult: tum ozel sirketlerin (oyuncu ve rakipler) esit baslangic nakdi carpani. */
+    public final double cashMult, rateAdd, fineMult;
+    /**
+     * Rakip davranisi: karar sikligi (GridBalance.RIVAL_BUILD_CHANCE ile carpilir) ve karar icin gereken
+     * nakit esigi (GridBalance.RIVAL_DECISION_CASH / rivalMult). Rakiplere kaynak (nakit) vermez.
+     */
+    public final double rivalMult;
 
     Difficulty(String label, double cash, double rate, double fine, double rival) {
         this.label = label; this.cashMult = cash; this.rateAdd = rate; this.fineMult = fine; this.rivalMult = rival;

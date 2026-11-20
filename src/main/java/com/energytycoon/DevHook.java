@@ -89,17 +89,17 @@ final class DevHook {
         GameState s = GameState.newGame(g);
         s.player.cash = 6e9;
         City c0 = s.cities.get(0), c1 = s.cities.get(Math.min(1, s.cities.size() - 1));
-        Plant focus = RivalAI.buildNear(s, s.player, s.catalog.get("lu-hjt"), c0, true);
-        RivalAI.buildNear(s, s.player, s.catalog.get("nw-45"), c0, true);
-        RivalAI.buildNear(s, s.player, s.catalog.get("rs-36"), c0, true);
-        RivalAI.buildNear(s, s.player, s.catalog.get("mp-ha"), c0, true);
-        RivalAI.buildNear(s, s.player, s.catalog.get("th-usc"), c1, true);
-        RivalAI.buildNear(s, s.player, s.catalog.get("atr-600"), c1, true);
-        RivalAI.buildNear(s, s.player, s.catalog.get("al-pelton"), c1, true);
-        RivalAI.buildNear(s, s.player, s.catalog.get("sp-perc"), c1, true);
+        Plant focus = s.placeLegacy(s.player, s.catalog.get("lu-hjt"), c0, 0);
+        s.placeLegacy(s.player, s.catalog.get("nw-45"), c0, 0);
+        s.placeLegacy(s.player, s.catalog.get("rs-36"), c0, 0);
+        s.placeLegacy(s.player, s.catalog.get("mp-ha"), c0, 0);
+        s.placeLegacy(s.player, s.catalog.get("th-usc"), c1, 0);
+        s.placeLegacy(s.player, s.catalog.get("atr-600"), c1, 0);
+        s.placeLegacy(s.player, s.catalog.get("al-pelton"), c1, 0);
+        s.placeLegacy(s.player, s.catalog.get("sp-perc"), c1, 0);
         if (env.containsKey("ET_ALLPLANTS")) {
             City c2 = s.cities.get(Math.min(2, s.cities.size() - 1));
-            for (String id : new String[] { "fk-sub", "fk-sc", "at-oc", "at-cc" }) RivalAI.buildNear(s, s.player, s.catalog.get(id), c2, true);
+            for (String id : new String[] { "fk-sub", "fk-sc", "at-oc", "at-cc" }) s.placeLegacy(s.player, s.catalog.get(id), c2, 0);
         }
         if (focus != null) { focus.upgrades.add(Upgrade.TRACKER); }
         for (int i = 0; i < 24 * 40; i++) s.tick();

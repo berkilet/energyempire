@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class EquipmentTest {
     static Plant place(GameState s, String eqId) {
         Equipment e = s.catalog.get(eqId);
-        Plant p = RivalAI.buildNear(s, s.player, e, s.cities.get(0), true);
+        Plant p = s.placeLegacy(s.player, e, s.cities.get(0), 0);
         assertNotNull(p, eqId);
         return p;
     }
@@ -75,7 +75,8 @@ class EquipmentTest {
         GameState s = GameState.newGame(16, "T");
         Equipment tandem = s.catalog.get("kg-tandem");
         assertNotNull(s.checkEquipment(tandem));
-        assertNull(RivalAI.buildNear(s, s.player, tandem, s.cities.get(0), true));
+        assertNull(s.placeLegacy(s.player, tandem, s.cities.get(0), 0));
+        assertNull(RivalAI.buildNear(s, s.player, tandem, s.cities.get(0)));
     }
 
     @Test

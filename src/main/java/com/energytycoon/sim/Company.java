@@ -7,6 +7,8 @@ import java.util.List;
 public final class Company {
     public String name;
     public boolean player;
+    /** Tarafsiz kamu sirketi (eski filo): YZ calistirmaz, iflas etmez, siralamalara girmez. */
+    public boolean neutral;
     /** Rakip YZ tarzi: fossil, green, balanced. */
     public String aiStyle = "balanced";
     public int colorRgb;

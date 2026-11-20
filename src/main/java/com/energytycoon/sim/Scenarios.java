@@ -48,6 +48,12 @@ public final class Scenarios {
 
     private static void reg(Scenario s) { ALL.put(s.id, s); }
 
+    static {
+        // Kendi eski filosunu oyuncuya veren senaryolarda kamu filosu daha kucuk (oyuncu filosu da sayilir).
+        ALL.get("coal").legacyCoverage = GridBalance.LEGACY_COVERAGE_SCENARIO;
+        ALL.get("crisis").legacyCoverage = GridBalance.LEGACY_COVERAGE_SCENARIO;
+    }
+
     public static Scenario get(String id) { return ALL.getOrDefault(id, ALL.get("free")); }
     public static List<Scenario> all() { return new ArrayList<>(ALL.values()); }
 
@@ -57,8 +63,8 @@ public final class Scenarios {
         int n = 0;
         for (City c : s.cities) {
             if (n >= Math.min(4, s.cities.size())) break;
-            Plant p = RivalAI.buildNear(s, s.player, old, c, true);
-            if (p != null) { p.builtAtHour = s.hour - 22L * Balance.HOURS_PER_YEAR; n++; }
+            Plant p = s.placeLegacy(s.player, old, c, 22);
+            if (p != null) n++;
         }
         s.player.cash = 260e6 * s.settings.difficulty.cashMult;
     }
@@ -67,8 +73,7 @@ public final class Scenarios {
         s.markets.gasMult = 2.0; s.markets.coalMult = 1.35;
         Equipment oc = s.catalog.get("at-oc");
         for (int i = 0; i < Math.min(2, s.cities.size()); i++) {
-            Plant p = RivalAI.buildNear(s, s.player, oc, s.cities.get(s.cities.size() - 1 - i), true);
-            if (p != null) p.builtAtHour = p.ageStartHour = s.hour - 12L * Balance.HOURS_PER_YEAR;
+            s.placeLegacy(s.player, oc, s.cities.get(s.cities.size() - 1 - i), 12);
         }
         s.player.cash = 380e6 * s.settings.difficulty.cashMult;
     }

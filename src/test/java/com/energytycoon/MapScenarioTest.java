@@ -33,9 +33,10 @@ class MapScenarioTest {
         g.size = 96; g.cities = 10; g.rivals = 3; g.seed = 4;
         GameState s = GameState.newGame(g);
         assertEquals(10, s.cities.size());
-        assertEquals(4, s.companies.size());
+        assertEquals(4, s.companies.stream().filter(c -> !c.neutral).count(), "oyuncu + 3 rakip");
+        assertNotNull(s.neutral, "kamu eski filosu");
         g.rivals = 0;
-        assertEquals(1, GameState.newGame(g).companies.size());
+        assertEquals(1, GameState.newGame(g).companies.stream().filter(c -> !c.neutral).count());
     }
 
     @Test
@@ -83,7 +84,7 @@ class MapScenarioTest {
         GameState s = GameState.newGame(3, "T");
         Objective noCoal = Scenarios.get("coal").objectives.get(0);
         assertTrue(noCoal.met(s));
-        RivalAI.buildNear(s, s.player, PlantType.COAL, s.cities.get(0), true);
+        s.placeLegacy(s.player, s.catalog.defaultFor(PlantType.COAL), s.cities.get(0), 0);
         assertFalse(noCoal.met(s));
     }
 }

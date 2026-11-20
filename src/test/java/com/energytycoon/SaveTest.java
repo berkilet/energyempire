@@ -10,8 +10,8 @@ class SaveTest {
     @Test
     void roundTrip() {
         GameState s = GameState.newGame(99, "Kayit A.Ş.");
-        RivalAI.buildNear(s, s.player, PlantType.GAS, s.cities.get(0), true);
-        RivalAI.buildNear(s, s.player, PlantType.SOLAR, s.cities.get(1), false);
+        s.placeLegacy(s.player, s.catalog.defaultFor(PlantType.GAS), s.cities.get(0), 0);
+        RivalAI.buildNear(s, s.player, PlantType.SOLAR, s.cities.get(1));
         for (int i = 0; i < 24 * 200; i++) s.tick();
 
         Json json = new Json();
@@ -36,7 +36,7 @@ class SaveTest {
         GameSettings g = new GameSettings();
         g.preset = com.energytycoon.world.MapPreset.HIGHLANDS; g.size = 48; g.cities = 4; g.rivals = 1; g.scenarioId = "green"; g.seed = 8;
         GameState s = GameState.newGame(g);
-        Plant p = RivalAI.buildNear(s, s.player, s.catalog.get("lu-hjt"), s.cities.get(0), true);
+        Plant p = s.placeLegacy(s.player, s.catalog.get("lu-hjt"), s.cities.get(0), 0);
         s.player.cash = 1e9;
         assertNull(s.startUpgrade(p, Upgrade.TRACKER));
         for (int i = 0; i < 24 * 50; i++) s.tick();
@@ -44,7 +44,7 @@ class SaveTest {
         assertEquals(com.energytycoon.world.MapPreset.HIGHLANDS, r.map.preset);
         assertEquals(48, r.map.size);
         assertEquals("green", r.scenario.id);
-        assertEquals(2, r.companies.size());
+        assertEquals(s.companies.size(), r.companies.size());
         Plant rp = r.plants.stream().filter(x -> x.id == p.id).findFirst().orElseThrow();
         assertEquals("lu-hjt", rp.equipment.id);
         assertTrue(rp.upgrades.contains(Upgrade.TRACKER));
