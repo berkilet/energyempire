@@ -26,6 +26,12 @@ public final class Plant extends GridNode {
     /** Haritada gosterilen ozel ad (ör. "Bozova Termik"); null ise tur adi. */
     public String customName;
 
+    /** Santralin bagli oldugu nokta (topoloji kurulunca atanir). */
+    public transient ConnectionPoint cp;
+
+    /** Hat dolulugu icin: santral ucunun dolulugu baglanti noktasininkidir. */
+    @Override public double utilization() { return cp == null ? 0 : cp.utilization(); }
+
     @Override public String name() { return customName != null ? customName : type.label; }
 
     public boolean operational() { return buildHoursLeft <= 0; }

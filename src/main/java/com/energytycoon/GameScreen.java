@@ -32,6 +32,8 @@ public final class GameScreen implements Screen, Hud.Listener {
     private int speed = 1, lastSpeed = 1;
     private double accum;
     private GridNode lineFrom;
+    /** Hat araci kademesi (Tab ile OG → YG → ÇYG). */
+    private LineTier lineTier = LineTier.YG;
     private int selNode = -1, selLine = -1;
     private boolean rightDown; private float rdx, rdy; private int lastMx, lastMy;
     private final Layer[] layers = Layer.values();
@@ -143,7 +145,7 @@ public final class GameScreen implements Screen, Hud.Listener {
             state.demolishPlant(p); selNode = -1;
             hud.toast("Santral yıkıldı. İade: " + Fmt.money(refund));
         } else if (selLine >= 0) {
-            for (PowerLine l : state.lines) if (l.id == selLine && l.owner.player) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); break; }
+            for (PowerLine l : state.lines) if (l.id == selLine && l.owner != null && l.owner.player) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); break; }
             selLine = -1;
         }
     }
@@ -182,6 +184,7 @@ public final class GameScreen implements Screen, Hud.Listener {
                 case Input.Keys.M -> hud.toggle("market");
                 case Input.Keys.C -> hud.toggle("companies");
                 case Input.Keys.H -> hud.toggle("help");
+                case Input.Keys.TAB -> { lineTier = lineTier.next(); if (tool == Tool.LINE) hud.toast("Hat kademesi: " + lineTier.label); }
                 case Input.Keys.L -> layer(layers[(wr.terrain.layer().ordinal() + 1) % layers.length]);
                 case Input.Keys.F5 -> action("save");
                 case Input.Keys.F9 -> action("load");
@@ -227,12 +230,12 @@ public final class GameScreen implements Screen, Hud.Listener {
                 GridNode n = state.nodeAt(x, y);
                 if (n == null) { hud.toast("Hat için bir santrale veya şehre tıklayın."); return; }
                 if (lineFrom == null) { lineFrom = n; return; }
-                String why = state.checkLine(lineFrom, n);
+                String why = state.checkLine(lineFrom, n, lineTier);
                 if (why != null) { hud.toast(why); return; }
-                double cost = state.lineCost(lineFrom, n);
+                double cost = state.lineCost(lineFrom, n, lineTier);
                 if (state.player.cash < cost) { hud.toast("Yetersiz nakit (" + Fmt.money(cost) + " gerekli)."); return; }
-                state.buildLine(state.player, lineFrom, n);
-                hud.toast("Hat kuruldu: " + lineFrom.name() + " - " + n.name() + " (" + Fmt.money(cost) + ")");
+                state.buildLine(state.player, lineFrom, n, lineTier);
+                hud.toast(lineTier.shortLabel + " hat kuruldu: " + lineFrom.name() + " - " + n.name() + " (" + Fmt.money(cost) + ")");
                 lineFrom = null;
             }
             case DEMOLISH -> {
@@ -244,7 +247,7 @@ public final class GameScreen implements Screen, Hud.Listener {
                     hud.toast("Santral yıkıldı. İade: " + Fmt.money(refund));
                 } else {
                     PowerLine l = wr.pickLine(x + 0.5f, y + 0.5f);
-                    if (l != null && l.owner.player) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); }
+                    if (l != null && l.owner != null && l.owner.player) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); }
                     else if (l != null) hud.toast("Bu hat size ait değil.");
                 }
             }
@@ -280,13 +283,15 @@ public final class GameScreen implements Screen, Hud.Listener {
             case LINE -> {
                 wr.lineFrom = lineFrom; wr.lineHover = n;
                 if (lineFrom != null && n != null) {
-                    String why = state.checkLine(lineFrom, n);
-                    double cost = state.lineCost(lineFrom, n);
+                    String why = state.checkLine(lineFrom, n, lineTier);
+                    double cost = state.lineCost(lineFrom, n, lineTier);
+                    double len = state.lineLength(lineFrom, n);
                     wr.lineValid = why == null && state.player.cash >= cost;
-                    hud.setPlaceInfo("Hat: " + Fmt.f1(state.lineLength(lineFrom, n)) + " kare  ·  " + Fmt.money(cost) + (why != null ? "   ✗ " + why : ""));
+                    hud.setPlaceInfo(lineTier.shortLabel + " hat: " + Fmt.f1(len) + " kare  ·  " + Fmt.money(cost) + "  ·  " + Fmt.mw(lineTier.capacityMW)
+                        + "  ·  " + lineTier.buildDays(len) + " gün  ·  kayıp %" + Fmt.f1(len * lineTier.lossPerTile * 100) + (why != null ? "   ✗ " + why : ""));
                 } else {
                     wr.lineValid = n != null;
-                    hud.setPlaceInfo(lineFrom == null ? "Hat başlangıcı için bir santrale/şehre tıklayın" : "Hat bitişi için bir santrale/şehre tıklayın");
+                    hud.setPlaceInfo(lineTier.label + " · " + (lineFrom == null ? "Hat başlangıcı için bir santrale/şehre tıklayın" : "Hat bitişi için bir santrale/şehre tıklayın") + " · Tab: kademe");
                 }
             }
             case DEMOLISH -> hud.setPlaceInfo(n instanceof Plant p && p.owner.player ? "Yık: " + p.name() + " (iade " + Fmt.money(p.bookValue(state.hour) * Balance.DEMOLISH_REFUND) + ")" : "Yıkmak için kendi santralinize veya hatlarınıza tıklayın");
@@ -349,8 +354,10 @@ public final class GameScreen implements Screen, Hud.Listener {
                 + "\nBölge fiyatı: $" + Fmt.f1(comp == null ? 0 : comp.price) + "/MWh";
         }
         if (selLine >= 0) for (PowerLine l : state.lines) if (l.id == selLine) {
-            return "İletim hattı\n" + l.a.name() + " ↔ " + l.b.name() + "\nSahibi: " + l.owner.name
-                + "\nUzunluk: " + Fmt.f1(l.lengthTiles) + " kare\nKapasite: " + Fmt.mw(l.capacityMW) + "\nYük: " + Fmt.pct(l.utilization());
+            return "İletim hattı · " + l.tier.label + "\n" + l.a.name() + " ↔ " + l.b.name() + "\nSahibi: " + l.ownerName()
+                + "\nDurum: " + l.status.label
+                + "\nUzunluk: " + Fmt.f1(l.lengthTiles) + " kare\nKapasite: " + Fmt.mw(l.capacityMW()) + "\nYük: " + Fmt.pct(l.utilization())
+                + "\nKayıp: %" + Fmt.f1(l.lossFraction() * 100) + "  ·  doluluk (geçen yıl) " + l.saturatedHoursLastYear + " saat";
         }
         return null;
     }
@@ -367,7 +374,7 @@ public final class GameScreen implements Screen, Hud.Listener {
             }
             a.add(new String[] { "Yık (iade %" + (int) (Balance.DEMOLISH_REFUND * 100) + ")", "demolish", "1" });
         } else if (selLine >= 0) {
-            for (PowerLine l : state.lines) if (l.id == selLine && l.owner.player) a.add(new String[] { "Hattı kaldır", "removeLine", "1" });
+            for (PowerLine l : state.lines) if (l.id == selLine && l.owner != null && l.owner.player) a.add(new String[] { "Hattı kaldır", "removeLine", "1" });
         }
         return a;
     }

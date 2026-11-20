@@ -33,4 +33,23 @@ public final class GridBalance {
     public static final double RIVAL_DECISION_CASH = 160e6;
     /** Rakibin bir ayda insaat karari verme olasiligi (zorluk carpaniyla carpilir). */
     public static final double RIVAL_BUILD_CHANCE = 0.55;
+
+    // ---- Faz 2: Hat kademeleri (Bolum 9). Sira: OG 34,5 kV, YG 154 kV, CYG 380 kV
+    public static final double[] TIER_CAPACITY_MW      = { 60, 250, 1000 };
+    public static final double[] TIER_COST_PER_TILE    = { 0.35e6, 1.1e6, 2.8e6 };
+    public static final double[] TIER_OM_PER_TILE_YEAR = { 6_000, 15_000, 30_000 };
+    public static final double[] TIER_LOSS_PER_TILE    = { 0.008, 0.0035, 0.0012 };
+    public static final double[] TIER_MAX_LENGTH       = { 8, 45, 60 };
+    public static final int[]    TIER_BASE_BUILD_DAYS  = { 15, 30, 60 };
+    public static final int[]    TIER_BUILD_DAYS_PER_TILE = { 1, 3, 5 };
+    public static final double[] TIER_OUTAGE_PER_TILE_HOUR = { 3e-6, 2e-6, 1.5e-6 };
+    /** Bir baglanti noktasinin en yakin sehre kaybi en fazla bu kadar olur. */
+    public static final double MAX_PATH_LOSS = 0.15;
+    /** Doluluk bu oranin ustundeyse hat o saat "dolu" sayilir. */
+    public static final double SATURATION_THRESHOLD = 0.99;
+    /** Hat defter degeri: dogrusal amortisman suresi (yil) ve alt sinir. */
+    public static final double LINE_LIFE_YEARS = 40, LINE_BOOK_FLOOR = 0.25;
+    /** Isletmeci (owner == null) hatlarinin gosterilen sahibi. */
+    public static final String OPERATOR_NAME = "Ulusal Şebeke İşletmesi (UŞİ)";
+    public static final String OPERATOR_SHORT = "UŞİ";
 }

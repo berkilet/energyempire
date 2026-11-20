@@ -15,7 +15,13 @@ public class SaveData {
     public static class PlantD { public int id, x, y, owner, buildLeft, outage; public String type; public long builtAt; public double lifetimeMWh, lastMonthProfit, monthProfit;
         public String equipment, pendingUpgrade; public String[] upgrades; public int upgradeLeft; public long ageStart = Long.MIN_VALUE;
         /** v3 */ public boolean legacy; public int retireYear, retireMonth; public String customName; }
-    public static class LineD { public int id, a, b, owner; public double cost; }
+    /** owner: sirket indeksi, -1 = isletmeci (UŞİ). tier/status null ise YG/ACTIVE (v2 kayitlari). */
+    public static class LineD {
+        public int id, a, b, owner; public double cost;
+        public String tier, status;
+        public long builtAtHour; public int buildHoursLeft, requesterId = -1, outageHoursLeft, saturatedHoursThisYear, saturatedHoursLastYear;
+        public double annualCharge;
+    }
 
     /** v3: kamu eski filosu (neutral sirket, legacy santral alanlari), rivalsStartWithFleet. v1/v2 okunabilir. */
     public static final int CURRENT_VERSION = 3;
@@ -87,7 +93,10 @@ public class SaveData {
             d.plants.add(pd);
         }
         for (PowerLine l : s.lines) {
-            LineD ld = new LineD(); ld.id = l.id; ld.a = l.a.id; ld.b = l.b.id; ld.owner = s.companies.indexOf(l.owner); ld.cost = l.buildCost;
+            LineD ld = new LineD(); ld.id = l.id; ld.a = l.a.id; ld.b = l.b.id; ld.owner = l.owner == null ? -1 : s.companies.indexOf(l.owner); ld.cost = l.buildCost;
+            ld.tier = l.tier.name(); ld.status = l.status.name(); ld.buildHoursLeft = l.buildHoursLeft; ld.builtAtHour = l.builtAtHour;
+            ld.requesterId = l.requester == null ? -1 : s.companies.indexOf(l.requester); ld.annualCharge = l.annualCharge;
+            ld.outageHoursLeft = l.outageHoursLeft; ld.saturatedHoursThisYear = l.saturatedHoursThisYear; ld.saturatedHoursLastYear = l.saturatedHoursLastYear;
             d.lines.add(ld);
         }
         d.monthlyPrice = s.history.monthlyPrice.stream().mapToDouble(Double::doubleValue).toArray();
@@ -155,7 +164,13 @@ public class SaveData {
         for (LineD ld : lines) {
             GridNode a = s.nodeById.get(ld.a), b = s.nodeById.get(ld.b);
             if (a == null || b == null) continue;
-            PowerLine l = new PowerLine(); l.id = ld.id; l.a = a; l.b = b; l.owner = s.companies.get(ld.owner); l.buildCost = ld.cost;
+            PowerLine l = new PowerLine(); l.id = ld.id; l.a = a; l.b = b; l.owner = ld.owner < 0 ? null : s.companies.get(ld.owner); l.buildCost = ld.cost;
+            if (l.owner != null && l.owner.neutral) l.owner = null; // kamu hatlari isletmeciye (UŞİ) aittir
+            l.tier = ld.tier == null ? LineTier.YG : LineTier.valueOf(ld.tier);
+            l.status = ld.status == null ? LineStatus.ACTIVE : LineStatus.valueOf(ld.status);
+            l.buildHoursLeft = ld.buildHoursLeft; l.builtAtHour = ld.builtAtHour; l.annualCharge = ld.annualCharge;
+            l.requester = ld.requesterId < 0 ? null : s.companies.get(ld.requesterId);
+            l.outageHoursLeft = ld.outageHoursLeft; l.saturatedHoursThisYear = ld.saturatedHoursThisYear; l.saturatedHoursLastYear = ld.saturatedHoursLastYear;
             l.lengthTiles = s.lineLength(a, b);
             s.lines.add(l); a.lines.add(l); b.lines.add(l);
         }

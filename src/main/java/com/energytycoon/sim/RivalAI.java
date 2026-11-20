@@ -64,11 +64,14 @@ public final class RivalAI {
         int[] site = findSite(s, e, city, 4, 16);
         if (site == null) return null;
         int bx = site[0], by = site[1];
-        double lineCost = s.map.inBounds(bx, by) ? s.lineCost(new Probe(bx, by), city) : 0;
+        Probe probe = new Probe(bx, by);
+        // Kademe: santral gucunu tasiyan en ucuz kademe (oyuncuyla ayni kurallar).
+        LineTier tier = GameState.tierFor(e.capacityMW, s.lineLength(probe, city));
+        double lineCost = s.map.inBounds(bx, by) ? s.lineCost(probe, city, tier) : 0;
         if (c.cash < e.capex() + lineCost + reserve) return null;
         Plant p = s.buildPlant(c, e, bx, by);
         if (p == null) return null;
-        s.buildLine(c, p, city);
+        if (s.buildLine(c, p, city, tier) == null) s.buildLine(c, p, city);
         return p;
     }
 

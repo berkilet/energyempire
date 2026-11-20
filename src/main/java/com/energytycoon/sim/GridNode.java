@@ -13,7 +13,7 @@ public abstract class GridNode {
 
     public double lineCapacity() {
         double c = 0;
-        for (PowerLine l : lines) c += l.capacityMW;
+        for (PowerLine l : lines) if (l.usable()) c += l.capacityMW();
         return c;
     }
     public double utilization() {
