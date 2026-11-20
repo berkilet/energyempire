@@ -176,7 +176,7 @@ public final class GridOperator {
             for (City a : s.cities) for (City b : s.cities) {
                 if (a.id >= b.id || part.get(a).equals(part.get(b))) continue;
                 double d = s.lineLength(a, b);
-                if (d <= LineTier.CYG.maxLength && d < bd) { bd = d; ba = a; bb = b; }
+                if (d <= LineTier.CYG.maxLength && d < bd && s.route(a, b).throughCity == null) { bd = d; ba = a; bb = b; }
             }
             if (ba == null) break;
             announce(ba, bb, LineTier.CYG);

@@ -395,17 +395,51 @@ public final class GameState {
         return mw >= GridBalance.CYG_MIN_PLANT_MW && length <= LineTier.CYG.maxLength ? LineTier.CYG : LineTier.YG;
     }
 
-    public double lineCost(GridNode a, GridNode b, LineTier tier) {
+    /** Guzergah ozeti: gecilen karelerin su/yuksek arazi orani, ortalama maliyet carpani ve icinden gecilen sehir. */
+    public static final class Route {
+        public double waterFrac, highFrac, mult = 1;
+        public City throughCity;
+    }
+
+    /** Duz hat guzergahindaki kareler (yarim kare adimla ornekleme; tekrarsiz). */
+    public Route route(GridNode a, GridNode b) {
+        Route r = new Route();
         double len = lineLength(a, b);
-        int steps = Math.max(1, (int) Math.ceil(len));
-        int w = 0;
+        int steps = Math.max(1, (int) Math.ceil(len * 2));
+        int n = 0, w = 0, hi = 0, last = -1;
+        double sum = 0;
         for (int i = 0; i <= steps; i++) {
-            int x = (int) Math.round(a.x + (b.x - a.x) * i / (double) steps);
-            int y = (int) Math.round(a.y + (b.y - a.y) * i / (double) steps);
-            if (map.inBounds(x, y) && map.isWater(x, y)) w++;
+            int x = (int) Math.floor(a.x + 0.5 + (b.x - a.x) * i / (double) steps);
+            int y = (int) Math.floor(a.y + 0.5 + (b.y - a.y) * i / (double) steps);
+            if (!map.inBounds(x, y)) continue;
+            int idx = map.idx(x, y);
+            if (idx == last) continue;
+            last = idx;
+            if (occ[idx] >= 0 && r.throughCity == null && nodeById.get(occ[idx]) instanceof City c && c != a && c != b) r.throughCity = c;
+            n++;
+            double m = 1;
+            if (map.water[idx]) { w++; m = GridBalance.ROUTE_WATER_MULT; }
+            else if (map.level[idx] >= GridBalance.ROUTE_HIGH_LEVEL) { hi++; m = GridBalance.ROUTE_HIGH_MULT; }
+            sum += m;
         }
-        double wf = w / (double) (steps + 1);
-        return len * tier.costPerTile * (1 + (Balance.LINE_WATER_MULT - 1) * wf);
+        if (n > 0) { r.waterFrac = w / (double) n; r.highFrac = hi / (double) n; r.mult = sum / n; }
+        return r;
+    }
+
+    /** Indirimsiz guzergah maliyeti (uzunluk x kare maliyeti x guzergah carpani). */
+    public double routeCost(GridNode a, GridNode b, LineTier tier) {
+        return lineLength(a, b) * tier.costPerTile * route(a, b).mult;
+    }
+
+    /** Ayni iki uc arasinda (herhangi durumda) hat var mi. */
+    public boolean hasParallel(GridNode a, GridNode b) {
+        for (PowerLine l : a.lines) if (l.other(a) == b) return true;
+        return false;
+    }
+
+    public double lineCost(GridNode a, GridNode b, LineTier tier) {
+        double c = routeCost(a, b, tier);
+        return hasParallel(a, b) ? c * (1 - GridBalance.PARALLEL_DISCOUNT) : c;
     }
 
     public String checkLine(GridNode a, GridNode b) { return checkLine(a, b, LineTier.YG); }
@@ -418,6 +452,8 @@ public final class GameState {
         int dup = 0;
         for (PowerLine l : a.lines) if (l.other(a) == b) dup++;
         if (dup >= 3) return "Bu iki nokta arası en fazla 3 hat";
+        City through = route(a, b).throughCity;
+        if (through != null) return "Hat şehir içinden geçemez (" + through.name + ")";
         if (tier == LineTier.CYG && (!cygEndpoint(a) || !cygEndpoint(b)))
             return "ÇYG yalnızca TM380, şehir veya " + (int) GridBalance.CYG_MIN_PLANT_MW + " MW üstü tekil santrale bağlanır";
         return null;
@@ -468,6 +504,81 @@ public final class GameState {
         }
         l.builtAtHour = hour + l.buildHoursLeft;
         return l;
+    }
+
+    /** Kademe yukseltme bedeli: (yeni - eski indirimsiz maliyet) x (1 + prim). */
+    public double upgradeCost(PowerLine l) {
+        LineTier to = l.tier.up();
+        if (to == null) return 0;
+        return (routeCost(l.a, l.b, to) - routeCost(l.a, l.b, l.tier)) * (1 + GridBalance.UPGRADE_PREMIUM);
+    }
+
+    public int upgradeHours(PowerLine l) {
+        LineTier to = l.tier.up();
+        return to == null ? 0 : (int) Math.round(to.buildDays(l.lengthTiles) * GridBalance.UPGRADE_TIME_MULT) * 24;
+    }
+
+    /** Null: yukseltme yapilabilir; aksi halde sebep. */
+    public String checkUpgrade(Company c, PowerLine l) {
+        LineTier to = l.tier.up();
+        if (to == null) return "Zaten en üst kademe";
+        if (l.owner != c) return "Yalnızca kendi hattınızı yükseltebilirsiniz";
+        if (l.status != LineStatus.ACTIVE) return "Hat aktif değil";
+        if (l.lengthTiles > to.maxLength) return to.shortLabel + " için hat çok uzun";
+        if (to == LineTier.CYG && (!cygEndpoint(l.a) || !cygEndpoint(l.b))) return "ÇYG uçları uygun değil (TM380, şehir veya 400 MW+ tekil santral)";
+        if (c.cash < upgradeCost(l)) return "Yetersiz nakit";
+        return null;
+    }
+
+    /** Kademe yukseltmesini baslatir: hat sure boyunca kapali (UPGRADING). */
+    public String upgradeLine(Company c, PowerLine l) {
+        String why = checkUpgrade(c, l);
+        if (why != null) return why;
+        double cost = upgradeCost(l);
+        c.cash -= cost; c.capexSpent += cost;
+        l.upgradeTo = l.tier.up(); l.upgradeCost = cost;
+        l.status = LineStatus.UPGRADING;
+        l.buildHoursLeft = upgradeHours(l);
+        topoDirty = true;
+        return null;
+    }
+
+    private void finishLineUpgrade(PowerLine l) {
+        l.tier = l.upgradeTo; l.buildCost += l.upgradeCost;
+        l.upgradeTo = null; l.upgradeCost = 0;
+        l.status = LineStatus.ACTIVE; l.buildHoursLeft = 0;
+        topoDirty = true;
+        if (affectsPlayer(l)) notify("Hat yükseltmesi tamamlandı: " + GridOperator.label(l) + " (" + Math.round(l.capacityMW()) + " MW)");
+    }
+
+    /** Hat oyuncuyu ilgilendiriyor mu: sahibi/basvurani oyuncu ya da bir ucu oyuncunun santrali/TM'si. */
+    public boolean affectsPlayer(PowerLine l) {
+        if (l.owner != null && l.owner.player || l.requester != null && l.requester.player) return true;
+        for (GridNode n : new GridNode[] { l.a, l.b })
+            if (n instanceof Plant p && p.owner.player || n instanceof Substation t && t.owner.player) return true;
+        return false;
+    }
+
+    /** Saatlik hat ariza zari ve sayaclari. Onarim bedeli sahibine (UŞİ ucretsiz). */
+    private void lineOutages() {
+        for (int i = 0; i < lines.size(); i++) {
+            PowerLine l = lines.get(i);
+            if (l.outageHoursLeft > 0) {
+                if (--l.outageHoursLeft == 0) {
+                    topoDirty = true;
+                    if (affectsPlayer(l)) notify("Hat arızası giderildi: " + GridOperator.label(l));
+                }
+                continue;
+            }
+            if (l.status != LineStatus.ACTIVE) continue;
+            if (rng.nextDouble() >= l.tier.outagePerTileHour * l.lengthTiles) continue;
+            l.outageHoursLeft = GridBalance.LINE_OUTAGE_MIN_H + rng.nextInt(GridBalance.LINE_OUTAGE_MAX_H - GridBalance.LINE_OUTAGE_MIN_H + 1);
+            topoDirty = true;
+            double repair = l.owner == null ? 0 : l.buildCost * GridBalance.LINE_REPAIR_COST;
+            if (l.owner != null) { l.owner.cash -= repair; l.owner.omCost += repair; }
+            if (affectsPlayer(l)) notify("HAT ARIZASI: " + GridOperator.label(l) + " " + l.outageHoursLeft + " saat devre dışı"
+                + (repair > 0 ? " · onarım " + Math.round(repair / 1e3) + "K $" : " · onarım UŞİ'de"));
+        }
     }
 
     /** Insaati/planlamasi biten hatti devreye alir; iki ayri sehirli sebeke parcasi birlesirse duyurur. */
@@ -905,7 +1016,9 @@ public final class GameState {
         for (int i = 0; i < lines.size(); i++) {
             PowerLine l = lines.get(i);
             if (l.status == LineStatus.BUILDING && --l.buildHoursLeft <= 0) activateLine(l);
+            else if (l.status == LineStatus.UPGRADING && --l.buildHoursLeft <= 0) finishLineUpgrade(l);
         }
+        lineOutages();
         operator.hourly();
 
         dispatchHour();

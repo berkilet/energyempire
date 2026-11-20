@@ -24,6 +24,9 @@ public final class PowerLine {
     public int holdHours;
     /** UŞİ'nin kendi plani (ucretsiz, kuyruga girmez). */
     public boolean operatorPlan;
+    /** Devam eden kademe yukseltmesinin hedefi (UPGRADING) ve bedeli. */
+    public LineTier upgradeTo;
+    public double upgradeCost;
 
     public GridNode other(GridNode n) { return n == a ? b : a; }
     public boolean operator() { return owner == null; }

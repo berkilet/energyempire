@@ -29,6 +29,7 @@ public class SaveData {
         public long builtAtHour; public int buildHoursLeft, requesterId = -1, outageHoursLeft, saturatedHoursThisYear, saturatedHoursLastYear;
         public double annualCharge;
         /** Faz 5 */ public long appliedAtHour; public double contribution; public boolean accelerated, operatorPlan; public int holdHours;
+        /** Faz 6 */ public String upgradeTo; public double upgradeCost;
     }
 
     /** v3: kamu eski filosu (neutral sirket, legacy santral alanlari), rivalsStartWithFleet. v1/v2 okunabilir. */
@@ -115,6 +116,7 @@ public class SaveData {
             ld.requesterId = l.requester == null ? -1 : s.companies.indexOf(l.requester); ld.annualCharge = l.annualCharge;
             ld.outageHoursLeft = l.outageHoursLeft; ld.saturatedHoursThisYear = l.saturatedHoursThisYear; ld.saturatedHoursLastYear = l.saturatedHoursLastYear;
             ld.appliedAtHour = l.appliedAtHour; ld.contribution = l.contribution; ld.accelerated = l.accelerated; ld.operatorPlan = l.operatorPlan; ld.holdHours = l.holdHours;
+            ld.upgradeTo = l.upgradeTo == null ? null : l.upgradeTo.name(); ld.upgradeCost = l.upgradeCost;
             d.lines.add(ld);
         }
         d.monthlyPrice = s.history.monthlyPrice.stream().mapToDouble(Double::doubleValue).toArray();
@@ -199,6 +201,7 @@ public class SaveData {
             l.requester = ld.requesterId < 0 ? null : s.companies.get(ld.requesterId);
             l.outageHoursLeft = ld.outageHoursLeft; l.saturatedHoursThisYear = ld.saturatedHoursThisYear; l.saturatedHoursLastYear = ld.saturatedHoursLastYear;
             l.appliedAtHour = ld.appliedAtHour; l.contribution = ld.contribution; l.accelerated = ld.accelerated; l.operatorPlan = ld.operatorPlan; l.holdHours = ld.holdHours;
+            l.upgradeTo = ld.upgradeTo == null ? null : LineTier.valueOf(ld.upgradeTo); l.upgradeCost = ld.upgradeCost;
             l.lengthTiles = s.lineLength(a, b);
             s.lines.add(l); a.lines.add(l); b.lines.add(l);
         }

@@ -43,6 +43,8 @@ public final class ModelFactory implements Disposable {
 
     /** Pylon iletken yuksekligi ve kol yari genisligi. */
     public static final float PYLON_H = 0.82f, PYLON_ARM = 0.14f;
+    /** Iletken kalinligi (kademeye gore WorldRenderer ayarlar). */
+    public float cableWidth = 0.012f;
 
     public ModelFactory() {
         windowTex = makeWindowTexture(false);
@@ -648,7 +650,7 @@ public final class ModelFactory implements Disposable {
         for (int i = 1; i <= segs; i++) {
             float t = i / (float) segs;
             cur.set(MathUtils.lerp(p.x, q.x, t), MathUtils.lerp(p.y, q.y, t) - 0.12f * 4f * t * (1 - t) * Math.min(1f, len / 1.6f), MathUtils.lerp(p.z, q.z, t));
-            strut(b, ident, prev, cur, 0.012f, Color.WHITE);
+            strut(b, ident, prev, cur, cableWidth, Color.WHITE);
             prev.set(cur);
         }
     }

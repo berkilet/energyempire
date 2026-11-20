@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * Gelistirici dogrulama kancasi; yalnizca ET_SHOT ortam degiskeni varsa calisir (normal oyunda etkisiz).
  * ET_SHOT=png yolu, ET_SCENARIO=menu|setup|game, ET_PRESET=MapPreset, ET_SIM=senaryo id, ET_HOUR=saat,
- * ET_OPEN=equip:TYPE|market|select|invest|invest2|line|closed|tm|tmfinance|linechoice|opapps, ET_ZOOM=px/birim, ET_FOCUS=plant|overview, ET_SHADOW=0..2, ET_FRAMES=n
+ * ET_OPEN=equip:TYPE|market|select|invest|invest2|line|closed|tm|tmfinance|linechoice|opapps|lineup, ET_ZOOM=px/birim, ET_FOCUS=plant|overview, ET_SHADOW=0..2, ET_FRAMES=n
  */
 final class DevHook {
     private final EnergyGame game;
@@ -52,6 +52,7 @@ final class DevHook {
             else if (open.equals("closed")) gs.devHideHelp();
             else if (open.equals("tm")) gs.devBuildSubstation();
             else if (open.equals("linechoice")) gs.devLineChoice();
+            else if (open.equals("lineup")) gs.devSelectOwnLine();
             else if (open.equals("opapps")) gs.devOperatorApps();
             else if (open.equals("opmap")) { gs.devOperatorApps(); gs.devToggle("operator"); }
             else if (open.equals("tmfinance")) { gs.devBuildSubstation(); gs.devToggle("finance"); }

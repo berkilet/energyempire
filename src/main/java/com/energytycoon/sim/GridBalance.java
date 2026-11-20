@@ -105,4 +105,16 @@ public final class GridBalance {
     public static final double OP_REINFORCE_SATURATION = 0.25;
     /** Rakip YZ: yeni santrali kendi kumesine/TM'sine yerlestirmeyi deneme olasiligi. */
     public static final double RIVAL_CLUSTER_CHANCE = 0.5;
+
+    // ---- Faz 6: guzergah, paralel hat, kademe yukseltme, hat arizasi
+    /** Guzergah karesi carpani: su ve yuksek arazi (kademe >= ROUTE_HIGH_LEVEL). */
+    public static final double ROUTE_WATER_MULT = 1.8, ROUTE_HIGH_MULT = 1.5;
+    public static final int ROUTE_HIGH_LEVEL = 11;
+    /** Ayni iki uc arasinda ikinci/ucuncu hat bu oranda ucuz. */
+    public static final double PARALLEL_DISCOUNT = 0.40;
+    /** Kademe yukseltme: (yeni - eski guzergah maliyeti) x (1 + prim); sure = yeni kademenin insaat suresi x carpan, hat kapali. */
+    public static final double UPGRADE_PREMIUM = 0.20, UPGRADE_TIME_MULT = 0.6;
+    /** Hat arizasi: saatlik olasilik = kademe.outagePerTileHour x uzunluk; sure (saat); onarim hat maliyetinin orani (UŞİ ucretsiz). */
+    public static final int LINE_OUTAGE_MIN_H = 12, LINE_OUTAGE_MAX_H = 48;
+    public static final double LINE_REPAIR_COST = 0.005;
 }

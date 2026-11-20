@@ -46,7 +46,7 @@ public final class WorldRenderer implements Disposable {
         ModelInstance body; int tier;
         final List<ModelInstance> hi = new ArrayList<>(), lo = new ArrayList<>(), parks = new ArrayList<>();
     }
-    private static final class LineVis { Model model; ModelInstance inst; float lastUtil = -1; int sig; LineStatus status; }
+    private static final class LineVis { Model model; ModelInstance inst; float lastUtil = -1; int sig; LineStatus status; LineTier tier; }
     private static final class Particle { final Vector3 p = new Vector3(); final Vector3 v = new Vector3(); float life, max, size; boolean steam; }
 
     public final GameState state;
@@ -231,6 +231,7 @@ public final class WorldRenderer implements Disposable {
         }
         for (PowerLine l : state.lines) {
             LineVis lv = lineVis.get(l.id);
+            if (lv != null && lv.tier != l.tier) { models.untrack(lv.model); lineVis.put(l.id, lv = buildLineVis(l)); }
             if (lv != null && lv.status != l.status) applyLineStatus(l, lv);
         }
     }
@@ -376,7 +377,11 @@ public final class WorldRenderer implements Disposable {
             float x = MathUtils.lerp(a.x, b.x, t), z = MathUtils.lerp(a.z, b.z, t);
             pylons.add(new Vector3(x, topAt(x, z), z));
         }
+        // kademeye gore iletken kalinligi: OG ince, ÇYG kalin
+        models.cableWidth = l.tier == LineTier.OG ? 0.008f : l.tier == LineTier.YG ? 0.012f : 0.019f;
         lv.model = models.buildLine(pylons, a, b);
+        models.cableWidth = 0.012f;
+        lv.tier = l.tier;
         lv.inst = new ModelInstance(lv.model);
         applyLineStatus(l, lv);
         return lv;
@@ -433,6 +438,13 @@ public final class WorldRenderer implements Disposable {
         for (PowerLine l : state.lines) {
             LineVis lv = lineVis.get(l.id);
             if (lv == null) continue;
+            if (l.outageHoursLeft > 0) {
+                // arizali hat: kirmizi yanip soner
+                Material m = lv.inst.getMaterial("cable");
+                if (m != null) ((ColorAttribute) m.get(ColorAttribute.Diffuse)).color.set((time * 3f) % 1f < 0.5f ? C_HI : C_IDLE);
+                lv.lastUtil = -1;
+                continue;
+            }
             float u = (float) l.utilization();
             if (Math.abs(u - lv.lastUtil) < 0.01f) continue;
             lv.lastUtil = u;
@@ -581,6 +593,13 @@ public final class WorldRenderer implements Disposable {
                 float s = n instanceof City ? 3.05f : 1.05f;
                 selectBox.transform.setToTranslation(n.x + 0.5f - s / 2, state.map.topAt(n.x, n.y) + 0.02f, n.y + 0.5f - s / 2).scale(s, 0.06f, s);
                 overlays.add(selectBox);
+                // baglanti noktasinin (kume/TM) diger uyeleri de vurgulanir
+                ConnectionPoint cp = n instanceof Plant p ? p.cp : n instanceof Substation t ? t.cp : null;
+                if (cp != null && (cp.members.size() > 1 || cp.tm != null)) {
+                    int ti = selTileBase;
+                    for (Plant m : cp.members) if (m != n) ti = tile(ti, m.x, m.y, SEL_CP, 0.4f, 1.04f);
+                    if (cp.tm != null && cp.tm != n) ti = tile(ti, cp.tm.x, cp.tm.y, SEL_CP, 0.4f, 1.04f);
+                }
             }
         }
         if (selectedLineId >= 0) {
@@ -701,9 +720,13 @@ public final class WorldRenderer implements Disposable {
                 ti = tile(ti, x, y, col, dx == 0 && dy == 0 ? 0.45f : 0.18f, 1f);
             }
         }
+        selTileBase = ti;
     }
 
     private final List<ModelInstance> dashPool = new ArrayList<>();
+    /** renderGridExtras'in kullandigi kare sayisi; secim vurgusu havuzda bunun ardindan baslar. */
+    private int selTileBase;
+    private static final Color SEL_CP = new Color(1f, 0.9f, 0.2f, 1);
     private static final Color C_PLAN = new Color(0.55f, 0.8f, 1f, 1), C_QUEUE = new Color(1f, 0.8f, 0.35f, 1);
 
     /** Planlanan/kuyruktaki hat: iki uc arasinda zeminde kesikli cizgi (UŞİ planlari mavi, basvurular sari). */
