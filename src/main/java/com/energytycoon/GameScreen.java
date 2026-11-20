@@ -87,6 +87,15 @@ public final class GameScreen implements Screen, Hud.Listener {
     public void devKey(int key) { Gdx.input.getInputProcessor().keyDown(key); Gdx.input.getInputProcessor().keyUp(key); }
     public void devOpenEquipment(PlantType t) { hud.devOpenEquipment(t); }
     public void devToggle(String w) { hud.toggle(w); }
+    public void devShowInvest(String category) { hud.hideHelp(); hud.devShowInvest(category); }
+    public void devLineTool(LineTier t) { hud.hideHelp(); lineTier = t; tool(Tool.LINE, null); }
+    public void devNoHover(boolean b) { devNoHover = b; }
+    public void devHideHelp() { hud.hideHelp(); }
+    public String devUiState() {
+        return "arac=" + tool + " kademe=" + lineTier.shortLabel + " yatirim=" + (hud.investOpen() ? "acik" : "kapali")
+            + " pencere=" + (hud.anyWindowOpen() ? "acik" : "kapali") + " katman=" + wr.terrain.layer().label;
+    }
+    public void devAction(String a) { action(a); }
 
     public String devPickTest() {
         StringBuilder sb = new StringBuilder();
@@ -110,12 +119,13 @@ public final class GameScreen implements Screen, Hud.Listener {
     @Override public void tool(Tool t, Equipment e) {
         tool = t; plantEq = e; lineFrom = null;
         if (t != Tool.SELECT) { selNode = -1; selLine = -1; }
-        if (t == Tool.PLANT && e != null) hud.setPlaceInfo(e.fullName() + " seçildi. Haritada bir yere tıklayın.");
+        if (t == Tool.PLANT && e != null) hud.setPlaceInfo("Haritada bir yere tıklayın.");
     }
     @Override public void speed(int s) { speed = s; if (s > 0) lastSpeed = s; }
     @Override public void layer(Layer l) { wr.terrain.setLayer(l); }
     @Override public void action(String a) {
         if (a.startsWith("upgrade:")) { upgradeSelected(Upgrade.valueOf(a.substring(8))); return; }
+        if (a.startsWith("line:")) { lineTier = LineTier.valueOf(a.substring(5)); tool(Tool.LINE, null); return; }
         switch (a) {
             case "finance", "market", "companies", "help", "settings" -> hud.toggle(a);
             case "menu" -> hud.toggle("menu");
@@ -184,12 +194,16 @@ public final class GameScreen implements Screen, Hud.Listener {
                 case Input.Keys.M -> hud.toggle("market");
                 case Input.Keys.C -> hud.toggle("companies");
                 case Input.Keys.H -> hud.toggle("help");
-                case Input.Keys.TAB -> { lineTier = lineTier.next(); if (tool == Tool.LINE) hud.toast("Hat kademesi: " + lineTier.label); }
+                case Input.Keys.TAB -> lineTier = lineTier.next();
                 case Input.Keys.L -> layer(layers[(wr.terrain.layer().ordinal() + 1) % layers.length]);
                 case Input.Keys.F5 -> action("save");
                 case Input.Keys.F9 -> action("load");
+                case Input.Keys.B -> hud.toggleInvest();
+                case Input.Keys.FORWARD_DEL -> { hud.hideInvest(); tool(Tool.DEMOLISH, null); }
                 case Input.Keys.ESCAPE -> {
+                    // Esc: once araci iptal eder, sonra yatirim menusunu kapatir, sonra pencereleri/menuyu.
                     if (tool != Tool.SELECT) cancelTool();
+                    else if (hud.investOpen()) hud.hideInvest();
                     else if (hud.anyWindowOpen()) hud.closeWindows();
                     else hud.toggle("menu");
                 }
@@ -277,7 +291,7 @@ public final class GameScreen implements Screen, Hud.Listener {
                 if (why == null) why = state.checkEquipment(plantEq);
                 boolean afford = state.player.cash >= plantEq.capex();
                 wr.ghostEquipment = plantEq; wr.ghostValid = why == null && afford;
-                hud.setPlaceInfo(plantEq.fullName() + "  " + Fmt.money(plantEq.capex()) + "  ·  " + siteInfo(plantEq, t[0], t[1])
+                hud.setPlaceInfo(siteInfo(plantEq, t[0], t[1])
                     + (why != null ? "   ✗ " + why : !afford ? "   ✗ Yetersiz nakit" : ""));
             }
             case LINE -> {
@@ -410,7 +424,7 @@ public final class GameScreen implements Screen, Hud.Listener {
         hud.setSelection(sel == null ? "Haritada bir santrale, şehre veya hatta tıklayın." : sel, selectionActions());
 
         wr.render(dt, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
-        hud.update(state, tool, plantEq, speed, wr.terrain.layer());
+        hud.update(state, tool, plantEq, speed, wr.terrain.layer(), lineTier);
         hud.render(dt);
     }
 

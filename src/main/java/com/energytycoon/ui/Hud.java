@@ -19,7 +19,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-/** Scene2D arayuz: ust cubuk, insa paleti, bilgi paneli, senaryo paneli, pencereler, bildirimler. */
+/** Scene2D arayuz: ust cubuk, sol alt arac cubugu + yatirim menusu, bilgi paneli, senaryo paneli, pencereler, bildirimler. */
 public final class Hud {
     public enum Tool { SELECT, PLANT, LINE, DEMOLISH }
 
@@ -38,14 +38,23 @@ public final class Hud {
 
     @SuppressWarnings("rawtypes") private com.badlogic.gdx.scenes.scene2d.ui.Cell companyCell, debtCell;
     private Actor debtChip;
-    private final Label company, cash, debt, value, date, price, demand, info, placeInfo, layerLbl;
+    private final Label company, cash, debt, value, date, price, demand, info, placeInfo;
     private final Table toasts = new Table();
-    private final Map<PlantType, ImageTextButton> plantBtns = new EnumMap<>(PlantType.class);
+    private final Table dock = new Table(), layerPop = new Table(), ctxBar = new Table();
+    private final ImageButton investBtn, selectBtn, demBtn, layerBtn;
+    private final TextTooltip layerTip;
+    private final Map<Layer, TextButton> layerBtns = new EnumMap<>(Layer.class);
+    private final InvestMenu invest;
+    private final Label ctxTitle;
+    @SuppressWarnings("rawtypes") private com.badlogic.gdx.scenes.scene2d.ui.Cell ctxTitleCell;
+    private Tool curTool = Tool.SELECT;
+    private LineTier curTier = LineTier.YG;
+    /** Faz 4/5 ozellikleri acildiginda true yapilir. */
+    public boolean substationsEnabled, operatorEnabled;
     private static final Map<PlantType, String> PLANT_ICONS = new EnumMap<>(Map.of(
         PlantType.COAL, "icon_factory", PlantType.GAS, "icon_factory", PlantType.SOLAR, "icon_solar",
         PlantType.WIND, "icon_wind", PlantType.HYDRO, "icon_hydro", PlantType.NUCLEAR, "icon_bolt"));
     private final Map<PlantType, Equipment> chosen = new EnumMap<>(PlantType.class);
-    private final TextButton selectBtn, lineBtn, demBtn;
     private final ImageButton[] speedBtns = new ImageButton[4];
     private Label speedLbl;
     /** Hiz kademelerinin gercek carpani (1x = bir gunde 24 sn). */
@@ -119,49 +128,51 @@ public final class Hud {
             top.add(tip(b, w[2])).size(42, 32).padLeft(2);
         }
 
-        // ----- sol: insa paleti
-        Table left = new Table(skin);
-        Label hint = l("Tür seçin → tedarikçi/model seçin → haritaya tıklayın", "dim");
-        hint.setWrap(true);
-        left.add(hint).width(216).left().padBottom(6).row();
-        for (PlantType t : PlantType.values()) {
-            ImageTextButton.ImageTextButtonStyle st = new ImageTextButton.ImageTextButtonStyle(skin.get("small", TextButton.TextButtonStyle.class));
-            st.imageUp = skin.getDrawable(PLANT_ICONS.get(t));
-            ImageTextButton b = new ImageTextButton("", st);
-            b.getImageCell().size(30, 32).padLeft(4);
-            b.getLabel().setAlignment(Align.left);
-            b.getLabel().setWrap(true);
-            b.getLabelCell().pad(2, 6, 2, 6).width(166);
-            b.setProgrammaticChangeEvents(false);
-            b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) {
-                b.setChecked(!b.isChecked()); // durum update()'te belirlenir
-                openEquipment(t);
-            } });
-            plantBtns.put(t, b);
-            left.add(b).width(216).minHeight(44).padBottom(3).row();
-        }
-        selectBtn = tool("Seç / İncele", Tool.SELECT);
-        lineBtn = tool("Hat Çek (iletim)", Tool.LINE);
-        demBtn = tool("Yık / Hat Kaldır", Tool.DEMOLISH);
-        left.add(l("ARAÇLAR", "dim")).left().padTop(8).row();
-        left.add(selectBtn).growX().height(30).padBottom(3).row();
-        left.add(lineBtn).growX().height(30).padBottom(3).row();
-        left.add(demBtn).growX().height(30).padBottom(3).row();
-        left.add(l("HARİTA KATMANI (L)", "dim")).left().padTop(8).row();
-        Table lay = new Table();
-        int col = 0;
+        // ----- sol alt: arac cubugu (dock) + yatirim menusu + katman listesi
+        investBtn = dockButton("icon_build", "Yatırım (B)", () -> toggleInvest());
+        selectBtn = dockButton("icon_cursor", "Seç / İncele (sağ tık veya Esc ile dönülür)", () -> { hideInvest(); cb.tool(Tool.SELECT, null); });
+        demBtn = dockButton("icon_demolish", "Yık / Hat Kaldır (Delete)", () -> { hideInvest(); cb.tool(Tool.DEMOLISH, null); });
+        layerBtn = dockButton("icon_layers", "Harita katmanı (L)", () -> layerPop.setVisible(!layerPop.isVisible()));
+        layerTip = (TextTooltip) layerBtn.getListeners().select(l -> l instanceof TextTooltip).iterator().next();
+        dock.setBackground(skin.getDrawable("card"));
+        dock.pad(5);
+        for (ImageButton b : new ImageButton[] { investBtn, selectBtn, demBtn, layerBtn }) dock.add(b).size(52, 54).pad(2);
+        dock.pack();
+
+        layerPop.setBackground(skin.getDrawable("card"));
+        layerPop.pad(6);
+        layerPop.add(l("HARİTA KATMANI (L)", "dim")).left().padBottom(4).row();
         for (Layer ly : Layer.values()) {
             TextButton b = new TextButton(ly.label, skin, "small");
+            b.setProgrammaticChangeEvents(false);
             final Layer fl = ly;
-            b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { cb.layer(fl); } });
-            // Sabit genislik: 3 x 70 + bosluklar = 216 (panel icerik genisligi); yazi genisligi paneli buyutmesin.
-            lay.add(b).height(26).width(70).pad(1);
-            if (++col % 3 == 0) lay.row();
+            b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { cb.layer(fl); layerPop.setVisible(false); } });
+            layerBtns.put(ly, b);
+            layerPop.add(b).width(150).height(28).padBottom(2).row();
         }
-        left.add(lay).left().row();
-        layerLbl = l("", "dim");
-        left.add(layerLbl).left().padTop(3);
-        Table leftFrame = skins.framedPanel(l("İNŞA", "title"), left);
+        layerPop.pack();
+        layerPop.setVisible(false);
+
+        invest = new InvestMenu(skins);
+        InvestMenu.Category plantsCat = new InvestMenu.Category("Santral Yatırımları", true)
+            .add(plantGroup("Fosil", PlantType.COAL, PlantType.GAS))
+            .add(plantGroup("Yenilenebilir", PlantType.SOLAR, PlantType.WIND, PlantType.HYDRO))
+            .add(plantGroup("Nükleer", PlantType.NUCLEAR));
+        InvestMenu.Group lineGroup = new InvestMenu.Group("Hat Çek");
+        for (LineTier t : LineTier.values()) lineGroup.add(new InvestMenu.Item("icon_pylon", t.label + "  (en çok " + (int) t.maxLength + " kare)",
+            () -> Fmt.mw(t.capacityMW) + " · " + Fmt.money(t.costPerTile) + "/kare",
+            () -> true, () -> st == null || st.player.cash >= t.costPerTile * 3,
+            () -> curTool == Tool.LINE && curTier == t,
+            () -> { cb.action("line:" + t.name()); if (!invest.pinned()) hideInvest(); }));
+        // Faz 4/5'te gorunur olacak kalemler: veri tabanli; gorunur satiri olmayan grup/kategori cizilmez.
+        InvestMenu.Group tmGroup = new InvestMenu.Group("Trafo Merkezi")
+            .add(new InvestMenu.Item("icon_factory", "TM154", () -> "", () -> substationsEnabled, () -> true, () -> false, () -> cb.action("substation:1")))
+            .add(new InvestMenu.Item("icon_factory", "TM380", () -> "", () -> substationsEnabled, () -> true, () -> false, () -> cb.action("substation:2")));
+        InvestMenu.Group opGroup = new InvestMenu.Group(null)
+            .add(new InvestMenu.Item("icon_city", "UŞİ Başvurularım", () -> "", () -> operatorEnabled, () -> true, () -> false, () -> cb.action("operatorApps")));
+        invest.add(plantsCat).add(new InvestMenu.Category("Bağlantı Yatırımları", false).add(lineGroup).add(tmGroup).add(opGroup));
+        invest.update();
+        invest.root.setVisible(false);
 
         // ----- sag: secim + senaryo
         Table right = new Table(skin);
@@ -180,8 +191,14 @@ public final class Hud {
         rightCol.add(skins.framedPanel(l("SEÇİM", "title"), right)).top().right().growX().row();
         rightCol.add(skins.framedPanel(scenTitle, scen)).top().right().growX().padTop(4);
 
-        placeInfo = l("", "default");
+        placeInfo = l("", "small");
         placeInfo.setAlignment(Align.center);
+        ctxTitle = l("", "default");
+        ctxTitle.setAlignment(Align.center);
+        ctxBar.pad(6, 16, 6, 16);
+        ctxTitleCell = ctxBar.add(ctxTitle);
+        ctxBar.row();
+        ctxBar.add(placeInfo);
         toasts.bottom();
 
         Table root = new Table();
@@ -189,17 +206,19 @@ public final class Hud {
         root.setTouchable(Touchable.childrenOnly);
         root.add(top).growX().row();
         Table mid = new Table();
-        mid.add(leftFrame).top().left().padLeft(6).padTop(4);
         mid.add().grow();
         mid.add(rightCol).top().right().padRight(6).padTop(4);
         root.add(mid).grow();
         stage.addActor(root);
+        stage.addActor(dock);
+        stage.addActor(layerPop);
+        stage.addActor(invest.root);
         // Bildirimler ve alt bilgi ayri katmanda: sayilari artinca ana yerlesimi (ust cubugu) itmesinler.
         Table bottom = new Table();
         bottom.setFillParent(true);
         bottom.setTouchable(Touchable.disabled);
         bottom.bottom();
-        bottom.add(placeInfo).padBottom(4).row();
+        bottom.add(ctxBar).padBottom(4).row();
         bottom.add(toasts).padBottom(12);
         stage.addActor(bottom);
 
@@ -249,17 +268,18 @@ public final class Hud {
 
     private static final String HELP =
         "Amaç: Senaryo hedeflerine ulaşın (sağ alttaki panel). Serbest oyunda hedef $4 milyar piyasa değeri.\n\n"
-      + "1) Soldan bir santral türüne tıklayın: tedarikçi ve model penceresi açılır. Panel/türbin/kazan modeli üretimi, "
+      + "1) Sol alttaki Yatırım düğmesine (B) basın, Santral Yatırımları altından bir türe tıklayın: tedarikçi ve model penceresi açılır. Panel/türbin/kazan modeli üretimi, "
       + "verimi, yaşlanmayı, fiyatı ve inşaat süresini belirler. Tedarikçi itibarı arıza ve teslim gecikmesi riskini, garanti süresi ücretsiz onarımı belirler.\n"
       + "2) Modeli seçtikten sonra haritaya tıklayın. Yeşil kutu = uygun yer. Alttaki çubuk o sahada beklenen performansı gösterir.\n"
-      + "3) 'Hat Çek' ile önce santrale, sonra şehre tıklayarak iletim hattı kurun. Hatsız santral elektrik satamaz.\n"
+      + "3) Yatırım → Bağlantı Yatırımları → Hat Çek (OG/YG/ÇYG) seçip önce santrale, sonra şehre tıklayın. Tab kademeyi değiştirir. "
+      + "Hattın kapasitesi santralin satabileceği gücü sınırlar; uzun hatta kayıp artar. Hatsız santral elektrik satamaz.\n"
       + "4) Her saat talep en ucuz santralden başlayarak karşılanır (merit order). Fiyat son devreye giren santralin maliyetidir.\n"
       + "5) Kendi santralinizi seçince yükseltme butonları çıkar: güneşte tracker ve robotik temizlik, rüzgarda repowering, "
       + "kömür/gazda karbon yakalama, nükleerde ömür uzatma vb.\n"
       + "6) Yeni teknolojiler yıllar içinde piyasaya çıkar (ör. 2028 dev türbin, 2030 SMR, 2033 tandem panel).\n"
       + "7) Karşılanamayan talep ceza getirir, karbon vergisi her yıl artar. Nakit yetmezse Finans'tan borçlanın.\n\n"
       + "Kontroller: Sağ tık sürükle = kaydır, tekerlek = yakınlaştır, Q/E = döndür, WASD/oklar = kaydır, Boşluk = duraklat, "
-      + "1/2/3 = hız (1x: bir gün 24 sn), L = katman, F5/F9 = kaydet/yükle, Esc = iptal/menü.";
+      + "1/2/3 = hız (1x: bir gün 24 sn), B = yatırım, Delete = yık, Tab = hat kademesi, L = katman, F5/F9 = kaydet/yükle, Esc = iptal/menü.";
 
     private TextButton btn(String text, String action, String style) {
         TextButton b = new TextButton(text, skin, style);
@@ -272,6 +292,7 @@ public final class Hud {
         equipWin.show(st, t, chosen.get(t), e -> {
             chosen.put(t, e);
             cb.tool(Tool.PLANT, e);
+            if (!invest.pinned()) hideInvest();
         });
     }
 
@@ -284,11 +305,86 @@ public final class Hud {
         return new int[] { (int) v.x, (int) v.y };
     }
 
-    private TextButton tool(String text, Tool t) {
-        TextButton b = new TextButton(text, skin, "small");
+    private ImageButton dockButton(String icon, String tipText, Runnable r) {
+        ImageButton.ImageButtonStyle st = new ImageButton.ImageButtonStyle(skin.get("small", TextButton.TextButtonStyle.class));
+        st.imageUp = skin.getDrawable(icon);
+        ImageButton b = new ImageButton(st);
+        b.getImageCell().size(40, 42);
         b.setProgrammaticChangeEvents(false);
-        b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { cb.tool(t, null); } });
-        return b;
+        b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { r.run(); } });
+        return tip(b, tipText);
+    }
+
+    private InvestMenu.Group plantGroup(String title, PlantType... types) {
+        InvestMenu.Group g = new InvestMenu.Group(title);
+        for (PlantType t : types) g.add(new InvestMenu.Item(PLANT_ICONS.get(t), t.label, () -> plantSub(t), () -> true,
+            () -> st == null || st.player.cash >= shownEquipment(t).capex(),
+            () -> curTool == Tool.PLANT && curEq != null && curEq.type == t,
+            () -> openEquipment(t)));
+        return g;
+    }
+
+    private Equipment curEq;
+
+    /** Secili model varsa o, yoksa bugun alinabilen en ucuz model. */
+    private Equipment shownEquipment(PlantType t) {
+        Equipment ce = chosen.get(t);
+        if (ce != null || st == null) return ce != null ? ce : null;
+        Equipment best = null;
+        for (Equipment e : st.catalog.available(t, st.year())) if (best == null || e.capex() < best.capex()) best = e;
+        return best != null ? best : st.catalog.defaultFor(t);
+    }
+
+    private String plantSub(PlantType t) {
+        if (st == null) return "";
+        Equipment ce = chosen.get(t);
+        if (ce != null) return "Seçili: " + ce.supplier.name + " " + ce.model + " · " + Fmt.money(ce.capex());
+        return "En düşük model fiyatı: " + Fmt.money(shownEquipment(t).capex());
+    }
+
+    // ----- yatirim menusu: ac/kapa (~150 ms kayarak/solarak)
+    /** Kapanma animasyonu suresince de kapali sayilir. */
+    public boolean investOpen() { return investShown; }
+    private boolean investShown;
+    public void toggleInvest() { if (investOpen()) hideInvest(); else showInvest(); }
+    public void showInvest() {
+        if (investShown) return;
+        investShown = true;
+        layerPop.setVisible(false);
+        invest.update();
+        invest.root.clearActions();
+        invest.root.pack();
+        float x = investX(), y = investY();
+        invest.root.setVisible(true);
+        invest.root.getColor().a = 0;
+        invest.root.setPosition(x, y - 12);
+        invest.root.addAction(Actions.parallel(Actions.fadeIn(0.15f), Actions.moveTo(x, y, 0.15f)));
+        invest.root.toFront();
+    }
+    public void hideInvest() {
+        if (!investShown) return;
+        investShown = false;
+        invest.root.clearActions();
+        invest.root.addAction(Actions.sequence(Actions.parallel(Actions.fadeOut(0.15f), Actions.moveBy(0, -12, 0.15f)), Actions.visible(false)));
+    }
+    /** Dogrulama: menuyu animasyonsuz ac. */
+    public void devShowInvest(String category) {
+        invest.open(category);
+        showInvest();
+        invest.root.clearActions();
+        invest.root.getColor().a = 1;
+        invest.root.setPosition(investX(), investY());
+    }
+    private float investX() { return dock.getX(); }
+    private float investY() { return dock.getY() + dock.getHeight() + 6; }
+
+    private void layoutOverlays() {
+        dock.setPosition(8, 8);
+        layerPop.setPosition(dock.getX() + layerBtn.getX(), dock.getY() + dock.getHeight() + 6);
+        if (invest.root.isVisible() && invest.root.getActions().isEmpty()) {
+            invest.root.pack();
+            invest.root.setPosition(investX(), investY());
+        }
     }
 
     private Label l(String t, String style) { return new Label(t, skin, style); }
@@ -373,6 +469,17 @@ public final class Hud {
 
     public void setPlaceInfo(String s) { placeInfo.setText(s); }
 
+    private String contextText(Tool tool, Equipment eq, LineTier tier) {
+        return switch (tool) {
+            case PLANT -> eq == null ? "" : eq.type.label + " · " + eq.supplier.name + " " + eq.model + " · " + Fmt.money(eq.capex())
+                + " · Sol tık: yerleştir · Esc: iptal";
+            case LINE -> "Hat Çek · " + tier.label + " · " + Fmt.mw(tier.capacityMW) + " · " + Fmt.money(tier.costPerTile) + "/kare"
+                + " · Sol tık: başlangıç, sonra bitiş · Tab: kademe · Esc: iptal";
+            case DEMOLISH -> "Yık / Hat Kaldır · Sol tık: kendi santraliniz veya hattınız · Esc: iptal";
+            default -> "";
+        };
+    }
+
     /** actionList: {etiket, eylem-id, "1" etkin / "0" pasif} */
     public void setSelection(String text, List<String[]> actionList) {
         info.setText(text);
@@ -413,8 +520,9 @@ public final class Hud {
         return "█".repeat(n) + "░".repeat(10 - n);
     }
 
-    public void update(GameState s, Tool tool, Equipment eq, int speed, Layer layer) {
+    public void update(GameState s, Tool tool, Equipment eq, int speed, Layer layer, LineTier tier) {
         this.st = s;
+        curTool = tool; curEq = eq; curTier = tier;
         Company p = s.player;
         company.setText(p.name.length() > 18 ? p.name.substring(0, 18) : p.name);
         cash.setText(Fmt.money(p.cash));
@@ -431,18 +539,18 @@ public final class Hud {
         if (speedBtns[0].getStyle() != ps) speedBtns[0].setStyle(ps);
         speedLbl.setText(speed == 0 ? "" : SPEED_TEXT[speed]);
         if (speed == 0) date.setColor(Skins.WARN); else date.setColor(Color.WHITE);
-        for (Map.Entry<PlantType, ImageTextButton> e : plantBtns.entrySet()) {
-            PlantType t = e.getKey();
-            Equipment ce = chosen.get(t);
-            Equipment shown = ce != null ? ce : s.catalog.defaultFor(t);
-            String txt = t.label + "  ·  " + Fmt.money(shown.capex()) + "\n" + (ce != null ? shown.supplier.name + " " + shown.model : "model seçmek için tıklayın");
-            if (!e.getValue().getText().toString().equals(txt)) e.getValue().setText(txt);
-            boolean can = p.cash >= shown.capex();
-            e.getValue().getLabel().setColor(can ? Color.WHITE : new Color(1f, 0.55f, 0.5f, 1));
-            e.getValue().setChecked(tool == Tool.PLANT && eq != null && eq.type == t);
-        }
-        selectBtn.setChecked(tool == Tool.SELECT); lineBtn.setChecked(tool == Tool.LINE); demBtn.setChecked(tool == Tool.DEMOLISH);
-        layerLbl.setText("Aktif: " + layer.label);
+        investBtn.setChecked(investOpen() || tool == Tool.PLANT || tool == Tool.LINE);
+        selectBtn.setChecked(tool == Tool.SELECT && !investOpen());
+        demBtn.setChecked(tool == Tool.DEMOLISH);
+        layerBtn.setChecked(layerPop.isVisible());
+        for (Map.Entry<Layer, TextButton> e : layerBtns.entrySet()) e.getValue().setChecked(e.getKey() == layer);
+        ((Label) layerTip.getActor()).setText("Harita katmanı (L) · Aktif: " + layer.label);
+        if (investOpen()) invest.update();
+        layoutOverlays();
+        boolean ctx = tool != Tool.SELECT;
+        ctxBar.setBackground(ctx ? skin.getDrawable("card") : null);
+        ctxTitle.setText(contextText(tool, eq, tier));
+        if (ctx != (ctxTitleCell.getActor() != null)) { ctxTitleCell.setActor(ctx ? ctxTitle : null); ctxBar.invalidateHierarchy(); }
 
         // senaryo paneli
         Scenario sc = s.scenario;

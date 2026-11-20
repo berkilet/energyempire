@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * Gelistirici dogrulama kancasi; yalnizca ET_SHOT ortam degiskeni varsa calisir (normal oyunda etkisiz).
  * ET_SHOT=png yolu, ET_SCENARIO=menu|setup|game, ET_PRESET=MapPreset, ET_SIM=senaryo id, ET_HOUR=saat,
- * ET_OPEN=equip:TYPE|market|select, ET_ZOOM=px/birim, ET_FOCUS=plant|overview, ET_SHADOW=0..2, ET_FRAMES=n
+ * ET_OPEN=equip:TYPE|market|select|invest|invest2|line|closed, ET_ZOOM=px/birim, ET_FOCUS=plant|overview, ET_SHADOW=0..2, ET_FRAMES=n
  */
 final class DevHook {
     private final EnergyGame game;
@@ -41,10 +41,15 @@ final class DevHook {
         if (frame == 30 && gs != null) System.out.println(gs.devPickTest());
         if (frame == 31 && gs != null && env.containsKey("ET_VERTS")) for (int d = 0; d < 3; d++) System.out.println("VERTS detay=" + d + " kose=" + gs.devTerrainVerts(d));
         if (gs != null && env.containsKey("ET_PAUSETEST")) pauseTest();
+        if (gs != null && env.containsKey("ET_UITEST")) uiTest();
         if (frame == 6 && gs != null) {
             String open = get("ET_OPEN", "");
             if (open.startsWith("equip:")) gs.devOpenEquipment(PlantType.valueOf(open.substring(6)));
             else if (open.equals("market") || open.equals("menu") || open.equals("finance") || open.equals("help") || open.equals("settings") || open.equals("companies")) gs.devToggle(open);
+            else if (open.equals("invest")) gs.devShowInvest("Santral Yatırımları");
+            else if (open.equals("invest2")) gs.devShowInvest("Bağlantı Yatırımları");
+            else if (open.equals("line")) gs.devLineTool(LineTier.valueOf(get("ET_TIER", "YG")));
+            else if (open.equals("closed")) gs.devHideHelp();
             else if (open.equals("select")) {
                 for (Plant p : gameState().plants) if (p.owner.player && p.type == PlantType.SOLAR) { gs.devSelect(p.id); break; }
             }
@@ -60,6 +65,27 @@ final class DevHook {
             Gdx.app.exit();
         }
     }
+
+    /** Faz 3 arayuz testi: kisayollar ve Esc sirasi. */
+    private void uiTest() {
+        String step = switch (frame) {
+            case 8 -> { gs.devHideHelp(); yield null; }
+            case 10 -> { gs.devKey(com.badlogic.gdx.Input.Keys.B); yield "B"; }
+            case 14 -> { gs.devAction("line:CYG"); gs.devKey(com.badlogic.gdx.Input.Keys.B); yield "Hat Cek CYG secildi, menu kapandi (B)"; }
+            case 16 -> { gs.devKey(com.badlogic.gdx.Input.Keys.TAB); yield "Tab"; }
+            case 18 -> { gs.devKey(com.badlogic.gdx.Input.Keys.B); yield "B (arac acikken menu)"; }
+            case 20 -> { gs.devKey(com.badlogic.gdx.Input.Keys.ESCAPE); yield "Esc #1 (arac iptal)"; }
+            case 24 -> { gs.devKey(com.badlogic.gdx.Input.Keys.ESCAPE); yield "Esc #2 (menu kapanir)"; }
+            case 28 -> { gs.devKey(com.badlogic.gdx.Input.Keys.FORWARD_DEL); yield "Delete"; }
+            case 30 -> { gs.devKey(com.badlogic.gdx.Input.Keys.ESCAPE); yield "Esc (yik iptal)"; }
+            case 32 -> { gs.devKey(com.badlogic.gdx.Input.Keys.L); yield "L"; }
+            case 34 -> { gs.devKey(com.badlogic.gdx.Input.Keys.ESCAPE); yield "Esc #3 (oyun menusu)"; }
+            default -> null;
+        };
+        if (step != null) pendingStep = step;
+        else if (pendingStep != null && frame % 2 == 1) { System.out.println("UITEST " + pendingStep + " -> " + gs.devUiState()); pendingStep = null; }
+    }
+    private String pendingStep;
 
     private long h0, t0, t1;
     /** Durdurma testi: fareyle II'ye tikla, sonra bosluk ile devam/durdur; saat ilerlemesini raporla. */
