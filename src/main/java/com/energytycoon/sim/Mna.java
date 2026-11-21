@@ -311,7 +311,7 @@ public final class Mna {
         t.price = Math.max(maxPaid(acq, target), target.eq.listed ? target.eq.price : fundamentalPerShare(target));
         t.prePrice = target.eq.listed ? target.eq.price : fundamentalPerShare(target);
         t.startHour = s.hour; t.endHour = s.hour + FinanceBalance.TENDER_DAYS * 24L;
-        t.cash = Math.max(0, acq.cash);
+        t.cash = Math.max(0, acq.cash - RivalAI.reserve(s, acq)); // rezerv ustu nakit
         Bank b = s.finance.bestAcquisitionBank(acq, 10e6, target);
         if (b != null) { t.loanBank = b.ordinal() + 1; t.loanApproved = s.finance.maxAcquisitionLoan(acq, b, target); }
         d().offers.add(t);
@@ -329,6 +329,19 @@ public final class Mna {
         List<DealBook.TenderOffer> r = new ArrayList<>();
         for (DealBook.TenderOffer t : d().offers) if (!t.closed && t.target == idx(target)) r.add(t);
         return r;
+    }
+
+    /**
+     * Kontrol payi alindiginda acilacak zorunlu teklifin tahmini maliyeti: diger ortaklarin (serbest dolasim kabul egrisiyle,
+     * diger sirketler tamamen) hisseleri x fiyat. Alici kararinda bu maliyeti butceler.
+     */
+    public double mandatoryCostEstimate(Company buyer, Company target, double price) {
+        double market = target.eq.listed ? target.eq.price : fundamentalPerShare(target);
+        double acc = acceptance(market > 0 ? price / market - 1 : 0);
+        double n = target.eq.free() * acc;
+        Set<Company> g = s.competition.group(buyer);
+        for (int j = 0; j < s.companies.size(); j++) if (!g.contains(co(j))) n += target.eq.held(j);
+        return n * price;
     }
 
     /** Teklif tutari: alici grubu disindaki serbest dolasim + diger ortaklar (+ fiyat kurucunun istedigini karsiliyorsa kurucu payi). */
@@ -483,7 +496,7 @@ public final class Mna {
         double n = fromFree + fromFounder;
         for (double v : fromHolders) n += v;
         // finansman: nakit (teklifte gosterilen ve eldeki), onayli kredi, pay takasi
-        double cashAvail = Math.max(0, Math.min(t.cash > 0 ? t.cash : bidder.cash, bidder.cash));
+        double cashAvail = Math.max(0, Math.min(t.cash, bidder.cash)); // teklifte gosterilen nakit (rezerv korunur)
         Bank bank = t.loanBank > 0 ? Bank.values()[t.loanBank - 1] : null;
         double loanAvail = bank != null && t.loanApproved > 0 ? Math.min(t.loanApproved, s.finance.maxAcquisitionLoan(bidder, bank, target)) : 0;
         double swapAvail = bidder.eq.listed ? t.swapShares : 0;
@@ -680,14 +693,17 @@ public final class Mna {
         if (!t.player && !t.eq.listed && distressed(t) && t.eq.founder > t.eq.shares * 0.52) {
             double need = t.eq.shares * 0.51 - groupStake(c, t) * t.eq.shares;
             Ask a = founderAsk(t, need);
-            Financing f = aiFinancing(c, t, need * a.perShare);
+            Financing f = aiFinancing(c, t, need * a.perShare + mandatoryCostEstimate(c, t, a.perShare));
+            if (f != null) { f.cash = Math.min(f.cash, need * a.perShare); f.loan = Math.max(0, need * a.perShare - f.cash); if (f.loan <= 0) f.bank = null; }
             if (f != null && buyFromFounder(c, t, need, a.perShare, f) == null) return;
         }
         // a2) kurucu kontrolundeki sirket (oyuncu disinda): finansman yetiyorsa kurucudan kontrol payi (istenen primle)
         if (!t.player && t.eq.founder >= t.eq.shares * FinanceBalance.CONTROL) {
             double need = t.eq.shares * 0.51 - groupStake(c, t) * t.eq.shares;
             Ask a = founderAsk(t, need);
-            Financing f = aiFinancing(c, t, need * a.perShare);
+            // zorunlu teklif dahil toplam maliyet finanse edilebiliyorsa
+            Financing f = aiFinancing(c, t, need * a.perShare + mandatoryCostEstimate(c, t, a.perShare));
+            if (f != null) { f.cash = Math.min(f.cash, need * a.perShare); f.loan = Math.max(0, need * a.perShare - f.cash); if (f.loan <= 0) f.bank = null; }
             if (f != null && buyFromFounder(c, t, need, a.perShare, f) == null) return;
         }
         // b) dagink ortakli halka acik sirket: cagri
