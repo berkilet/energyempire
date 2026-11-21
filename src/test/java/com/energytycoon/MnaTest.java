@@ -382,4 +382,39 @@ class MnaTest {
         assertEquals(1, s.scenario.objectives.size());
         assertEquals(FinanceBalance.CONSOLIDATION_DEADLINE, s.scenario.deadlineYear);
     }
+
+    @Test
+    void acquisitionLoanAmortizesFivePercentWithBalloon() {
+        Object[] m = market(0.20, 0.20);
+        GameState s = (GameState) m[0]; Company a = (Company) m[1], b = (Company) m[2];
+        a.cash = 5e9;
+        for (int k = 0; k < 4; k++) { a.qEbitda[k] = 200e6; b.qEbitda[k] = 100e6; }
+        a.quarters = 8; b.eq.fundamental = 2e9;
+        Loan l = s.finance.signAcquisition(a, Bank.KIYI, 400e6, b);
+        assertNotNull(l, s.finance.acquisitionRefusal(a, Bank.KIYI, 400e6, b));
+        double interest = 400e6 * l.effectiveRate() / 4;
+        assertEquals(interest + 400e6 * 0.05 / 4, l.payment(400e6, l.remainingPeriods()), 1, "ceyreklik: faiz + yillik %5 anapara");
+        assertEquals(100e6 * (1 + l.effectiveRate() / 4), l.payment(100e6, 1), 1, "son taksit: kalan bakiye toplu");
+        double[] sch = s.finance.schedule12(a);
+        double year = 0; for (double v : sch) year += v;
+        System.out.printf("devralma kredisi 400M: ilk yıl borç servisi %.1fM (annüite olsaydı ~%.1fM)%n", year / 1e6, Loan.annuity(400e6, l.effectiveRate(), 4, 28) * 4 / 1e6);
+        assertTrue(year < Loan.annuity(400e6, l.effectiveRate(), 4, 28) * 4 * 0.6);
+    }
+
+    @Test
+    void subsidiaryPaysDividendsAndRatingIsConsolidated() {
+        Object[] m = market(0.20, 0.20);
+        GameState s = (GameState) m[0]; Company a = (Company) m[1], b = (Company) m[2];
+        int ai = s.companies.indexOf(a);
+        b.eq.add(ai, b.eq.shares * 0.6); b.eq.founder = b.eq.shares * 0.4; b.eq.parent = ai;
+        b.cash = 1e9; double a0 = a.cash;
+        assertEquals(FinanceBalance.SUB_DIVIDEND[0], s.capital.effectiveDividendPct(b), "halka kapali bagli ortaklik da temettu oder");
+        b.eq.qNetAcc = 40e6;
+        s.capital.quarterly(b);
+        assertEquals(40e6 * 0.5 * 0.6, a.cash - a0, 1, "ana sirkete payi kadar nakit");
+        // konsolide not: ana sirketin tek basina borcu yuksek, bagli ortakligin FAVOK'u eklenir
+        for (int k = 0; k < 4; k++) { a.qEbitda[k] = 10e6; b.qEbitda[k] = 100e6; a.qInterest[k] = 1e6; b.qInterest[k] = 1e6; }
+        assertEquals(s.finance.ebitda4(a) + s.finance.ebitda4(b), s.finance.groupEbitda4(a), 1);
+        assertTrue(s.finance.leverage(a) < (a.debt() - a.cash + 1) / s.finance.ebitda4(a) + 1e9);
+    }
 }

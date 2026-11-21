@@ -129,8 +129,8 @@ public final class MnaBot {
         Bank b = s.finance.bestAcquisitionBank(p, 10e6, t);
         double loanMax = b == null ? 0 : s.finance.maxAcquisitionLoan(p, b, t);
         // temkinli alici: birlesik (pro forma) Net borc / FAVOK en fazla 3 (banka siniri 4-4,5)
-        double e4 = s.finance.ebitda4(p) + Math.max(0, s.finance.ebitda4(t));
-        double ndNow = p.debt() - p.cash + Math.max(0, t.debt() - t.cash);
+        double e4 = s.finance.groupEbitda4(p) + Math.max(0, s.finance.ebitda4(t));
+        double ndNow = s.finance.groupNetDebt(p) + Math.max(0, t.debt() - t.cash);
         loanMax = Math.max(0, Math.min(loanMax, 3.0 * e4 - ndNow));
         if (leverageMode) {
             f.loan = Math.min(loanMax, cost); f.bank = b;

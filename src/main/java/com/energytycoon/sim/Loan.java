@@ -50,6 +50,19 @@ public final class Loan {
             + (status == Status.LATE ? FinanceBalance.LATE_RATE : 0);
     }
 
+    /**
+     * Donem odemesi (faiz + anapara), bakiye ve kalan donem sayisina gore: devralma kredisinde yillik %5 anapara,
+     * kalani son taksitte; diger kredilerde annuite.
+     */
+    public double payment(double bal, int periodsLeft) {
+        double r = effectiveRate(), interest = bal * r * frequencyMonths / 12;
+        if (acquisition) {
+            if (periodsLeft <= 1) return interest + bal;
+            return interest + Math.min(bal, principal * FinanceBalance.ACQ_AMORTIZATION * frequencyMonths / 12);
+        }
+        return annuity(bal, r, 12 / frequencyMonths, Math.max(1, periodsLeft));
+    }
+
     /** Annuite taksiti: P * r / (1 - (1 + r)^-n), r = yillik faiz / yilda donem sayisi. */
     public static double annuity(double principal, double annualRate, int periodsPerYear, int n) {
         double r = annualRate / periodsPerYear;

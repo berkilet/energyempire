@@ -614,7 +614,6 @@ public final class Mna {
     public String setStrategy(Company parent, Company sub, int strategy) {
         if (!controls(parent, sub)) return "Kontrol (onaylı bağlı ortaklık) yok";
         sub.eq.strategy = Math.max(0, Math.min(2, strategy));
-        if (sub.eq.strategy == 2 && sub.eq.listed) s.capital.setDividend(sub, 50);
         return null;
     }
 

@@ -41,10 +41,21 @@ public final class Finance {
     /** Son 4 ceyregin FAVOK'u, net borc ve faiz giderinden not; yeni sirket BB, temerrut gecmisi B ile sinirli. */
     public Rating computeRating(Company c) {
         if (c.quarters < 4) return capped(c, Rating.BB);
-        double e = 0, i = 0;
-        for (int k = 0; k < 4; k++) { e += c.qEbitda[k]; i += c.qInterest[k]; }
-        return capped(c, Rating.compute(e, c.debt() - c.cash, i));
+        return capped(c, Rating.compute(groupEbitda4(c), groupNetDebt(c), groupInterest4(c)));
     }
+
+    // ---- konsolidasyon (paket 2): %50 ustu bagli ortakliklar ana sirketin notunda ve taahhutlerinde tam konsolide edilir
+    /** Ana sirket ve faal bagli ortakliklari. */
+    public List<Company> consolidation(Company c) {
+        List<Company> g = new ArrayList<>();
+        g.add(c);
+        int ci = s.companies.indexOf(c);
+        for (Company x : s.companies) if (x != c && x.eq.parent == ci && !x.eq.merged && !x.bankrupt) g.add(x);
+        return g;
+    }
+    public double groupEbitda4(Company c) { double e = 0; for (Company x : consolidation(c)) e += ebitda4(x); return e; }
+    public double groupInterest4(Company c) { double e = 0; for (Company x : consolidation(c)) e += interest4(x); return e; }
+    public double groupNetDebt(Company c) { double d = 0; for (Company x : consolidation(c)) d += x.debt() - x.cash; return d; }
 
     private Rating capped(Company c, Rating r) {
         if (c.defaultCapUntil > s.hour) r = r.worse(Rating.B);
@@ -58,9 +69,10 @@ public final class Finance {
     public double ebitda4(Company c) { double e = 0; for (double v : c.qEbitda) e += v; return e; }
     public double interest4(Company c) { double e = 0; for (double v : c.qInterest) e += v; return e; }
 
-    public double leverage(Company c) { double e = ebitda4(c); return e <= 0 ? Double.POSITIVE_INFINITY : (c.debt() - c.cash) / e; }
+    /** Net borc / FAVOK (grup, konsolide). */
+    public double leverage(Company c) { double e = groupEbitda4(c); return e <= 0 ? Double.POSITIVE_INFINITY : groupNetDebt(c) / e; }
 
-    public double coverage(Company c) { double i = interest4(c); return i <= 1 ? Double.POSITIVE_INFINITY : ebitda4(c) / i; }
+    public double coverage(Company c) { double i = groupInterest4(c); return i <= 1 ? Double.POSITIVE_INFINITY : groupEbitda4(c) / i; }
 
     public boolean greenEligible(Company c) {
         double r = 0, g = 0;
@@ -164,8 +176,8 @@ public final class Finance {
         if (b == Bank.YESIL && fossilShare(target) > 0.5) return b.label + " fosil ağırlıklı şirketin devralınmasını finanse etmez";
         double max = FinanceBalance.ACQ_MAX_SHARE * s.capital.value(target);
         if (amount > max + 1) return "En fazla hedef değerinin %50'si (" + money(max) + ")";
-        double e4 = ebitda4(c) + Math.max(0, ebitda4(target));
-        double nd = c.debt() - c.cash + amount + Math.max(0, target.debt() - target.cash);
+        double e4 = groupEbitda4(c) + Math.max(0, ebitda4(target));
+        double nd = groupNetDebt(c) + amount + Math.max(0, target.debt() - target.cash);
         if (e4 <= 0) return "Birleşik FAVÖK yok";
         if (nd / e4 > b.covenantLimit()) return "Birleşik Net borç / FAVÖK " + String.format(java.util.Locale.ROOT, "%.1f", nd / e4).replace('.', ',') + " > " + b.covenantLimit();
         return null;
@@ -475,7 +487,8 @@ public final class Finance {
                 double interest = l.accrued;
                 double principal = 0;
                 if (!grace) {
-                    double inst = Loan.annuity(l.outstanding, l.effectiveRate(), 12 / l.frequencyMonths, l.remainingPeriods());
+                    double inst = l.acquisition ? l.payment(l.outstanding, l.remainingPeriods()) - l.outstanding * l.effectiveRate() * l.frequencyMonths / 12 + interest
+                        : Loan.annuity(l.outstanding, l.effectiveRate(), 12 / l.frequencyMonths, l.remainingPeriods());
                     principal = Math.min(l.outstanding, Math.max(0, inst - interest));
                     if (l.remainingPeriods() <= 1) principal = l.outstanding;
                 }
@@ -740,7 +753,7 @@ public final class Finance {
             while (due < monthStart + 12L * HPM && bal > 1) {
                 int m = (int) Math.max(0, (due - monthStart) / HPM);
                 double interest = bal * l.effectiveRate() * l.frequencyMonths / 12;
-                double pay = due < l.graceEndHour ? interest : Loan.annuity(bal, l.effectiveRate(), 12 / l.frequencyMonths, Math.max(1, periodsLeft));
+                double pay = due < l.graceEndHour ? interest : l.payment(bal, periodsLeft);
                 double principal = due < l.graceEndHour ? 0 : Math.max(0, pay - interest);
                 if (m < 12) out[m] += pay;
                 bal -= principal;
@@ -756,7 +769,7 @@ public final class Finance {
         if (l.type == Loan.Type.REVOLVER) return new double[] { (s.hour / HPM + 1) * (double) HPM, l.outstanding * l.effectiveRate() / 12 };
         if (l.dueAmount > 0) return new double[] { s.hour, l.dueAmount + l.demand };
         double interest = (l.outstanding - l.pendingPrincipal) * l.effectiveRate() * l.frequencyMonths / 12;
-        double pay = l.nextDueHour < l.graceEndHour ? interest : Loan.annuity(l.outstanding, l.effectiveRate(), 12 / l.frequencyMonths, l.remainingPeriods());
+        double pay = l.nextDueHour < l.graceEndHour ? interest : l.payment(l.outstanding - l.pendingPrincipal, l.remainingPeriods());
         return new double[] { l.nextDueHour, pay + l.demand };
     }
 

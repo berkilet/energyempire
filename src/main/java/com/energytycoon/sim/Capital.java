@@ -298,14 +298,21 @@ public final class Capital {
         return null;
     }
 
+    /** Bagli ortaklik ana sirketin stratejisine gore temettu oder (halka kapali olsa da); digerleri kendi politikasi. */
+    public int effectiveDividendPct(Company c) {
+        if (c.eq.parent >= 0 && !c.eq.merged) return Math.max(c.eq.dividendPct, FinanceBalance.SUB_DIVIDEND[Math.max(0, Math.min(2, c.eq.strategy))]);
+        return c.eq.dividendPct;
+    }
+
     public void setDividend(Company c, int pct) { c.eq.dividendPct = pct >= 50 ? 50 : pct >= 30 ? 30 : 0; }
 
     /** Ceyrek sonu temettu: karin politika orani; kurucu payina dusen kisim sirkette kalir, diger ortaklara odenir. */
     private void dividend(Company c, double qNet) {
         Equity e = c.eq;
         e.lastDividend = 0;
-        if (e.dividendPct <= 0 || qNet <= 0 || c.neutral || dividendBlocker(c) != null) return;
-        double total = qNet * e.dividendPct / 100.0;
+        int pct = effectiveDividendPct(c);
+        if (pct <= 0 || qNet <= 0 || c.neutral || dividendBlocker(c) != null) return;
+        double total = qNet * pct / 100.0;
         double out = total * (1 - e.founderPct());
         if (out <= 0 || c.cash < out) return;
         c.cash -= out;

@@ -128,8 +128,9 @@ public final class MnaTab {
             sb.add(new Label("Bağlı ortaklık stratejisi:", skin, "small")).padRight(6);
             for (int k = 0; k < 3; k++) sb.add(toggle(Mna.STRATEGY[k], t.eq.strategy == k, "strategy:" + ti + ":" + k)).height(28).padRight(4);
             root.add(sb).padBottom(2).row();
-            Label sl = new Label("Büyüme: rakip YZ gibi yatırım yapar · Temkinli: yalnızca düşük kaldıraç ve bol nakitle yatırım · Nakit üret: yeni santral yok, %50 temettü. "
-                + "Kârı pay oranında konsolide edilir; üretimi pazar payınıza eklenir.", skin, "dim");
+            Label sl = new Label("Büyüme: rakip YZ gibi yatırım yapar, kârın %" + FinanceBalance.SUB_DIVIDEND[0] + "'ini temettü öder · Temkinli: yalnızca düşük kaldıraç ve bol nakitle yatırım, %"
+                + FinanceBalance.SUB_DIVIDEND[1] + " temettü · Nakit üret: yeni santral yok, %" + FinanceBalance.SUB_DIVIDEND[2] + " temettü. Temettünün payınıza düşen kısmı nakit olarak size gelir. "
+                + "Kredi notunuz ve banka taahhütleriniz bağlı ortaklıklarla birlikte (konsolide) hesaplanır; üretimi pazar payınıza eklenir.", skin, "dim");
             sl.setWrap(true);
             root.add(sl).width(780).padBottom(4).row();
         }
