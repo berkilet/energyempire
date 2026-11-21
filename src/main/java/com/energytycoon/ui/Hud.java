@@ -71,8 +71,8 @@ public final class Hud {
     public boolean substationsEnabled = true, operatorEnabled = true;
     private int curTmLevel;
     private static final Map<PlantType, String> PLANT_ICONS = new EnumMap<>(Map.of(
-        PlantType.COAL, "icon_factory", PlantType.GAS, "icon_factory", PlantType.SOLAR, "icon_solar",
-        PlantType.WIND, "icon_wind", PlantType.HYDRO, "icon_hydro", PlantType.NUCLEAR, "icon_bolt"));
+        PlantType.COAL, "icon_coal", PlantType.GAS, "icon_gas", PlantType.SOLAR, "icon_solar",
+        PlantType.WIND, "icon_wind", PlantType.HYDRO, "icon_hydro", PlantType.NUCLEAR, "icon_nuclear"));
     private final Map<PlantType, Equipment> chosen = new EnumMap<>(PlantType.class);
     private final ImageButton[] speedBtns = new ImageButton[4];
     private Label speedLbl;

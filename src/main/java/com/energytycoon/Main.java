@@ -38,6 +38,7 @@ public final class Main {
         // Ses kullanilmiyor: OpenAL yerel kutuphanesi hic yuklenmez/cikarilmaz.
         cfg.disableAudio(true);
         cfg.setTitle("Enerji İmparatorluğu");
+        cfg.setWindowIcon(com.badlogic.gdx.Files.FileType.Classpath, "ui/app_128.png", "ui/app_64.png", "ui/app_32.png", "ui/app_16.png");
         cfg.setWindowedMode(1360, 800);
         // Dogrulama: ET_SIZE=GxY (yalnizca gelistirici kancasi; normal oyunda tanimsiz)
         String size = System.getenv("ET_SIZE");
