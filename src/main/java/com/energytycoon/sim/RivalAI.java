@@ -28,9 +28,9 @@ public final class RivalAI {
 
     /** ECA icin banka: yesil stil Yesilvadi'yi, digerleri iliski puani en yuksek (pesin masraf indirimi) bankayi secer. */
     static Bank ecaBank(GameState s, Company c, Equipment e) {
-        if (c.aiStyle.equals("green") && c.bankBanUntil[Bank.YESIL.ordinal()] <= s.hour) return Bank.YESIL;
+        if (c.aiStyle.equals("green") && s.finance.ecaRefusal(c, e, Bank.YESIL) == null) return Bank.YESIL;
         Bank best = Bank.KIYI;
-        for (Bank b : Bank.values()) if (c.bankBanUntil[b.ordinal()] <= s.hour && c.bankScore[b.ordinal()] > c.bankScore[best.ordinal()]) best = b;
+        for (Bank b : Bank.values()) if (s.finance.ecaRefusal(c, e, b) == null && c.bankScore[b.ordinal()] > c.bankScore[best.ordinal()]) best = b;
         return best;
     }
 

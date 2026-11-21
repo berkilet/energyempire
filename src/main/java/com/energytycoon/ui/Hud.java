@@ -403,7 +403,8 @@ public final class Hud {
     private void openEquipment(PlantType t) {
         if (st == null) return;
         equipWin.ecaLine = e -> {
-            if (!Finance.ecaEligible(e)) return "ECA yok (" + e.supplier.origin + " tedarikçi)";
+            String no = st.finance.ecaRefusal(st.player, e, ecaBank);
+            if (no != null) return no;
             Finance.EcaQuote q = st.finance.ecaQuote(st.player, e, ecaBank, ecaFreq);
             return "ECA uygun · " + e.supplier.origin + " · tahmini taksit " + Fmt.money(q.installment) + " / " + (ecaFreq == 6 ? "6 ay" : "yıl")
                 + " · peşin " + Fmt.money(st.finance.ecaCashNeed(st.player, e, ecaBank, ecaFreq)) + " · tahmini DSCR " + FinanceCenter.num(st.finance.expectedDscr(st.player, e, st.cities.get(0).x, st.cities.get(0).y, ecaBank, ecaFreq));

@@ -159,6 +159,15 @@ public final class Finance {
 
     public static boolean ecaEligible(Equipment e) { return ecaPremiumRate(e.supplier.origin) > 0; }
 
+    /** ECA'yi bu banka duzenler mi? Null: evet; degilse gerekce (ticari kredideki banka kurallariyla ayni). */
+    public String ecaRefusal(Company c, Equipment e, Bank b) {
+        if (!ecaEligible(e)) return "ECA yok (" + e.supplier.origin + " tedarikçi)";
+        if (exempt(c)) return "Kamu kredi kullanmaz";
+        if (c.bankBanUntil[b.ordinal()] > s.hour) return b.label + " temerrüt sonrası " + FinanceBalance.REL_BAN_YEARS + " yıl kredi vermez";
+        if (b == Bank.YESIL && !e.type.renewable) return b.label + " fosil santrale kredi vermez";
+        return null;
+    }
+
     public static int ecaYears(PlantType t) {
         return switch (t) { case NUCLEAR -> FinanceBalance.ECA_NUCLEAR_YEARS; case COAL, HYDRO -> FinanceBalance.ECA_MAX_YEARS; case GAS -> 12; default -> FinanceBalance.ECA_MIN_YEARS; };
     }
@@ -202,7 +211,7 @@ public final class Finance {
     }
 
     public Loan signEca(Company c, Plant p, Bank b, int freqMonths) {
-        if (exempt(c) || c.bankBanUntil[b.ordinal()] > s.hour) return null;
+        if (ecaRefusal(c, p.equipment, b) != null) return null;
         EcaQuote q = ecaQuote(c, p.equipment, b, freqMonths);
         if (q == null) return null;
         Loan l = new Loan();
@@ -225,7 +234,7 @@ public final class Finance {
      */
     public Plant buildWithEca(Company c, Equipment e, int x, int y, Bank b, int freqMonths) {
         EcaQuote q = ecaQuote(c, e, b, freqMonths);
-        if (q == null || exempt(c) || c.bankBanUntil[b.ordinal()] > s.hour) return null;
+        if (q == null || ecaRefusal(c, e, b) != null) return null;
         if (c.cash + q.amount - q.premium - q.bankFee < e.capex()) return null;
         c.cash += q.amount;
         Plant p = s.buildPlant(c, e, x, y);

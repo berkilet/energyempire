@@ -10,9 +10,10 @@ public enum Rating {
 
     public Rating worse(Rating o) { return ordinal() >= o.ordinal() ? this : o; }
 
-    /** Not hesabi (son 4 ceyrek): FAVOK <= 0 ise CCC. netDebt negatif olabilir (net nakit). */
+    /** Not hesabi (son 4 ceyrek): FAVOK <= 0 ise net borcluya CCC, net nakitliye B. netDebt negatif olabilir (net nakit). */
     public static Rating compute(double ebitda4, double netDebt, double interest4) {
-        if (ebitda4 <= 0) return CCC;
+        // FAVOK yoksa: net borclu sirket CCC; net nakitli (borcunu nakdiyle kapatabilen) sirket B
+        if (ebitda4 <= 0) return netDebt <= 0 ? B : CCC;
         double lev = netDebt / ebitda4;
         double cover = interest4 <= 1 ? Double.POSITIVE_INFINITY : ebitda4 / interest4;
         Rating byLev = CCC, byCover = CCC;

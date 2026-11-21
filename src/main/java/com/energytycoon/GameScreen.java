@@ -505,6 +505,8 @@ public final class GameScreen implements Screen, Hud.Listener {
                 if (why == null) why = state.checkEquipment(plantEq);
                 if (why != null) { hud.toast(why); return; }
                 boolean eca = hud.ecaOn() && Finance.ecaEligible(plantEq);
+                String ecaNo = eca ? state.finance.ecaRefusal(state.player, plantEq, hud.ecaBank()) : null;
+                if (ecaNo != null) { hud.toast("ECA: " + ecaNo + ". Başka banka seçin veya ECA'sız alın."); return; }
                 double needCash = eca ? state.finance.ecaCashNeed(state.player, plantEq, hud.ecaBank(), hud.ecaFreq()) : plantEq.capex();
                 if (state.player.cash < needCash) { hud.toast("Yetersiz nakit (" + Fmt.money(needCash) + " gerekli). Finans'tan kredi kullanabilirsiniz."); return; }
                 Plant p = eca ? state.finance.buildWithEca(state.player, plantEq, x, y, hud.ecaBank(), hud.ecaFreq()) : state.buildPlant(state.player, plantEq, x, y);

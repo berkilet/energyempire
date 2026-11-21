@@ -149,8 +149,14 @@ public final class BalanceCheck {
                 StringBuilder rates = new StringBuilder(), ratings = new StringBuilder();
                 java.util.Map<Company, StringBuilder> rt = new java.util.LinkedHashMap<>();
                 for (Company c : s.companies) if (!c.neutral) rt.put(c, new StringBuilder());
+                java.util.Map<Loan, Boolean> seen = new java.util.IdentityHashMap<>();
                 while (s.year() < 2041 && !s.gameOver) {
                     s.tick(); s.messages.clear();
+                    if (s.hour % Balance.HOURS_PER_MONTH == 0)
+                        for (Company c : s.companies) for (Loan l : c.loans) if (seen.put(l, Boolean.TRUE) == null) {
+                            if (l.type == Loan.Type.ECA) { ecaN++; ecaVol += l.principal; }
+                            else if (l.type == Loan.Type.COMMERCIAL) { comN++; comVol += l.principal; }
+                        }
                     if (s.hour % Balance.HOURS_PER_YEAR == 0) {
                         rates.append(String.format(Locale.ROOT, " %d:%.2f", s.year() - 1, s.macro.policyRate * 100));
                         for (Map.Entry<Company, StringBuilder> e : rt.entrySet()) {
@@ -172,8 +178,6 @@ public final class BalanceCheck {
                     firms++; late += c.lateEvents; def += c.defaults; restr += c.restructures; if (c.bankrupt) bankrupt++;
                     for (Loan l : c.loans) {
                         if (l.status == Loan.Status.DEFAULTED) defByType.merge(l.type.label + (l.type == Loan.Type.ECA && l.dscrLowQuarters >= FinanceBalance.ECA_DSCR_DEFAULT_QUARTERS ? " (DSCR)" : l.daysLate >= FinanceBalance.DEFAULT_DAYS ? " (90 gün)" : " (iflas/çapraz)"), 1, Integer::sum);
-                        if (l.type == Loan.Type.ECA) { ecaN++; ecaVol += l.principal; }
-                        else if (l.type == Loan.Type.COMMERCIAL) { comN++; comVol += l.principal; }
                     }
                 }
             }
