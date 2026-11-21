@@ -143,7 +143,8 @@ public final class GameState {
         int want = settings.cities;
         int tries = 0;
         List<String> names = new ArrayList<>(List.of(CITY_NAMES));
-        java.util.Collections.shuffle(names, rng);
+        java.util.Collections.shuffle(names, rng);   // rastgele sayi akisi (harita yerlesimi) eski tohumlarla ayni kalsin
+        names = CityNames.generate(new java.util.Random(settings.seed * 0x9E3779B97F4A7C15L + 17), want);
         double spacing = map.size / Math.sqrt(want) * 0.85;
         int margin = Math.max(4, map.size / 12);
         int maxLevel = Math.max(9, settings.preset.relief - 4);

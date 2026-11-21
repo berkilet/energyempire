@@ -355,6 +355,10 @@ public class SaveData {
             if (d > 1) s.finance.convertLegacyDebt(c, d);
             if (s.finance.revolver(c) == null && !c.bankrupt) s.finance.openRevolverFree(c, Bank.KIYI);
         }
+        // Eski kayit: ECA kredisinde bolge adi (Avrupa, Uzak Dogu...) -> bagli santralin tedarikci ulkesi
+        for (Company c : s.companies) for (Loan l : c.loans)
+            if (l.type == Loan.Type.ECA && l.ecaOrigin != null && Finance.ecaPremiumRate(l.ecaOrigin) < 0)
+                for (Plant p : s.plants) if (p.id == l.linkedPlant && p.equipment != null) { l.ecaOrigin = p.equipment.supplier.origin; break; }
         if (monthlyPrice != null) for (double v : monthlyPrice) s.history.monthlyPrice.add(v);
         s.rng.setSeed(seed ^ hour * 31);
         s.updateValuations();

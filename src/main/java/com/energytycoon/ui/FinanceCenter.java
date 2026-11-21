@@ -331,7 +331,7 @@ public final class FinanceCenter {
         loans.add(rows).padBottom(6).row();
         Table acts = new Table();
         acts.add(button("Yeni kredi…", "wizard", true)).width(160).height(32).padRight(6);
-        if (f.revolver(p) == null) acts.add(button("İşletme kredisi limiti aç (Kıyıbank)", "revopen", true)).height(32);
+        if (f.revolver(p) == null) acts.add(button("İşletme kredisi limiti aç (" + Bank.KIYI.label + ")", "revopen", true)).height(32);
         loans.add(acts).padBottom(10).row();
         // bankalar
         loans.add(UiKit.section(skin, "BANKALAR")).row();

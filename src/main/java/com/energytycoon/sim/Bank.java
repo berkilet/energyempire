@@ -1,10 +1,10 @@
 package com.energytycoon.sim;
 
-/** Kurgusal bankalar. */
+/** Kurgusal bankalar: dunyanin buyuk bankalarinin parodi adlari (her dilde ayni kalir; ceviriye girmez). */
 public enum Bank {
-    KIYI("Kıyıbank", "Genel ticari banka · ortalama koşullar, en geniş limit"),
-    YESIL("Yeşilvadi Kalkınma Bankası", "Yenilenebilir odaklı · yenilenebilir krediye −0,5 puan, 10 yıla kadar vade; fosil santrale kredi vermez; taahhüt Net borç/FAVÖK ≤ 4,0"),
-    DEMIRTAS("Demirtaş Yatırım Bankası", "Risk iştahı yüksek · CCC nota da kredi verir (+2 puan); diğer notlarda +0,5 puan");
+    KIYI("Deutsche Bunk", "Genel ticari banka · ortalama koşullar, en geniş limit"),
+    YESIL("Crédit Agricool", "Yenilenebilir odaklı · yenilenebilir krediye −0,5 puan, 10 yıla kadar vade; fosil santrale kredi vermez; taahhüt Net borç/FAVÖK ≤ 4,0"),
+    DEMIRTAS("Lemon Brothers", "Risk iştahı yüksek · CCC nota da kredi verir (+2 puan); diğer notlarda +0,5 puan");
 
     public final String label, profile;
     Bank(String l, String p) { label = l; profile = p; }

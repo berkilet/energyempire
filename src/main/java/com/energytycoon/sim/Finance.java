@@ -94,7 +94,7 @@ public final class Finance {
         if (exempt(c)) return "Kamu kredi kullanmaz";
         if (c.bankBanUntil[b.ordinal()] > s.hour) return "Temerrüt sonrası " + FinanceBalance.REL_BAN_YEARS + " yıl kredi vermez";
         Rating r = rating(c);
-        if (type != Loan.Type.ECA && !b.lendsTo(r)) return "CCC nota yalnızca Demirtaş kredi verir";
+        if (type != Loan.Type.ECA && !b.lendsTo(r)) return "CCC nota yalnızca " + Bank.DEMIRTAS.label + " kredi verir";
         if (type == Loan.Type.COMMERCIAL && c.bankCovenantBreach[b.ordinal()]) return "Taahhüt ihlali: yeni ticari kredi yok";
         if (b == Bank.YESIL && purpose != null && !purpose.type.renewable) return "Fosil santrale kredi vermez";
         if (c.restructUsed && c.restructProtectUntil > s.hour) return "Yapılandırma sürüyor";
@@ -152,7 +152,8 @@ public final class Finance {
     /** Tedarikci ulkesi icin ECA sigorta primi (risk); yerli tedarikcide ECA yok. */
     public static double ecaPremiumRate(String origin) {
         return switch (origin) {
-            case "İskandinavya" -> 0.04; case "Alpler" -> 0.045; case "Avrupa" -> 0.05; case "Kuzey Amerika" -> 0.055; case "Uzak Doğu" -> 0.08;
+            case "Danimarka", "Norveç" -> 0.04; case "İsviçre" -> 0.045; case "Almanya", "Fransa", "Kanada" -> 0.05;
+            case "İtalya", "İspanya", "ABD" -> 0.055; case "Japonya" -> 0.06; case "Çin" -> 0.08;
             default -> -1;
         };
     }

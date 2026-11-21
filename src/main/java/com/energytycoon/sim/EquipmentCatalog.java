@@ -12,22 +12,22 @@ public final class EquipmentCatalog {
     public final Map<String, Equipment> equipment = new LinkedHashMap<>();
 
     public EquipmentCatalog() {
-        Supplier sunpeak = sup("sunpeak", "SunPeak", "Uzak Doğu", 0.68, 10);
-        Supplier helion = sup("helion", "Helion Modül", "Avrupa", 0.85, 12);
-        Supplier lumina = sup("lumina", "Lumina PV", "Kuzey Amerika", 0.92, 15);
+        Supplier sunpeak = sup("sunpeak", "SunPeak", "Çin", 0.68, 10);
+        Supplier helion = sup("helion", "Helion Modül", "Almanya", 0.85, 12);
+        Supplier lumina = sup("lumina", "Lumina PV", "ABD", 0.92, 15);
         Supplier kuzey = sup("kuzey", "Kuzey Güneş", "Yerli", 0.80, 12);
         Supplier ruzgarsan = sup("ruzgarsan", "Rüzgarsan", "Yerli", 0.66, 5);
-        Supplier nordwind = sup("nordwind", "Nordwind", "İskandinavya", 0.88, 10);
-        Supplier aeolus = sup("aeolus", "Aeolus Türbin", "Avrupa", 0.93, 12);
-        Supplier boreal = sup("boreal", "Boreal Energy", "Kuzey Amerika", 0.82, 10);
-        Supplier atlas = sup("atlas", "Atlas Turbines", "Avrupa", 0.85, 8);
-        Supplier meridian = sup("meridian", "Meridian Power", "Kuzey Amerika", 0.92, 10);
+        Supplier nordwind = sup("nordwind", "Nordwind", "Danimarka", 0.88, 10);
+        Supplier aeolus = sup("aeolus", "Aeolus Türbin", "İspanya", 0.93, 12);
+        Supplier boreal = sup("boreal", "Boreal Energy", "Kanada", 0.82, 10);
+        Supplier atlas = sup("atlas", "Atlas Turbines", "İtalya", 0.85, 8);
+        Supplier meridian = sup("meridian", "Meridian Power", "ABD", 0.92, 10);
         Supplier ferrum = sup("ferrum", "Ferrum Kazan", "Yerli", 0.78, 6);
-        Supplier taurus = sup("taurus", "Taurus Heavy", "Uzak Doğu", 0.88, 10);
-        Supplier hydrova = sup("hydrova", "Hydrova", "Avrupa", 0.90, 15);
-        Supplier alpina = sup("alpina", "Alpina Hidro", "Alpler", 0.86, 12);
-        Supplier atomtek = sup("atomtek", "Atomtek", "Avrupa", 0.90, 20);
-        Supplier polaris = sup("polaris", "Polaris SMR", "Kuzey Amerika", 0.78, 15);
+        Supplier taurus = sup("taurus", "Taurus Heavy", "Japonya", 0.88, 10);
+        Supplier hydrova = sup("hydrova", "Hydrova", "Norveç", 0.90, 15);
+        Supplier alpina = sup("alpina", "Alpina Hidro", "İsviçre", 0.86, 12);
+        Supplier atomtek = sup("atomtek", "Atomtek", "Fransa", 0.90, 20);
+        Supplier polaris = sup("polaris", "Polaris SMR", "ABD", 0.78, 15);
 
         //  id, type, supplier, model, tech, MW, capex/MW, eff, outMult, a, b, deg, build, om, year, visA, visB, not
         // GUNES: a = sicak saha kaybi
