@@ -112,7 +112,7 @@ public final class CompaniesView {
             Label[] r = compRows.get(k);
             double cap = 0; int n = 0;
             for (Plant p : s.plants) if (p.owner == c && p.operational()) { cap += p.capacityMW(); n++; }
-            r[0].setText(c.name + (c.bankrupt ? "  (iflas)" : ""));
+            r[0].setText(c.name + (c.eq.merged ? "  (birleşti)" : c.bankrupt ? "  (iflas)" : c.eq.parent >= 0 ? "  (bağlı ortaklık)" : ""));
             r[1].setText(Fmt.money(c.valuation));
             UiKit.setMoney(skin, r[2], c.cash, true);
             r[3].setText(c.debt() > 0 ? Fmt.money(c.debt()) : "—");

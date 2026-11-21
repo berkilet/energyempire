@@ -219,6 +219,7 @@ public final class BalanceCheck {
     static int onlySize;
 
     static void mna(int seeds, boolean leverage) {
+        if (System.getenv("NO_CAP") != null) Competition.priceCapEnabled = false;
         for (int[] cfg : new int[][] { { 64, 5 }, { 96, 12 } }) {
             if (onlySize > 0 && cfg[0] != onlySize) continue;
             int a = 0, b = 0, c = 0, attempts = 0, appr = 0, cond = 0, rej = 0, tk = 0, failed = 0, ipos = 0;
@@ -228,7 +229,8 @@ public final class BalanceCheck {
                 GameState s = game(seed, cfg[0], cfg[1], "free");
                 s.aiPlayer = true;
                 int pi = s.companies.indexOf(s.player);
-                boolean gotA = false; int playerTk = 0, playerCond = 0;
+                boolean gotA = false; int playerTk = 0, playerCond = 0, condMonths = 0;
+                double maxComb = 0, minRatio = 1e9;
                 List<String> log = new ArrayList<>();
                 int[] parent = new int[s.companies.size()]; Arrays.fill(parent, -1);
                 boolean[] listed = new boolean[s.companies.size()];
@@ -237,6 +239,13 @@ public final class BalanceCheck {
                     s.tick(); s.messages.clear();
                     if (s.hour % Balance.HOURS_PER_MONTH != 0) continue;
                     MnaBot.monthly(s, leverage);
+                    for (Company x : s.companies) {
+                        if (x == s.player || x.neutral || x.bankrupt || s.competition.sameGroup(x, s.player)) continue;
+                        Competition.Preview pv = s.competition.preview(s.player, x);
+                        if (pv.outcome == Competition.CONDITIONAL) condMonths++;
+                        if (pv.valueRatio < FinanceBalance.SCALE_EXEMPTION_RATIO) for (Competition.Row r : pv.rows) maxComb = Math.max(maxComb, r.combined);
+                        minRatio = Math.min(minRatio, pv.valueRatio);
+                    }
                     for (Company x : s.companies) if (x != s.player && s.mna.stake(s.player, x) > 0.20) gotA = true;
                     for (int i = 0; i < s.companies.size(); i++) {
                         Company x = s.companies.get(i);
@@ -251,7 +260,7 @@ public final class BalanceCheck {
                     }
                     if (System.getenv("MNA_TRACE") != null && s.month() == 0) {
                         Company q = s.player;
-                        log.add(String.format(Locale.ROOT, "%d iz: hakim %s tavanlı santral %d nakit %.0fM borç %.0fM ND/FAVÖK %.1f not %s gecikme %d payı olan şirket %d değer %.0fM", s.year() - 1, q.eq.dominant, (int) s.plants.stream().filter(x -> x.owner == q && x.priceCap > 0).count(), q.cash / 1e6, q.debt() / 1e6,
+                        log.add(String.format(Locale.ROOT, "%d iz: hisse %.2fM temettü %%%d geri alım %.0fM hakim %s tavanlı santral %d nakit %.0fM borç %.0fM ND/FAVÖK %.1f not %s gecikme %d payı olan şirket %d değer %.0fM", s.year() - 1, q.eq.shares / 1e6, q.eq.dividendPct, q.eq.buybackBudget / 1e6, q.eq.dominant, (int) s.plants.stream().filter(x -> x.owner == q && x.priceCap > 0).count(), q.cash / 1e6, q.debt() / 1e6,
                             s.finance.leverage(q), s.finance.rating(q), q.lateEvents, (int) s.companies.stream().filter(x -> x != q && s.mna.stake(q, x) > 0).count(), s.capital.value(q) / 1e6));
                     }
                     if (leverage && trackFrom > 0 && s.month() == 0 && s.year() <= trackFrom + 3) {
@@ -265,7 +274,8 @@ public final class BalanceCheck {
                 for (String r : s.deals.rejectReasons) reasons.merge(r.replaceAll("[0-9]+", "#"), 1, Integer::sum);
                 for (boolean l : listed) if (l) ipos++;
                 System.out.println("-- " + cfg[0] + "x" + cfg[0] + " tohum " + seed + (s.gameOver ? " (" + s.gameOverReason + ")" : "") + ": bot %20+ pay " + gotA + ", bot devralma " + playerTk + ", koşullu " + playerCond
-                    + " · oyuncu kurucu payı %" + Math.round(s.player.eq.founderPct() * 100));
+                    + " · oyuncu kurucu payı %" + Math.round(s.player.eq.founderPct() * 100)
+                    + String.format(Locale.ROOT, " · koşullu onay fırsatı (ay) %d · oran<1,5 iken en yüksek bölgesel birleşik pay %%%.0f · en düşük değer oranı %.2f", condMonths, maxComb * 100, minRatio));
                 for (String l : log) System.out.println("   " + l);
                 if (leverage) System.out.println("   devralma sonrası:" + (track.length() == 0 ? " devralma yok" : track));
             }

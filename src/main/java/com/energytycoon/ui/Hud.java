@@ -391,7 +391,7 @@ public final class Hud {
     }
 
     private static final String HELP =
-        "Amaç: Senaryo hedeflerine ulaşın (sağ alttaki panel). Serbest oyunda hedef $4 milyar piyasa değeri.\n\n"
+        "Amaç: Senaryo hedeflerine ulaşın (sağ alttaki panel). Serbest oyunda hedef $7 milyar piyasa değeri.\n\n"
       + "1) Sol alttaki Yatırım düğmesine (B) basın, Santral Yatırımları altından bir türe tıklayın: tedarikçi ve model penceresi açılır. Panel/türbin/kazan modeli üretimi, "
       + "verimi, yaşlanmayı, fiyatı ve inşaat süresini belirler. Tedarikçi itibarı arıza ve teslim gecikmesi riskini, garanti süresi ücretsiz onarımı belirler.\n"
       + "2) Modeli seçtikten sonra haritaya tıklayın. Yeşil kutu = uygun yer. Alttaki çubuk o sahada beklenen performansı gösterir.\n"
@@ -410,7 +410,12 @@ public final class Hud {
       + "8) Finans (F, araç çubuğu veya nakit göstergesi): Kredi notunuz Net borç/FAVÖK ve FAVÖK/faiz oranlarından çeyreklik hesaplanır; faiz = politika faizi + not primi. "
       + "Krediler sekmesindeki 'Yeni kredi…' sihirbazı üç bankanın teklifini yan yana gösterir. ECA kredisi (ekipman bedelinin %85'i, ödemesiz dönem, daha ucuz) "
       + "yalnızca santral siparişinde, ekipman penceresinden seçilir. Taksitler vade günü nakitten otomatik düşer; nakit yetmezse işletme kredisi limiti kullanılır, "
-      + "o da yetmezse gecikme (30 gün tolerans) ve 90 günde temerrüt başlar. Ödeme Takvimi sekmesi önümüzdeki 12 ayın taksitlerini ve olası nakit açığını gösterir.\n\n"
+      + "o da yetmezse gecikme (30 gün tolerans) ve 90 günde temerrüt başlar. Ödeme Takvimi sekmesi önümüzdeki 12 ayın taksitlerini ve olası nakit açığını gösterir.\n"
+      + "9) Sermaye: 8 çeyrek, son 4 çeyrek kâr ve en az BB notla halka açılabilirsiniz (6 ay hazırlık, arz oranını siz seçersiniz). Halka açık şirket bedelli sermaye artırımı, "
+      + "geri alım ve temettü kullanabilir. Kurucu payınız %50'nin altına düşerse rakipler size çağrı yapabilir; devralınırsanız oyun biter.\n"
+      + "10) Birleşme ve Satın Alma: kurucuya teklif (pazarlık), piyasadan pay, çağrı (yalnızca dağınık ortaklı şirkete). %50'yi aşan işlem rekabet otoritesine gider: "
+      + "ölçek farkı (değer oranı ≥ 1,5) ön incelemede onay; bölgesel birleşik pay %60'ı aşarsa satış taahhüdüyle koşullu onay; ulusal %80 sınırı ret. "
+      + "Onaydan önce kontrol hakkı yoktur. Bir pazarda %50'yi aşan şirketin fiyatı ortalama üretim maliyeti + %15 ile sınırlıdır.\n\n"
       + "Kontroller: Sağ tık sürükle = kaydır, tekerlek = yakınlaştır, Q/E = döndür, WASD/oklar = kaydır, Boşluk = duraklat, "
       + "1/2/3 = hız (1x: bir gün 24 sn), B = yatırım, V = varlıklarım, Delete = yık, Tab = hat kademesi, L = katman, F5/F9 = kaydet/yükle, Esc = iptal/menü.";
 

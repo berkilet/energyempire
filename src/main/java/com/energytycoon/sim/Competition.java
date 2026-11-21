@@ -328,8 +328,12 @@ public final class Competition {
     }
 
     /** Hakim durum: bir pazarda payi %50'yi asan grubun santrallerine o pazarda fiyat tavani (ortalama uretim maliyeti + %15). */
+    /** Olcum icin: hakim durum fiyat tavani uygulansin mi (oyunda her zaman acik). */
+    public static boolean priceCapEnabled = true;
+
     void dominance() {
         for (Plant p : s.plants) p.priceCap = 0;
+        if (!priceCapEnabled) return;
         Set<Company> tops = new HashSet<>();
         for (Company c : s.companies) if (!c.neutral && !c.bankrupt && !c.eq.merged) tops.add(top(c));
         boolean playerDominant = false;
