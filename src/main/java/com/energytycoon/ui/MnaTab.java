@@ -134,7 +134,7 @@ public final class MnaTab {
         if (ctrl) {
             Table sb = new Table();
             sb.add(new Label("Bağlı ortaklık stratejisi:", skin, "small")).padRight(6);
-            for (int k = 0; k < 3; k++) sb.add(toggle(Mna.STRATEGY[k], t.eq.strategy == k, "strategy:" + ti + ":" + k)).height(28).padRight(4);
+            for (int k = 0; k < 3; k++) sb.add(toggleIcon(Mna.STRATEGY[k], STRAT_ICONS[k], t.eq.strategy == k, "strategy:" + ti + ":" + k)).height(28).padRight(4);
             root.add(sb).padBottom(2).row();
             Label sl = new Label("Büyüme: rakip YZ gibi yatırım yapar, kârın %" + FinanceBalance.SUB_DIVIDEND[0] + "'ini temettü öder · Temkinli: yalnızca düşük kaldıraç ve bol nakitle yatırım, %"
                 + FinanceBalance.SUB_DIVIDEND[1] + " temettü · Nakit üret: yeni santral yok, %" + FinanceBalance.SUB_DIVIDEND[2] + " temettü. Temettünün payınıza düşen kısmı nakit olarak size gelir. "
@@ -250,6 +250,16 @@ public final class MnaTab {
         TextButton b = new TextButton(text, skin, "small");
         b.setDisabled(!enabled);
         b.addListener(new ChangeListener() { public void changed(ChangeEvent ev, Actor a) { if (!b.isDisabled()) { action.accept(act); key = ""; } } });
+        return b;
+    }
+
+    private static final String[] STRAT_ICONS = { "grp_growth", "grp_cautious", "grp_cashcow" };
+
+    private com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton toggleIcon(String text, String icon, boolean on, String act) {
+        com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = UiKit.iconButton(skin, text, icon, "small", 20, 21);
+        b.setChecked(on);
+        b.setProgrammaticChangeEvents(false);
+        b.addListener(new ChangeListener() { public void changed(ChangeEvent ev, Actor a) { action.accept(act); key = ""; } });
         return b;
     }
 

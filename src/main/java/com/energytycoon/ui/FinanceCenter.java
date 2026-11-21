@@ -16,6 +16,7 @@ import java.util.function.Consumer;
  * eylemler), Piyasa ve Faiz (politika faizi, beklenti, olaylar, endeks). Butun metinler sarilir; uzun tablolar kaydirilir.
  */
 public final class FinanceCenter {
+    private static final String[] TAB_ICONS = { "fin_summary", "fin_schedule", "fin_loans", "fin_market", "fin_capital", "fin_mna" };
     public enum Tab { SUMMARY("Özet"), SCHEDULE("Ödeme Takvimi"), LOANS("Krediler"), MARKET("Piyasa ve Faiz"), CAPITAL("Sermaye"), MNA("Birleşme ve Satın Alma");
         final String label; Tab(String l) { label = l; } }
 
@@ -54,10 +55,10 @@ public final class FinanceCenter {
         capitalTab = new CapitalTab(skins, action);
         mnaTab = new MnaTab(skins, action);
         root.defaults().left();
-        ButtonGroup<TextButton> g = new ButtonGroup<>();
+        ButtonGroup<com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton> g = new ButtonGroup<>();
         settingTab = true;
         for (Tab t : Tab.values()) {
-            TextButton b = new TextButton(t.label, skin, "small");
+            com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = UiKit.iconButton(skin, t.label, TAB_ICONS[t.ordinal()], "small", 20, 21);
             b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { if (b.isChecked() && !settingTab) setTab(t); } });
             g.add(b);
             tabs.add(b).height(30).padRight(3);
@@ -137,7 +138,7 @@ public final class FinanceCenter {
     public void setTab(Tab t) {
         tab = t;
         settingTab = true;
-        for (int i = 0; i < tabs.getChildren().size; i++) ((TextButton) tabs.getChildren().get(i)).setChecked(Tab.values()[i] == t);
+        for (int i = 0; i < tabs.getChildren().size; i++) ((com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton) tabs.getChildren().get(i)).setChecked(Tab.values()[i] == t);
         settingTab = false;
         bodyCell.setActor(switch (t) { case SUMMARY -> summary; case SCHEDULE -> schedule; case LOANS -> loans; case MARKET -> market;
             case CAPITAL -> capitalTab.root; case MNA -> mnaTab.root; });

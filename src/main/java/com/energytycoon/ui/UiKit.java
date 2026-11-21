@@ -18,13 +18,32 @@ public final class UiKit {
         return l;
     }
 
+    /** Soldaki ikonlu dugme (sekme/menu). Stil, mevcut metin dugmesi stilinden turetilir; secili hali korunur. */
+    public static com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton iconButton(Skin skin, String text, String icon, String style, float w, float h) {
+        com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton.ImageTextButtonStyle st = new com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton.ImageTextButtonStyle(
+            skin.get(style, com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle.class));
+        st.imageUp = skin.getDrawable("icon_" + icon);
+        com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = new com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton(text, st);
+        b.getImageCell().size(w, h).padRight(4);
+        return b;
+    }
+
     /** KPI karti: ust satirda aciklama, altta buyuk deger; alt satir istege bagli (ör. degisim). */
-    public static Table card(Skin skin, String caption, Label value, Label sub) {
+    public static Table card(Skin skin, String caption, Label value, Label sub) { return card(skin, caption, value, sub, null); }
+
+    /** Ikonlu KPI karti: baslik satirinin soluna kucuk ikon. */
+    public static Table card(Skin skin, String caption, Label value, Label sub, String icon) {
         Table t = new Table(skin);
         t.setBackground("card");
         t.pad(6, 10, 6, 10);
         t.left().top();
-        t.add(new Label(caption, skin, "dim")).left().row();
+        if (icon == null) t.add(new Label(caption, skin, "dim")).left().row();
+        else {
+            Table cap = new Table();
+            cap.add(new com.badlogic.gdx.scenes.scene2d.ui.Image(skin.getDrawable("icon_" + icon))).size(18, 19).padRight(4);
+            cap.add(new Label(caption, skin, "dim")).left();
+            t.add(cap).left().row();
+        }
         t.add(value).left().padTop(1).row();
         // Alt satir yoksa bos satir: tum kartlar ayni yukseklikte kalsin.
         com.badlogic.gdx.scenes.scene2d.ui.Cell<Label> c = t.add(sub != null ? sub : new Label(" ", skin, "dim")).left().padTop(1);
