@@ -139,8 +139,8 @@ public final class FinanceBalance {
     public static final double[] CONSOLIDATION_MILESTONE_SHARES = { 0.35, 0.60 };
 
     // ---- 4. Pay alimi ve devralma
-    /** Kurucunun istedigi prim: kontrolu koruyan satis %15-25, kontrol kaybi >= %60, zor durumda %0-10, nakit ihtiyacinda %5-15. */
-    public static final double ASK_BASE_MIN = 0.15, ASK_BASE_MAX = 0.25, ASK_CONTROL_MIN = 0.60, ASK_CONTROL_MAX = 0.70;
+    /** Kurucunun istedigi prim: kontrolu koruyan satis %15-25, kontrol kaybi >= %36 (once %60), zor durumda %0-10, nakit ihtiyacinda %5-15. */
+    public static final double ASK_BASE_MIN = 0.15, ASK_BASE_MAX = 0.25, ASK_CONTROL_MIN = 0.36, ASK_CONTROL_MAX = 0.46;
     public static final double ASK_DISTRESS_MAX = 0.10, ASK_CASH_MIN = 0.05, ASK_CASH_MAX = 0.15;
     /** Teklif istenen fiyatin bu oranindan dusukse dogrudan ret; aradaysa bir kez karsi teklif. */
     public static final double COUNTER_BAND = 0.85;

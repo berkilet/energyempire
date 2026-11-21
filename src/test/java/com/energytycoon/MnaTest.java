@@ -55,7 +55,7 @@ class MnaTest {
         Mna.Ask lose = s.mna.founderAsk(t, t.eq.shares * 0.6);
         System.out.printf("prim: kontrol korunur %.0f%%, kontrol kaybı %.0f%% (%s)%n", keep.premium * 100, lose.premium * 100, lose.reason);
         assertTrue(lose.controlLoss);
-        assertTrue(lose.premium >= 0.60);
+        assertTrue(lose.premium >= FinanceBalance.ASK_CONTROL_MIN && lose.premium > keep.premium);
         assertTrue(keep.premium >= 0.05 && keep.premium <= 0.25, "kontrol korunur: %15-25 (nakit ihtiyacinda %5-15)");
         t.rating = Rating.B;
         Mna.Ask dist = s.mna.founderAsk(t, t.eq.shares * 0.6);
