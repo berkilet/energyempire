@@ -60,7 +60,7 @@ class SimTest {
                 if (s.gameOver) break;
             }
             System.out.printf("seed %d yil %d: oyuncu nakit=%.0fM borc=%.0fM deger=%.0fM  fiyat=%.1f  riv1=%.0fM riv2=%.0fM  sehir sat: %s%n",
-                seed, s.year(), s.player.cash / 1e6, s.player.debt / 1e6, s.player.valuation / 1e6, s.statPrice,
+                seed, s.year(), s.player.cash / 1e6, s.player.debt() / 1e6, s.player.valuation / 1e6, s.statPrice,
                 s.companies.get(1).valuation / 1e6, s.companies.get(2).valuation / 1e6,
                 s.cities.stream().map(c -> String.format("%.2f", c.satisfaction)).toList());
         }

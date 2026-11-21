@@ -63,6 +63,14 @@ public final class RivalAI {
         }
     }
 
+    /** El konan santral ihalesi: getiri esigini saglayan fiyat (defterin en fazla %90'i), nakit + yedek yetiyorsa; yoksa 0. */
+    public static double seizedPlantBid(GameState s, Company c, Plant p) {
+        if (!p.operational() || p.lastMonthProfit <= 0) return 0;
+        double byYield = p.lastMonthProfit * 12 / Balance.RIVAL_BUY_YIELD;
+        double bid = Math.min(byYield, p.bookValue(s.hour) * 0.9);
+        return c.cash >= bid + GridBalance.RIVAL_BUILD_RESERVE ? bid : 0;
+    }
+
     /** Ilanlardan alim: santral yillik kari / fiyat >= esik; TM yaricapinda kendi santrali varsa. Ayda en fazla bir alim. */
     static void buyListings(GameState s, Company c) {
         for (Listing l : s.sales.open()) {

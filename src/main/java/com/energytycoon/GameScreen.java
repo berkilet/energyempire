@@ -287,7 +287,6 @@ public final class GameScreen implements Screen, Hud.Listener {
             case "finance", "market", "companies", "help", "settings" -> hud.toggle(a);
             case "menu" -> hud.toggle("menu");
             case "borrow" -> { if (!state.borrow(state.player)) hud.toast("Kredi limitine ulaştınız."); }
-            case "repay" -> { if (!state.repay(state.player)) hud.toast("Geri ödeme için yeterli nakit/borç yok."); }
             case "save" -> hud.toast(SaveManager.save(state, "save") ? "Oyun kaydedildi." : "Kayıt başarısız!");
             case "load" -> { if (SaveManager.exists("save")) { if (!game.continueGame("save")) hud.toast("Yükleme başarısız!"); } else hud.toast("Kayıt bulunamadı."); }
             case "togglePause" -> speed(speed == 0 ? lastSpeed : 0);

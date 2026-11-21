@@ -92,7 +92,7 @@ class SaleTest {
         t.buildHoursLeft = 0;
         int plants = s.plants.size(), lines = s.lines.size(), tms = s.substations.size();
         r.cash = -5e9; // satislar acigi kapatamaz
-        for (int m = 0; m < 4 && !r.bankrupt; m++) for (int h = 0; h < HPM; h++) {
+        for (int m = 0; m < 14 && !r.bankrupt; m++) for (int h = 0; h < HPM; h++) {
             a.monthProfit = 1e6; b.monthProfit = 1e6; // Kamu zarar etmeyen santrali ister
             s.tick(); r.cash = Math.min(r.cash, -5e9);
         }

@@ -844,7 +844,7 @@ public final class Hud {
         cash.setText(Fmt.money(p.cash));
         Label.LabelStyle cs = skin.get(p.cash < 0 ? "valueBad" : "value", Label.LabelStyle.class);
         if (cash.getStyle() != cs) cash.setStyle(cs);
-        debt.setText(Fmt.money(p.debt));
+        debt.setText(Fmt.money(p.debt()));
         value.setText(Fmt.money(p.valuation));
         price.setText("$" + Fmt.f1(s.statPrice) + "/MWh");
         demand.setText(Fmt.mw(s.statDemand) + " · siz " + Fmt.mw(s.statPlayerMW));

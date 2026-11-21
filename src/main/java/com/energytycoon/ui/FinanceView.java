@@ -167,28 +167,28 @@ public final class FinanceView {
         dayNote.setText("* ayın " + s.dayOfMonth() + ". günü itibarıyla (ay " + Balance.DAYS_PER_MONTH + " gün)");
 
         // kredi
-        UiKit.setMoney(skin, debt, p.debt, false);
+        UiKit.setMoney(skin, debt, p.debt(), false);
         UiKit.setMoney(skin, limit, limitV, false);
-        float use = (float) (limitV > 0 ? p.debt / limitV : 0);
+        float use = (float) (limitV > 0 ? p.debt() / limitV : 0);
         creditMeter.set(use, use < 0.6f ? Skins.ACCENT : use < 0.9f ? Skins.WARN : Skins.BAD);
         rate.setText(String.format(Locale.ROOT, "%%%.1f", rateV * 100));
-        monthlyInterest.setText(p.debt > 0 ? "−" + Fmt.money(p.debt * rateV / 12) : "—");
-        boolean canBorrow = p.debt + Balance.LOAN_STEP <= limitV;
-        double repayAmt = Math.min(Balance.LOAN_STEP, p.debt);
+        monthlyInterest.setText(p.debt() > 0 ? "−" + Fmt.money(p.debt() * rateV / 12) : "—");
+        boolean canBorrow = p.debt() + Balance.LOAN_STEP <= limitV;
+        double repayAmt = Math.min(Balance.LOAN_STEP, p.debt());
         boolean canRepay = repayAmt > 0 && p.cash >= repayAmt;
         borrowBtn.setDisabled(!canBorrow);
         repayBtn.setDisabled(!canRepay);
         String note;
         if (!canBorrow) note = "Kredi limiti dolu. Limit, tesis ve hatlarınızın defter değeriyle büyür.";
-        else if (p.debt <= 0) note = "Borcunuz yok. Borçlanınca faiz oranı kaldıraca göre artar.";
+        else if (p.debt() <= 0) note = "Borcunuz yok. Borçlanınca faiz oranı kaldıraca göre artar.";
         else if (!canRepay) note = "Geri ödeme için yeterli nakit yok.";
         else note = "Kullanılan kredi: %" + Math.round(use * 100) + ". Faiz her ay sonunda ödenir.";
         creditNote.setText(note);
 
         UiKit.setMoney(skin, assets, assetsV, false);
         UiKit.setMoney(skin, cashB, p.cash, true);
-        debtB.setText(p.debt > 0 ? "−" + Fmt.money(p.debt) : "—");
-        UiKit.setMoney(skin, equity, p.cash + assetsV - p.debt, true);
+        debtB.setText(p.debt() > 0 ? "−" + Fmt.money(p.debt()) : "—");
+        UiKit.setMoney(skin, equity, p.cash + assetsV - p.debt(), true);
     }
 
     private static String gwh(double mwh) { return String.format(Locale.ROOT, "%.1f GWh", mwh / 1000); }

@@ -115,7 +115,7 @@ public final class CompaniesView {
             r[0].setText(c.name + (c.bankrupt ? "  (iflas)" : ""));
             r[1].setText(Fmt.money(c.valuation));
             UiKit.setMoney(skin, r[2], c.cash, true);
-            r[3].setText(c.debt > 0 ? Fmt.money(c.debt) : "—");
+            r[3].setText(c.debt() > 0 ? Fmt.money(c.debt()) : "—");
             r[4].setText(String.valueOf(n));
             r[5].setText(Fmt.mw(cap));
             r[6].setText(c.lastMwhGenerated > 0 ? String.format(Locale.ROOT, "%.0f GWh", c.lastMwhGenerated / 1000) : "—");

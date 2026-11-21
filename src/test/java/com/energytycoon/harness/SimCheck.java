@@ -42,7 +42,7 @@ public final class SimCheck {
         for (SimHarness.Month r : rows) System.out.println(r.csv());
         for (Company c : s.companies)
             System.out.printf(Locale.ROOT, "  %-22s nakit=%8.0fM borç=%6.0fM değer=%8.0fM santral=%d%n",
-                c.name, c.cash / 1e6, c.debt / 1e6, c.valuation / 1e6, s.totalPlantsOf(c));
+                c.name, c.cash / 1e6, c.debt() / 1e6, c.valuation / 1e6, s.totalPlantsOf(c));
         if (s.gameOver) System.out.println("OYUN BİTTİ: " + s.gameOverReason);
         if (out != null) {
             Path p = Path.of(out);

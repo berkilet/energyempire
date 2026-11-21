@@ -5,7 +5,65 @@ import java.util.List;
 
 /** Kayit icin duz veri modeli (LibGDX Json ile serilestirilir). */
 public class SaveData {
-    public static class CompanyD { public String name; public boolean player; public int color; public double cash, debt, valuation, stockPrice;
+    /** Finans (kredi notu, bankalar, krediler). Yoksa (eski kayit) cd.debt Kiyibank ticari kredisine donusturulur. */
+    public static class LoanD {
+        public int id, linkedPlant, tenorMonths, graceMonths, frequencyMonths, covenantBreaches, daysLate, onTimePayments, dscrLowQuarters;
+        public String type, bank, ecaOrigin, status; public boolean fixed, everLate, covenantPenalty, dscrPenalty, restructured;
+        public double principal, outstanding, rate, spread, accrued, dueAmount, demand, pendingPrincipal, limit;
+        public long startHour, nextDueHour, maturityHour, graceEndHour, lastResetHour, drawnSinceHour = -1;
+    }
+    public static class FinD {
+        public String rating = "BB"; public boolean lateNotch, dividendBan, restructUsed, restructOfferPending;
+        public int quarters, plantsAtRestruct, lateEvents, defaults, restructures;
+        public double qEbitdaAcc, qInterestAcc, qRenewAcc, qGenAcc, fees, lastFees;
+        public double[] qEbitda, qInterest, qRenew, qGen; public int[] bankScore, bankBreachQuarters; public long[] bankBanUntil; public boolean[] bankCovenantBreach;
+        public long defaultCapUntil, restructProtectUntil, mustSellBy, restructOfferHour, negativeSinceHour = -1;
+        public List<LoanD> loans = new ArrayList<>();
+
+        static FinD from(Company c, GameState s) {
+            FinD f = new FinD();
+            f.rating = c.rating.name(); f.lateNotch = c.lateNotch; f.dividendBan = c.dividendBan; f.restructUsed = c.restructUsed; f.restructOfferPending = c.restructOfferPending;
+            f.quarters = c.quarters; f.plantsAtRestruct = c.plantsAtRestruct; f.lateEvents = c.lateEvents; f.defaults = c.defaults; f.restructures = c.restructures;
+            f.qEbitdaAcc = c.qEbitdaAcc; f.qInterestAcc = c.qInterestAcc; f.qRenewAcc = c.qRenewAcc; f.qGenAcc = c.qGenAcc; f.fees = c.fees; f.lastFees = c.lastFees;
+            f.qEbitda = c.qEbitda; f.qInterest = c.qInterest; f.qRenew = c.qRenew; f.qGen = c.qGen; f.bankScore = c.bankScore; f.bankBreachQuarters = c.bankBreachQuarters;
+            f.bankBanUntil = c.bankBanUntil; f.bankCovenantBreach = c.bankCovenantBreach;
+            f.defaultCapUntil = c.defaultCapUntil; f.restructProtectUntil = c.restructProtectUntil; f.mustSellBy = c.mustSellBy; f.restructOfferHour = c.restructOfferHour; f.negativeSinceHour = c.negativeSinceHour;
+            for (Loan l : c.loans) {
+                LoanD d = new LoanD();
+                d.id = l.id; d.linkedPlant = l.linkedPlant; d.tenorMonths = l.tenorMonths; d.graceMonths = l.graceMonths; d.frequencyMonths = l.frequencyMonths;
+                d.covenantBreaches = l.covenantBreaches; d.daysLate = l.daysLate; d.onTimePayments = l.onTimePayments; d.dscrLowQuarters = l.dscrLowQuarters;
+                d.type = l.type.name(); d.bank = l.bank.name(); d.ecaOrigin = l.ecaOrigin; d.status = l.status.name(); d.fixed = l.fixed; d.everLate = l.everLate;
+                d.covenantPenalty = l.covenantPenalty; d.dscrPenalty = l.dscrPenalty; d.restructured = l.restructured;
+                d.principal = l.principal; d.outstanding = l.outstanding; d.rate = l.rate; d.spread = l.spread; d.accrued = l.accrued; d.dueAmount = l.dueAmount;
+                d.demand = l.demand; d.pendingPrincipal = l.pendingPrincipal; d.limit = l.limit;
+                d.startHour = l.startHour; d.nextDueHour = l.nextDueHour; d.maturityHour = l.maturityHour; d.graceEndHour = l.graceEndHour; d.lastResetHour = l.lastResetHour; d.drawnSinceHour = l.drawnSinceHour;
+                f.loans.add(d);
+            }
+            return f;
+        }
+
+        void apply(Company c) {
+            c.rating = Rating.valueOf(rating); c.lateNotch = lateNotch; c.dividendBan = dividendBan; c.restructUsed = restructUsed; c.restructOfferPending = restructOfferPending;
+            c.quarters = quarters; c.plantsAtRestruct = plantsAtRestruct; c.lateEvents = lateEvents; c.defaults = defaults; c.restructures = restructures;
+            c.qEbitdaAcc = qEbitdaAcc; c.qInterestAcc = qInterestAcc; c.qRenewAcc = qRenewAcc; c.qGenAcc = qGenAcc; c.fees = fees; c.lastFees = lastFees;
+            if (qEbitda != null && qEbitda.length == 4) { c.qEbitda = qEbitda; c.qInterest = qInterest; c.qRenew = qRenew; c.qGen = qGen; }
+            if (bankScore != null && bankScore.length == 3) { c.bankScore = bankScore; c.bankBreachQuarters = bankBreachQuarters; c.bankBanUntil = bankBanUntil; c.bankCovenantBreach = bankCovenantBreach; }
+            c.defaultCapUntil = defaultCapUntil; c.restructProtectUntil = restructProtectUntil; c.mustSellBy = mustSellBy; c.restructOfferHour = restructOfferHour; c.negativeSinceHour = negativeSinceHour;
+            if (loans != null) for (LoanD d : loans) {
+                Loan l = new Loan();
+                l.id = d.id; l.linkedPlant = d.linkedPlant; l.tenorMonths = d.tenorMonths; l.graceMonths = d.graceMonths; l.frequencyMonths = Math.max(1, d.frequencyMonths);
+                l.covenantBreaches = d.covenantBreaches; l.daysLate = d.daysLate; l.onTimePayments = d.onTimePayments; l.dscrLowQuarters = d.dscrLowQuarters;
+                l.type = Loan.Type.valueOf(d.type); l.bank = Bank.valueOf(d.bank); l.ecaOrigin = d.ecaOrigin; l.status = Loan.Status.valueOf(d.status); l.fixed = d.fixed; l.everLate = d.everLate;
+                l.covenantPenalty = d.covenantPenalty; l.dscrPenalty = d.dscrPenalty; l.restructured = d.restructured;
+                l.principal = d.principal; l.outstanding = d.outstanding; l.rate = d.rate; l.spread = d.spread; l.accrued = d.accrued; l.dueAmount = d.dueAmount;
+                l.demand = d.demand; l.pendingPrincipal = d.pendingPrincipal; l.limit = d.limit;
+                l.startHour = d.startHour; l.nextDueHour = d.nextDueHour; l.maturityHour = d.maturityHour; l.graceEndHour = d.graceEndHour; l.lastResetHour = d.lastResetHour; l.drawnSinceHour = d.drawnSinceHour;
+                c.loans.add(l);
+            }
+        }
+    }
+
+    public static class CompanyD { public FinD fin; public String name; public boolean player; public int color; public double cash, debt, valuation, stockPrice;
         public boolean bankrupt; public int negativeMonths;
         public double lastRevenue, lastFuel, lastOm, lastCarbon, lastInterest, lastFines, lastNet, lastMwh, lastCo2;
         public double[] netHistory; public double[] valHist, cashHist;
@@ -98,14 +156,15 @@ public class SaveData {
         d.wind = s.markets.wind; d.cloud = s.markets.cloud; d.demandNoise = s.markets.demandNoise;
         for (Company c : s.companies) {
             CompanyD cd = new CompanyD();
-            cd.name = c.name; cd.player = c.player; cd.color = c.colorRgb; cd.cash = c.cash; cd.debt = c.debt;
+            cd.name = c.name; cd.player = c.player; cd.color = c.colorRgb; cd.cash = c.cash; cd.debt = 0; // eski alan: borc artik kredilerde
+            cd.fin = FinD.from(c, s);
             cd.valuation = c.valuation; cd.stockPrice = c.stockPrice; cd.bankrupt = c.bankrupt; cd.negativeMonths = c.negativeMonths;
             cd.lastRevenue = c.lastRevenue; cd.lastFuel = c.lastFuel; cd.lastOm = c.lastOm; cd.lastCarbon = c.lastCarbon;
             cd.lastInterest = c.lastInterest; cd.lastFines = c.lastFines; cd.lastNet = c.lastNet; cd.lastMwh = c.lastMwhGenerated; cd.lastCo2 = c.lastCo2;
             cd.netHistory = c.netHistory.stream().mapToDouble(Double::doubleValue).toArray();
             cd.valHist = c.valuationHistory.stream().mapToDouble(Double::doubleValue).toArray();
             cd.cashHist = c.cashHistory.stream().mapToDouble(Double::doubleValue).toArray();
-            cd.aiStyle = c.aiStyle; cd.rateAdd = c.rateAdd; cd.lastRenew = c.lastRenewMwh; cd.neutral = c.neutral;
+            cd.aiStyle = c.aiStyle; cd.lastRenew = c.lastRenewMwh; cd.neutral = c.neutral;
             d.companies.add(cd);
         }
         for (City c : s.cities) {
@@ -168,6 +227,7 @@ public class SaveData {
     }
 
     public GameState restore() {
+        java.util.Map<Company, Double> legacyDebt = new java.util.HashMap<>();
         GameSettings g = new GameSettings();
         g.seed = seed;
         if (preset != null) g.preset = com.energytycoon.world.MapPreset.valueOf(preset);
@@ -193,7 +253,7 @@ public class SaveData {
         s.markets.wind = wind; s.markets.cloud = cloud; s.markets.demandNoise = demandNoise;
         for (CompanyD cd : companies) {
             Company c = new Company(cd.name, cd.player, cd.color, cd.cash);
-            c.debt = cd.debt; c.valuation = cd.valuation; c.stockPrice = cd.stockPrice; c.bankrupt = cd.bankrupt; c.negativeMonths = cd.negativeMonths;
+            c.valuation = cd.valuation; c.stockPrice = cd.stockPrice; c.bankrupt = cd.bankrupt; c.negativeMonths = cd.negativeMonths;
             c.lastRevenue = cd.lastRevenue; c.lastFuel = cd.lastFuel; c.lastOm = cd.lastOm; c.lastCarbon = cd.lastCarbon;
             c.lastInterest = cd.lastInterest; c.lastFines = cd.lastFines; c.lastNet = cd.lastNet; c.lastMwhGenerated = cd.lastMwh; c.lastCo2 = cd.lastCo2;
             if (cd.netHistory != null) for (double v : cd.netHistory) c.netHistory.add(v);
@@ -203,8 +263,10 @@ public class SaveData {
             else if (!c.player) c.aiStyle = c.name.startsWith("Yeşil") ? "green" : "fossil";
             c.neutral = cd.neutral;
             if (c.neutral) c.colorRgb = GridBalance.NEUTRAL_COLOR; // eski kayitlarda gri
+            if (cd.fin != null) cd.fin.apply(c);
+            legacyDebt.put(c, cd.fin == null ? cd.debt : 0.0);
 
-            c.rateAdd = cd.rateAdd; c.lastRenewMwh = cd.lastRenew;
+            c.lastRenewMwh = cd.lastRenew;
             s.companies.add(c);
             if (c.player) s.player = c;
             if (c.neutral) s.neutral = c;
@@ -286,6 +348,13 @@ public class SaveData {
             if (macro.indexHistory != null) for (double v : macro.indexHistory) mc.indexHistory.add(v);
             if (macro.expectedPath != null && macro.expectedPath.length == 12) mc.expectedPath = macro.expectedPath;
         } else s.macro.init(); // eski kayit: varsayilan makro ortam
+        // Eski kayit: tek borc tutari -> Kiyibank'tan 5 yillik, 3 ayda bir taksitli degisken ticari kredi; isletme kredisi limiti.
+        for (Company c : s.companies) {
+            if (c.neutral) continue;
+            double d = legacyDebt.getOrDefault(c, 0.0);
+            if (d > 1) s.finance.convertLegacyDebt(c, d);
+            if (s.finance.revolver(c) == null && !c.bankrupt) s.finance.openRevolverFree(c, Bank.KIYI);
+        }
         if (monthlyPrice != null) for (double v : monthlyPrice) s.history.monthlyPrice.add(v);
         s.rng.setSeed(seed ^ hour * 31);
         s.updateValuations();

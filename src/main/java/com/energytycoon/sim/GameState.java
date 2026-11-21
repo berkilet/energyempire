@@ -46,6 +46,8 @@ public final class GameState {
     public final SaleBook sales = new SaleBook(this);
     /** Makro ortam: politika faizi, rejimler, kuresel olaylar. */
     public final Macro macro = new Macro(this);
+    /** Finans motoru: not, bankalar, krediler, tahsilat. */
+    public final Finance finance = new Finance(this);
     /** Mesaj -> tiklaninca yapilacak eylem (ör. "tender:12"). */
     public final Map<String, String> messageActions = new HashMap<>();
     /** Test/dogrulama: kendi hatlari insaat beklemeden aktif olur (kayda yazilmaz). */
@@ -116,7 +118,6 @@ public final class GameState {
         GameState s = new GameState(settings);
         Difficulty d = s.settings.difficulty;
         s.player = new Company(s.settings.companyName, true, 0x2ecc71, Balance.START_CASH * d.cashMult);
-        s.player.rateAdd = d.rateAdd;
         s.companies.add(s.player);
         // Esit baslangic: tum ozel sirketler ayni nakitle baslar; zorluk rakiplerin kaynagini degil davranisini belirler.
         for (int i = 0; i < s.settings.rivals; i++) {
@@ -130,6 +131,8 @@ public final class GameState {
         s.scenario.setup.accept(s);
         if (s.settings.legacyFleet) s.placeLegacyFleet(s.scenario.legacyCoverage);
         s.macro.init();
+        // Her ozel sirket Kiyibank'ta not bazli isletme kredisi limitiyle baslar (otomatik tahsilatta kullanilir).
+        for (Company c : s.companies) if (!c.neutral) s.finance.openRevolverFree(c, Bank.KIYI);
         s.updateValuations();
         s.notify("Hoş geldiniz! Senaryo: " + s.scenario.title);
         return s;
@@ -318,8 +321,9 @@ public final class GameState {
         return v;
     }
 
-    public double interestRate(Company c) { return c.interestRate(assetValue(c)); }
-    public double creditLimit(Company c) { return c.creditLimit(assetValue(c)); }
+    /** Gosterge faiz: Kiyibank degisken ticari kredi. */
+    public double interestRate(Company c) { return macro.policyRate + finance.commercialSpread(c, Bank.KIYI, false, false); }
+    public double creditLimit(Company c) { return finance.creditLimit(c); }
 
     public void notify(String msg) {
         messages.add(msg);
@@ -732,18 +736,9 @@ public final class GameState {
         return best;
     }
 
+    /** Kisayol: Kiyibank'tan 5 yillik, 3 ayda bir taksitli degisken ticari kredi (LOAN_STEP). */
     public boolean borrow(Company c) {
-        double limit = creditLimit(c);
-        if (c.debt + Balance.LOAN_STEP > limit) return false;
-        c.debt += Balance.LOAN_STEP; c.cash += Balance.LOAN_STEP;
-        return true;
-    }
-
-    public boolean repay(Company c) {
-        double amt = Math.min(Balance.LOAN_STEP, c.debt);
-        if (amt <= 0 || c.cash < amt) return false;
-        c.debt -= amt; c.cash -= amt;
-        return true;
+        return finance.signCommercial(c, Bank.KIYI, FinanceBalance.LOAN_STEP, 5, 3, false, null) != null;
     }
 
     // ------------------------------------------------------------ topoloji
@@ -1018,7 +1013,10 @@ public final class GameState {
         }
         markets.hourly(rng);
         macro.hourly();
-        if (hod == 0) { markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); tenders.daily(); sales.daily(); }
+        if (hod == 0) {
+            markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); tenders.daily(); sales.daily();
+            for (int ci = 0; ci < companies.size(); ci++) { Company c = companies.get(ci); finance.daily(c); finance.dueWarnings(c); }
+        }
 
         boolean changed = false;
         for (Plant p : plants) {
@@ -1230,15 +1228,13 @@ public final class GameState {
         lastServedRatio = monthDemandMWh > 0 ? monthServedMWh / monthDemandMWh : 1;
         monthDemandMWh = 0; monthServedMWh = 0;
         for (Company c : companies) {
-            double assets = assetValue(c);
-            double rate = c.interestRate(assets);
-            double intr = c.neutral ? 0 : c.debt * rate / 12;
-            if (c.cash < 0 && !c.neutral) intr += -c.cash * Balance.OVERDRAFT_RATE / 12;
-            c.cash -= intr; c.interest += intr;
+            // Faiz: kredilerin aylik tahakkuku (nakit cikisi taksit gununde); eksi nakit cezasi. Kamu disarida.
+            finance.monthlyAccrual(c);
+            c.qEbitdaAcc += c.monthEbitda(); c.qRenewAcc += c.renewMwh; c.qGenAcc += c.mwhGenerated;
 
             double net = c.monthNetSoFar();
             c.lastRevenue = c.revenue; c.lastFuel = c.fuelCost; c.lastOm = c.omCost; c.lastCarbon = c.carbonCost;
-            c.lastInterest = c.interest; c.lastFines = c.fines; c.lastNet = net;
+            c.lastInterest = c.interest; c.lastFines = c.fines; c.lastNet = net; c.lastFees = c.fees; c.fees = 0;
             c.lastAccessIncome = c.accessIncome; c.lastAccessCost = c.accessCost; c.accessIncome = c.accessCost = 0;
             c.lastConnectionCharge = c.connectionCharge; c.connectionCharge = 0;
             c.lastMwhGenerated = c.mwhGenerated; c.lastCo2 = c.co2Tons; c.lastRenewMwh = c.renewMwh;
@@ -1248,7 +1244,8 @@ public final class GameState {
             while (c.netHistory.size() > 12) c.netHistory.pollFirst();
         }
         for (Plant p : plants) {
-            p.lastMonthProfit = p.monthProfit; p.yearProfit += p.monthProfit; p.monthProfit = 0;
+            p.lastMonthProfit = p.monthProfit; p.yearProfit += p.monthProfit; p.qProfitAcc += p.monthProfit; p.monthProfit = 0;
+            if (month() % 3 == 0) { p.qProfitLast = p.qProfitAcc; p.qProfitAcc = 0; }
             if (month() == 0) p.yearProfit = 0; // biten ay Aralik: yeni yil
             p.cpFullMonths = p.cpFullHoursMonth > Balance.HOURS_PER_MONTH * GridBalance.CP_FULL_MONTH_SHARE ? p.cpFullMonths + 1 : 0;
             p.cpFullHoursMonth = 0;
@@ -1267,21 +1264,9 @@ public final class GameState {
         history.monthly(statPrice);
 
         retireLegacy();
-        for (Company c : companies) {
-            if (c.bankrupt || c.neutral) continue;
-            if (c.cash < Balance.BANKRUPT_CASH) c.negativeMonths++; else c.negativeMonths = 0;
-            if (c.negativeMonths >= 2) {
-                c.bankrupt = true;
-                if (c.player) {
-                    gameOver = true; gameOverReason = "Şirketiniz iflas etti. Nakit tükendi ve borç ödenemedi.";
-                } else {
-                    // Varliklar yikilmaz: santraller Kamu'ya (istemezse kapatilir), trafo merkezleri ve hatlar UŞİ'ye.
-                    sales.bankruptcy(c);
-                }
-            } else if (c.player && c.cash < 0) {
-                notify("UYARI: Nakit negatif! Borçlanın veya giderleri azaltın.");
-            }
-        }
+        // Ceyrek sonu: kredi notu, taahhutler. Iflas yalnizca finans akisiyla (gecikme -> temerrut -> yapilandirma/iflas).
+        if (month() % 3 == 0) for (int ci = 0; ci < companies.size(); ci++) finance.quarterly(companies.get(ci));
+        if (player.cash < 0 && !player.bankrupt) notify("FİNANS: Nakit eksi! İşletme kredisi limiti dolu; 60 gün içinde düzelmezse temerrüt süreci başlar.", "finance");
         evaluateScenario();
         for (Company c : companies) if ((!c.player || aiPlayer) && !c.neutral && !c.bankrupt) RivalAI.monthly(this, c);
         if ((hour / Balance.HOURS_PER_MONTH) % 12 == 0) notify("Yeni yıl: " + year());
@@ -1305,7 +1290,7 @@ public final class GameState {
     public void updateValuations() {
         for (Company c : companies) {
             double assets = assetValue(c);
-            double equity = c.cash + assets - c.debt;
+            double equity = c.cash + assets - c.debt();
             int n = c.netHistory.size();
             double annual = n == 0 ? 0 : c.trailingNet() / n * 12;
             c.valuation = Math.max(0, equity + 4 * Math.max(0, annual));
