@@ -93,6 +93,22 @@ public final class GameScreen implements Screen, Hud.Listener {
     public void devLineTool(LineTier t) { hud.hideHelp(); lineTier = t; tool(Tool.LINE, null); }
     public void devNoHover(boolean b) { devNoHover = b; }
     public void devHideHelp() { hud.hideHelp(); }
+    /** Dogrulama: ornek krediler (ticari + ECA'li santral) ve finans sekmesi. */
+    public void devFinance(String tab) {
+        hud.hideHelp();
+        state.player.cash += 500e6;
+        state.finance.signCommercial(state.player, Bank.KIYI, 150e6, 5, 3, false, null);
+        state.finance.signCommercial(state.player, Bank.YESIL, 100e6, 7, 1, true, null);
+        Equipment e = state.catalog.get("at-cc");
+        for (int dx = 4; dx < 14; dx++) {
+            City c = state.cities.get(0);
+            if (state.checkPlacement(e.type, c.x + dx, c.y + 3) == null) { state.finance.buildWithEca(state.player, e, c.x + dx, c.y + 3, Bank.DEMIRTAS, 6); break; }
+        }
+        for (int h = 0; h < 24 * 95; h++) state.tick();
+        state.messages.clear();
+        if (tab.equals("wizard")) hud.devWizard();
+        else hud.openFinance(com.energytycoon.ui.FinanceCenter.Tab.valueOf(tab));
+    }
     public Hud devHud() { return hud; }
     public String devLinePick() { return wr.devLinePickTest(); }
     public void devSelectNode(int id) { selNode = id; selLine = -1; }
@@ -250,6 +266,22 @@ public final class GameScreen implements Screen, Hud.Listener {
             if (li != null) { String err = state.sales.buy(state.player, li); if (err != null) hud.toast(err); else { selNode = li.asset.id; hud.hideListing(); } }
             return;
         }
+        if (a.startsWith("prepay:")) {
+            int id = Integer.parseInt(a.substring(7));
+            for (Loan l : state.player.loans) if (l.id == id) { String err = state.finance.prepay(state.player, l); hud.toast(err != null ? err : l.name() + " kapatıldı."); break; }
+            return;
+        }
+        if (a.startsWith("revopen:")) {
+            Loan l = state.finance.openRevolver(state.player, Bank.valueOf(a.substring(8)));
+            hud.toast(l == null ? "İşletme kredisi limiti açılamadı." : "İşletme kredisi limiti açıldı: " + Fmt.money(l.limit) + " (" + l.bank.label + ")");
+            return;
+        }
+        if (a.startsWith("loan:")) {
+            String[] f = a.split(":");
+            Loan l = state.finance.signCommercial(state.player, Bank.valueOf(f[1]), Double.parseDouble(f[2]), Integer.parseInt(f[3]), Integer.parseInt(f[4]), Boolean.parseBoolean(f[5]), null);
+            hud.toast(l == null ? "Kredi imzalanamadı (limit, not veya banka koşulu)." : "Kredi imzalandı: " + l.name() + " " + Fmt.money(l.principal) + " · " + Macro.pct(l.rate));
+            return;
+        }
         if (a.startsWith("tender:")) { hud.showTender(Integer.parseInt(a.substring(7))); return; }
         if (a.startsWith("bid:")) {
             String[] f = a.split(":");
@@ -286,7 +318,12 @@ public final class GameScreen implements Screen, Hud.Listener {
         switch (a) {
             case "finance", "market", "companies", "help", "settings" -> hud.toggle(a);
             case "menu" -> hud.toggle("menu");
-            case "borrow" -> { if (!state.borrow(state.player)) hud.toast("Kredi limitine ulaştınız."); }
+            case "openfin", "restruct" -> hud.openFinance(com.energytycoon.ui.FinanceCenter.Tab.LOANS);
+            case "revopen" -> { if (state.finance.openRevolver(state.player, Bank.KIYI) == null) hud.toast("İşletme kredisi limiti açılamadı."); }
+            case "revdraw" -> { double d = state.finance.drawRevolver(state.player, FinanceBalance.LOAN_STEP); hud.toast(d > 0 ? "İşletme kredisinden " + Fmt.money(d) + " kullanıldı." : "Limit dolu."); }
+            case "revrepay" -> { double d = state.finance.repayRevolver(state.player, state.player.cash); hud.toast(d > 0 ? "İşletme kredisine " + Fmt.money(d) + " ödendi." : "Ödenecek tutar veya nakit yok."); }
+            case "restruct:accept" -> { state.finance.acceptRestructuring(state.player); hud.showRestructuring(false); }
+            case "restruct:reject" -> { state.finance.rejectRestructuring(state.player); hud.showRestructuring(false); }
             case "save" -> hud.toast(SaveManager.save(state, "save") ? "Oyun kaydedildi." : "Kayıt başarısız!");
             case "load" -> { if (SaveManager.exists("save")) { if (!game.continueGame("save")) hud.toast("Yükleme başarısız!"); } else hud.toast("Kayıt bulunamadı."); }
             case "togglePause" -> speed(speed == 0 ? lastSpeed : 0);
@@ -467,8 +504,11 @@ public final class GameScreen implements Screen, Hud.Listener {
                 String why = state.checkPlacement(plantEq.type, x, y);
                 if (why == null) why = state.checkEquipment(plantEq);
                 if (why != null) { hud.toast(why); return; }
-                if (state.player.cash < plantEq.capex()) { hud.toast("Yetersiz nakit (" + Fmt.money(plantEq.capex()) + " gerekli). Finans'tan borçlanın."); return; }
-                Plant p = state.buildPlant(state.player, plantEq, x, y);
+                boolean eca = hud.ecaOn() && Finance.ecaEligible(plantEq);
+                double needCash = eca ? state.finance.ecaCashNeed(state.player, plantEq, hud.ecaBank(), hud.ecaFreq()) : plantEq.capex();
+                if (state.player.cash < needCash) { hud.toast("Yetersiz nakit (" + Fmt.money(needCash) + " gerekli). Finans'tan kredi kullanabilirsiniz."); return; }
+                Plant p = eca ? state.finance.buildWithEca(state.player, plantEq, x, y, hud.ecaBank(), hud.ecaFreq()) : state.buildPlant(state.player, plantEq, x, y);
+                if (p != null && eca) hud.toast("ECA kredisi: " + plantEq.supplier.origin + " İhracat Kredi Kuruluşu · " + hud.ecaBank().label);
                 if (p != null) {
                     hud.toast(plantEq.fullName() + " inşaatı başladı (" + p.buildHoursLeft / 24 + " gün). Şimdi bir hat çekin!");
                     selNode = p.id;
@@ -591,7 +631,7 @@ public final class GameScreen implements Screen, Hud.Listener {
                 if (plantEq == null) return;
                 String why = state.checkPlacement(plantEq.type, t[0], t[1]);
                 if (why == null) why = state.checkEquipment(plantEq);
-                boolean afford = state.player.cash >= plantEq.capex();
+                boolean afford = state.player.cash >= (hud.ecaOn() && Finance.ecaEligible(plantEq) ? state.finance.ecaCashNeed(state.player, plantEq, hud.ecaBank(), hud.ecaFreq()) : plantEq.capex());
                 wr.ghostEquipment = plantEq; wr.ghostValid = why == null && afford;
                 hud.setPlaceInfo(siteInfo(plantEq, t[0], t[1])
                     + (why != null ? "   ✗ " + why : !afford ? "   ✗ Yetersiz nakit" : ""));
@@ -876,7 +916,13 @@ public final class GameScreen implements Screen, Hud.Listener {
         else if (!game.dayNight() || speed >= FREEZE_LIGHT_SPEED) wr.hourFloat = 13f;
         else wr.hourFloat = state.hourOfDay() + (float) Math.min(accum, 0.999);
         String m;
-        while ((m = state.messages.poll()) != null) hud.toast(m, state.messageActions.remove(m));
+        while ((m = state.messages.poll()) != null) {
+            String act = state.messageActions.remove(m);
+            if (act == null && m.startsWith("FİNANS:")) act = "openfin"; // Finans kategorisi: tiklaninca Finans merkezi
+            hud.toast(m, act);
+        }
+        // Yapilandirma teklifi: oyun durur, oyuncu karar verir
+        if (state.player.restructOfferPending) { if (speed != 0) speed(0); hud.showRestructuring(true); } else hud.showRestructuring(false);
         if (state.year() != lastAutosaveYear) { lastAutosaveYear = state.year(); SaveManager.save(state, "autosave"); }
 
         hud.setPlaceInfo("");

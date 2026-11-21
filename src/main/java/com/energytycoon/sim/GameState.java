@@ -1235,6 +1235,7 @@ public final class GameState {
             double net = c.monthNetSoFar();
             c.lastRevenue = c.revenue; c.lastFuel = c.fuelCost; c.lastOm = c.omCost; c.lastCarbon = c.carbonCost;
             c.lastInterest = c.interest; c.lastFines = c.fines; c.lastNet = net; c.lastFees = c.fees; c.fees = 0;
+            c.lastDebtService = c.debtServicePaid; c.debtServicePaid = 0; c.lastCapex = c.capexSpent;
             c.lastAccessIncome = c.accessIncome; c.lastAccessCost = c.accessCost; c.accessIncome = c.accessCost = 0;
             c.lastConnectionCharge = c.connectionCharge; c.connectionCharge = 0;
             c.lastMwhGenerated = c.mwhGenerated; c.lastCo2 = c.co2Tons; c.lastRenewMwh = c.renewMwh;

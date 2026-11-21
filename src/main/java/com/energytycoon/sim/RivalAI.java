@@ -57,12 +57,8 @@ public final class RivalAI {
     static Plant buildPlant(GameState s, Company c, Equipment e, int x, int y) {
         siteHint = new int[] { x, y };
         if (useEca(s, c, e)) {
-            Finance.EcaQuote q = s.finance.ecaQuote(c, e, ecaBank(s, c, e), 6);
-            c.cash += q.amount; // kredi siparisle birlikte kullandirilir
-            Plant p = s.buildPlant(c, e, x, y);
-            c.cash -= q.amount;
-            if (p != null) s.finance.signEca(c, p, ecaBank(s, c, e), 6);
-            return p;
+            Plant p = s.finance.buildWithEca(c, e, x, y, ecaBank(s, c, e), 6); // oyuncuyla ayni yol
+            if (p != null) return p;
         }
         return s.buildPlant(c, e, x, y);
     }

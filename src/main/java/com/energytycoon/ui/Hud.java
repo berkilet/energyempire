@@ -47,7 +47,7 @@ public final class Hud {
     /** Kamu santrali "K" rozetleri: ekran uzayinda sabit boyut, her yakinlastirmada okunur. */
     private final com.badlogic.gdx.scenes.scene2d.Group badges = new com.badlogic.gdx.scenes.scene2d.Group();
     private Label.LabelStyle badgeStyle;
-    private final ImageButton investBtn, assetsBtn, selectBtn, demBtn, layerBtn;
+    private final ImageButton investBtn, financeBtn, assetsBtn, selectBtn, demBtn, layerBtn;
     private final TextTooltip layerTip;
     private final Map<Layer, TextButton> layerBtns = new EnumMap<>(Layer.class);
     private final InvestMenu invest;
@@ -88,7 +88,14 @@ public final class Hud {
     private final TextButton lcOwnBtn, lcOpBtn;
     private final EquipmentWindow equipWin;
     private final Label gameOverLbl;
-    private final FinanceView financeView;
+    private final FinanceCenter financeView;
+    private LoanWizard wizard;
+    private Window wizardWin, restructWin;
+    private long financeRefreshAt;
+    /** Ekipman penceresinde ECA secimi: acik mi, banka, taksit sikligi (ay). */
+    private boolean ecaOn;
+    private Bank ecaBank = Bank.KIYI;
+    private int ecaFreq = 6;
     private final MarketView marketView;
     private final CompaniesView companiesView;
     private Window settingsWin;
@@ -106,7 +113,10 @@ public final class Hud {
         company = l("", "title"); cash = l("", "default"); debt = l("", "default"); value = l("", "default");
         date = l("", "default"); price = l("", "default"); demand = l("", "default");
         companyCell = top.add(company).left().padRight(10);
-        top.add(tip(skins.chip("coin", cash, false), "Nakit")).padRight(4);
+        Table cashChip = skins.chip("coin", cash, false);
+        cashChip.setTouchable(Touchable.enabled);
+        cashChip.addListener(new ClickListener() { @Override public void clicked(InputEvent e, float x, float y) { toggle("finance"); } });
+        top.add(tip(cashChip, "Nakit · tıklayınca Finans (F)")).padRight(4);
         debtChip = tip(skins.chip("battery", debt, false), "Borç");
         debtCell = top.add(debtChip).padRight(4);
         top.add(tip(skins.chip("upgrade", value, true), "Şirket piyasa değeri")).padRight(4);
@@ -153,6 +163,7 @@ public final class Hud {
 
         // ----- sol alt: arac cubugu (dock) + yatirim menusu + katman listesi
         investBtn = dockButton("icon_build", "Yatırım (B)", () -> toggleInvest());
+        financeBtn = dockButton("icon_coin", "Finans (F)", () -> { hideInvest(); toggle("finance"); });
         selectBtn = dockButton("icon_cursor", "Seç / İncele (sağ tık veya Esc ile dönülür)", () -> { hideInvest(); cb.tool(Tool.SELECT, null); });
         demBtn = dockButton("icon_demolish", "Yık / Hat Kaldır (Delete)", () -> { hideInvest(); cb.tool(Tool.DEMOLISH, null); });
         assetsBtn = dockButton("icon_assets", "Varlıklarım (V)", () -> { hideInvest(); toggle("assets"); });
@@ -160,7 +171,7 @@ public final class Hud {
         layerTip = (TextTooltip) layerBtn.getListeners().select(l -> l instanceof TextTooltip).iterator().next();
         dock.setBackground(skin.getDrawable("card"));
         dock.pad(5);
-        for (ImageButton b : new ImageButton[] { investBtn, assetsBtn, selectBtn, demBtn, layerBtn }) dock.add(b).size(52, 54).pad(2);
+        for (ImageButton b : new ImageButton[] { investBtn, financeBtn, assetsBtn, selectBtn, demBtn, layerBtn }) dock.add(b).size(52, 54).pad(2);
         dock.pack();
 
         layerPop.setBackground(skin.getDrawable("card"));
@@ -270,9 +281,27 @@ public final class Hud {
 
         // ----- pencereler
         finance = window("Finans");
-        financeView = new FinanceView(skins, () -> cb.action("borrow"), () -> cb.action("repay"));
+        financeView = new FinanceCenter(skins, a -> {
+            if (a.equals("wizard")) { if (st != null) { wizard.show(st); wizardWin.toFront(); } }
+            else cb.action(a);
+        });
         finance.add(scrolled(finance, financeView.root)).pad(4);
-        charts.add(financeView.chart);
+        charts.add(financeView.valueChart); charts.add(financeView.policyChart); charts.add(financeView.indexChart);
+        wizardWin = window("Yeni Kredi");
+        wizard = new LoanWizard(skin, wizardWin, cb::action);
+        wizardWin.setVisible(false);
+        restructWin = window("Yeniden Yapılandırma Teklifi");
+        Label rt = l("Ticari krediniz temerrüde düştü ve tüm ticari krediler muaccel oldu. Bankalar oyunda bir kez kullanılabilecek bir yapılandırma öneriyor:\n"
+            + "• 3 ay koruma süresi (tahsilat yok)\n• Ticari kredilerin vadesi 3 yıl uzar, faiz +2 puan\n• 6 ay içinde en az bir santralinizi satmalısınız\n• Kredi notunuz CCC olur\n\n"
+            + "Reddederseniz şirketiniz iflas eder.", "small");
+        rt.setWrap(true);
+        restructWin.add(rt).width(520).pad(8).row();
+        Table rb = new Table();
+        rb.add(btn("Kabul et", "restruct:accept", "accent")).width(200).height(34).padRight(8);
+        rb.add(btn("Reddet (iflas)", "restruct:reject", "default")).width(200).height(34);
+        restructWin.add(rb).padBottom(6);
+        restructWin.pack();
+        restructWin.setVisible(false);
 
         market = window("Piyasa");
         marketView = new MarketView(skins);
@@ -332,6 +361,7 @@ public final class Hud {
         equipWin = new EquipmentWindow(skin);
         skins.decorateWindow(equipWin, () -> equipWin.setVisible(false));
 
+        stage.addActor(wizardWin); stage.addActor(restructWin);
         for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, lineChoice, assetsWin }) {
             stage.addActor(w);
             w.setVisible(false);
@@ -356,7 +386,11 @@ public final class Hud {
       + "5) Kendi santralinizi seçince yükseltme butonları çıkar: güneşte tracker ve robotik temizlik, rüzgarda repowering, "
       + "kömür/gazda karbon yakalama, nükleerde ömür uzatma vb.\n"
       + "6) Yeni teknolojiler yıllar içinde piyasaya çıkar (ör. 2028 dev türbin, 2030 SMR, 2033 tandem panel).\n"
-      + "7) Karşılanamayan talep ceza getirir, karbon vergisi her yıl artar. Nakit yetmezse Finans'tan borçlanın.\n\n"
+      + "7) Karşılanamayan talep ceza getirir, karbon vergisi her yıl artar.\n"
+      + "8) Finans (F, araç çubuğu veya nakit göstergesi): Kredi notunuz Net borç/FAVÖK ve FAVÖK/faiz oranlarından çeyreklik hesaplanır; faiz = politika faizi + not primi. "
+      + "Krediler sekmesindeki 'Yeni kredi…' sihirbazı üç bankanın teklifini yan yana gösterir. ECA kredisi (ekipman bedelinin %85'i, ödemesiz dönem, daha ucuz) "
+      + "yalnızca santral siparişinde, ekipman penceresinden seçilir. Taksitler vade günü nakitten otomatik düşer; nakit yetmezse işletme kredisi limiti kullanılır, "
+      + "o da yetmezse gecikme (30 gün tolerans) ve 90 günde temerrüt başlar. Ödeme Takvimi sekmesi önümüzdeki 12 ayın taksitlerini ve olası nakit açığını gösterir.\n\n"
       + "Kontroller: Sağ tık sürükle = kaydır, tekerlek = yakınlaştır, Q/E = döndür, WASD/oklar = kaydır, Boşluk = duraklat, "
       + "1/2/3 = hız (1x: bir gün 24 sn), B = yatırım, V = varlıklarım, Delete = yık, Tab = hat kademesi, L = katman, F5/F9 = kaydet/yükle, Esc = iptal/menü.";
 
@@ -368,11 +402,52 @@ public final class Hud {
 
     private void openEquipment(PlantType t) {
         if (st == null) return;
+        equipWin.ecaLine = e -> {
+            if (!Finance.ecaEligible(e)) return "ECA yok (" + e.supplier.origin + " tedarikçi)";
+            Finance.EcaQuote q = st.finance.ecaQuote(st.player, e, ecaBank, ecaFreq);
+            return "ECA uygun · " + e.supplier.origin + " · tahmini taksit " + Fmt.money(q.installment) + " / " + (ecaFreq == 6 ? "6 ay" : "yıl")
+                + " · peşin " + Fmt.money(st.finance.ecaCashNeed(st.player, e, ecaBank, ecaFreq)) + " · tahmini DSCR " + FinanceCenter.num(st.finance.expectedDscr(st.player, e, st.cities.get(0).x, st.cities.get(0).y, ecaBank, ecaFreq));
+        };
+        equipWin.footer.clear();
+        Table ft = equipWin.footer;
+        ft.add(l("Finansman:", "default")).padRight(8);
+        ft.add(ecaToggle("ECA kredisi ile al (bedelin %85'i)", ecaOn, () -> ecaOn = !ecaOn, t)).height(28).padRight(10);
+        for (Bank b : Bank.values()) ft.add(ecaToggle(b.label, ecaBank == b, () -> ecaBank = b, t)).height(28).padRight(3);
+        ft.add(ecaToggle("6 ayda bir", ecaFreq == 6, () -> ecaFreq = 6, t)).height(28).padLeft(10).padRight(3);
+        ft.add(ecaToggle("yılda bir", ecaFreq == 12, () -> ecaFreq = 12, t)).height(28);
         equipWin.show(st, t, chosen.get(t), e -> {
             chosen.put(t, e);
             cb.tool(Tool.PLANT, e);
             if (!invest.pinned()) hideInvest();
         });
+    }
+
+    private TextButton ecaToggle(String text, boolean on, Runnable r, PlantType t) {
+        TextButton b = new TextButton(text, skin, "small");
+        b.setChecked(on);
+        b.setProgrammaticChangeEvents(false);
+        b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { r.run(); openEquipment(t); } });
+        return b;
+    }
+
+    public boolean ecaOn() { return ecaOn; }
+    public Bank ecaBank() { return ecaBank; }
+    public int ecaFreq() { return ecaFreq; }
+
+    /** Yapilandirma teklifi penceresi (oyuncu karar verene kadar). */
+    public void showRestructuring(boolean show) {
+        if (show == restructWin.isVisible()) return;
+        restructWin.setVisible(show);
+        if (show) { center(restructWin); restructWin.toFront(); }
+    }
+
+    /** Dogrulama: sihirbazi Kiyibank teklifi secili halde acar. */
+    public void devWizard() { if (st != null) { wizard.show(st); wizard.devSelect(Bank.KIYI); } }
+
+    public void openFinance(FinanceCenter.Tab tab) {
+        financeView.setTab(tab);
+        financeRefreshAt = 0;
+        if (!finance.isVisible()) toggle("finance");
     }
 
     public Equipment chosen(PlantType t) { return chosen.get(t); }
@@ -646,11 +721,14 @@ public final class Hud {
         Cell<?> c = w.getCell(sp);
         if (c == null) return;
         c.height(Value.prefHeight).width(Value.prefWidth);
+        w.invalidate();
         w.pack();
         float max = stage.getHeight() * 0.70f;
         if (w.getHeight() > max) {
-            float over = w.getHeight() - max;
-            c.height(sp.getPrefHeight() - over).width(sp.getPrefWidth() + 14);
+            // pencere cercevesi (baslik, kenar bosluklari) disinda kalan alan kaydirma alanina verilir
+            float chrome = w.getHeight() - sp.getHeight();
+            c.height(Math.max(120, max - chrome)).width(sp.getPrefWidth() + 14);
+            w.invalidate();   // hucre boyutu degisti: tablo onbellekteki olculeri yeniden hesaplasin
             w.pack();
         }
     }
@@ -669,7 +747,15 @@ public final class Hud {
     /** Acik yonetim pencerelerinin icerigini gunceller. */
     private void refreshWindows(GameState s) {
         if (s == null) return;
-        if (finance.isVisible()) financeView.update(s);
+        if (finance.isVisible() && System.currentTimeMillis() >= financeRefreshAt) {
+            financeRefreshAt = System.currentTimeMillis() + 300;
+            float h0 = finance.getHeight();
+            financeView.update(s);
+            finance.invalidateHierarchy();
+            limitHeight(finance);
+            finance.setPosition(Math.max(0, Math.min(finance.getX(), stage.getWidth() - finance.getWidth())), Math.max(0, finance.getY() + h0 - finance.getHeight()));
+        }
+        if (wizardWin.isVisible()) wizard.refresh();
         if (market.isVisible()) marketView.update(s);
         if (companies.isVisible()) companiesView.update(s);
         if (assetsWin.isVisible() && System.currentTimeMillis() >= assetsRefreshAt) {
@@ -719,12 +805,12 @@ public final class Hud {
 
     public boolean anyWindowOpen() {
         return finance.isVisible() || market.isVisible() || companies.isVisible() || help.isVisible() || menu.isVisible() || equipWin.isVisible()
-            || lineChoice.isVisible() || assetsWin.isVisible()
+            || lineChoice.isVisible() || assetsWin.isVisible() || wizardWin.isVisible()
             || (settingsWin != null && settingsWin.isVisible());
     }
     public void closeWindows() {
         finance.setVisible(false); market.setVisible(false); companies.setVisible(false); help.setVisible(false);
-        menu.setVisible(false); equipWin.setVisible(false); lineChoice.setVisible(false); assetsWin.setVisible(false);
+        menu.setVisible(false); equipWin.setVisible(false); lineChoice.setVisible(false); assetsWin.setVisible(false); wizardWin.setVisible(false);
         if (settingsWin != null) settingsWin.setVisible(false);
     }
     public void hideHelp() { help.setVisible(false); }
@@ -906,8 +992,10 @@ public final class Hud {
         }
         for (int i = 0; i < badges.getChildren().size; i++) {
             Actor a = badges.getChildren().get(i);
-            a.setVisible(i < n);
-            if (i < n) a.setPosition(xy[i * 2] - 8.5f, xy[i * 2 + 1] - 8.5f);
+            // ekran kenarindan tasan rozet yarim gorunmesin: tamami sigmiyorsa gizlenir
+            boolean on = i < n && xy[i * 2] - 8.5f >= 0 && xy[i * 2] + 8.5f <= stage.getWidth() && xy[i * 2 + 1] - 8.5f >= 0 && xy[i * 2 + 1] + 8.5f <= stage.getHeight();
+            a.setVisible(on);
+            if (on) a.setPosition(xy[i * 2] - 8.5f, xy[i * 2 + 1] - 8.5f);
         }
     }
 

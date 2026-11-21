@@ -42,6 +42,8 @@ public final class Company {
     public int plantsAtRestruct;
     /** Pesin masraflar, sigorta primleri, erken kapama cezalari (bu ay / gecen ay). */
     public double fees, lastFees;
+    /** Nakit akisi: kredilere odenen (anapara+faiz) ve yatirim harcamasi (bu ay / gecen ay). */
+    public double debtServicePaid, lastDebtService, lastCapex;
     /** Olcum: gecikme, temerrut, yapilandirma sayilari. */
     public int lateEvents, defaults, restructures;
     public boolean bankrupt;

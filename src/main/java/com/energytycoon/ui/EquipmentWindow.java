@@ -17,6 +17,9 @@ public final class EquipmentWindow extends Window {
     private final Table rows = new Table();
     private final Label note;
     private Consumer<Equipment> onPick;
+    /** Model satiri altinda finansman bilgisi (ECA) ve pencere altinda finansman secimi (Hud doldurur). */
+    public java.util.function.Function<Equipment, String> ecaLine;
+    public final Table footer = new Table();
 
     public EquipmentWindow(Skin skin) {
         super("Ekipman Seçimi", skin);
@@ -26,7 +29,8 @@ public final class EquipmentWindow extends Window {
         note = new Label("", skin, "small");
         note.setWrap(true);
         add(rows).growX().row();
-        add(note).width(880).padTop(8).left();
+        add(note).width(880).padTop(8).left().row();
+        add(footer).padTop(6).left();
         setVisible(false);
     }
 
@@ -67,6 +71,11 @@ public final class EquipmentWindow extends Window {
                 r.row();
                 Label lk = new Label("Piyasaya çıkış: " + e.availableYear, skin, "dim");
                 r.add(lk).colspan(cells.length).left().padLeft(4).padBottom(3);
+            } else if (ecaLine != null) {
+                r.row();
+                Label ec = new Label(ecaLine.apply(e), skin, "dim");
+                ec.setWrap(true);
+                r.add(ec).colspan(cells.length).width(900).left().padLeft(4).padBottom(3);
             }
             final String bg = locked ? "rowLocked" : e == current ? "rowSel" : "row";
             r.addListener(new ClickListener() {

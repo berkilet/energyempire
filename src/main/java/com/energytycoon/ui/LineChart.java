@@ -18,7 +18,7 @@ import java.util.function.Supplier;
  * yeterli veri yokken bos durum mesaji gosterir.
  */
 public final class LineChart extends Widget implements Disposable {
-    public enum Unit { MONEY, MW, PRICE, PLAIN }
+    public enum Unit { MONEY, MW, PRICE, PLAIN, PERCENT }
 
     private static final class Series {
         final Supplier<double[]> data; final Color color; final String label;
@@ -53,6 +53,7 @@ public final class LineChart extends Widget implements Disposable {
             case MONEY -> Fmt.money(v);
             case MW -> Fmt.mw(v);
             case PRICE -> "$" + (Math.abs(v) >= 100 ? String.valueOf(Math.round(v)) : Fmt.f1(v));
+            case PERCENT -> "%" + Fmt.f2(v * 100);
             default -> Fmt.f1(v);
         };
     }
@@ -75,7 +76,7 @@ public final class LineChart extends Widget implements Disposable {
         boolean hasData = maxLen >= 2 && Double.isFinite(min) && Double.isFinite(max);
         if (hasData) {
             if (zeroBased) min = Math.min(0, min);
-            if (max - min < 1e-9) { max += Math.max(1, Math.abs(max) * 0.1); min -= Math.max(1, Math.abs(min) * 0.1); if (zeroBased) min = Math.min(0, min); }
+            if (max - min < 1e-9) { double u = unit == Unit.PERCENT ? 0.01 : 1; max += Math.max(u, Math.abs(max) * 0.1); min -= Math.max(u, Math.abs(min) * 0.1); if (zeroBased) min = Math.min(0, min); }
             double range = max - min;
             max += range * 0.08;
             if (!zeroBased) min -= range * 0.06;
@@ -99,6 +100,7 @@ public final class LineChart extends Widget implements Disposable {
                 if (d.length < 2) continue;
                 sr.setColor(series.get(si).color);
                 for (int i = 1; i < d.length; i++) {
+                    if (!Double.isFinite(d[i - 1]) || !Double.isFinite(d[i])) continue; // bosluk (ör. gecmis / beklenti)
                     float x0 = px + pw * (i - 1) / (float) (d.length - 1), x1 = px + pw * i / (float) (d.length - 1);
                     float y0 = py + (float) ((d[i - 1] - min) / range * ph), y1 = py + (float) ((d[i] - min) / range * ph);
                     sr.line(x0, y0, x1, y1);

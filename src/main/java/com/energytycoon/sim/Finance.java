@@ -219,6 +219,42 @@ public final class Finance {
         return l;
     }
 
+    /**
+     * ECA ile santral siparisi (oyuncu ve rakip ayni yol): kredi siparisle birlikte kullandirilir, kalan tutari sirket oder.
+     * Null: kurulamadi (yer, nakit veya ECA uygun degil).
+     */
+    public Plant buildWithEca(Company c, Equipment e, int x, int y, Bank b, int freqMonths) {
+        EcaQuote q = ecaQuote(c, e, b, freqMonths);
+        if (q == null || exempt(c) || c.bankBanUntil[b.ordinal()] > s.hour) return null;
+        if (c.cash + q.amount - q.premium - q.bankFee < e.capex()) return null;
+        c.cash += q.amount;
+        Plant p = s.buildPlant(c, e, x, y);
+        c.cash -= q.amount;
+        if (p != null) signEca(c, p, b, freqMonths);
+        return p;
+    }
+
+    /** Santral icin pesin gereken nakit (ECA ile): bedel - kredi + prim + masraf. */
+    public double ecaCashNeed(Company c, Equipment e, Bank b, int freqMonths) {
+        EcaQuote q = ecaQuote(c, e, b, freqMonths);
+        return q == null ? e.capex() : e.capex() - q.amount + q.premium + q.bankFee;
+    }
+
+    // ------------------------------------------------------------ takvim projeksiyonu
+    /** Aylik tahmini faaliyet nakdi: son 4 ceyregin FAVOK ortalamasi; yoksa gecen ayin FAVOK'u. */
+    public double monthlyOperatingCash(Company c) {
+        if (c.quarters >= 4) return ebitda4(c) / 12;
+        return c.lastRevenue - c.lastFuel - c.lastOm - c.lastCarbon - c.lastFines + c.lastAccessIncome - c.lastAccessCost - c.lastConnectionCharge;
+    }
+
+    /** 12 aylik nakit projeksiyonu: nakit + isletme kredisi bosluğu, her ay faaliyet nakdi eklenir, taksitler duser. Aylik bakiye. */
+    public double[] cashProjection(Company c, double[] service) {
+        double[] out = new double[12];
+        double cash = c.cash + revolverRoom(c), op = monthlyOperatingCash(c);
+        for (int m = 0; m < 12; m++) { cash += op - service[m]; out[m] = cash; }
+        return out;
+    }
+
     // ------------------------------------------------------------ isletme kredisi
     public double revolverLimitFor(Company c) { return FinanceBalance.REVOLVER_LIMIT[rating(c).ordinal()]; }
 
@@ -402,7 +438,7 @@ public final class Finance {
             if (drawn > 0) notifyFin(c, "Taksit için işletme kredisinden " + money(drawn) + " otomatik kullanıldı (" + l.name() + ").");
         }
         if (c.cash >= due) {
-            c.cash -= due;
+            c.cash -= due; c.debtServicePaid += due;
             double principalPaid = Math.min(l.outstanding, l.pendingPrincipal + l.demand);
             l.outstanding -= principalPaid;
             l.pendingPrincipal = 0; l.dueAmount = 0; l.demand = 0;
@@ -655,7 +691,7 @@ public final class Finance {
         }
     }
 
-    void notifyFin(Company c, String msg) { notifyFin(c, msg, "finance"); }
+    void notifyFin(Company c, String msg) { notifyFin(c, msg, "openfin"); }
 
     void notifyFin(Company c, String msg, String action) {
         if (c.player) s.notify("FİNANS: " + msg, action);

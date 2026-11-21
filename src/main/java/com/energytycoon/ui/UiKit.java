@@ -27,7 +27,9 @@ public final class UiKit {
         t.add(new Label(caption, skin, "dim")).left().row();
         t.add(value).left().padTop(1).row();
         // Alt satir yoksa bos satir: tum kartlar ayni yukseklikte kalsin.
-        t.add(sub != null ? sub : new Label(" ", skin, "dim")).left().padTop(1);
+        com.badlogic.gdx.scenes.scene2d.ui.Cell<Label> c = t.add(sub != null ? sub : new Label(" ", skin, "dim")).left().padTop(1);
+        // kaydirmali alt satir kart genisligini doldurur (harf harf alt alta dizilmesin)
+        if (sub != null && sub.getWrap()) c.growX();
         return t;
     }
 
