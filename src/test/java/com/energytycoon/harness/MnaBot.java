@@ -70,7 +70,7 @@ public final class MnaBot {
                 Mna.Reply r = s.mna.founderReply(target, ctrl, ask.perShare * 0.92, false);
                 double price = r.kind == Mna.COUNTER ? r.perShare : r.kind == Mna.ACCEPT ? ask.perShare * 0.92 : -1;
                 if (price > 0) {
-                    Mna.Financing f = financing(s, p, target, ctrl * price, reserve, true);
+                    Mna.Financing f = financing(s, p, target, ctrl * price, reserve, leverageMode);
                     if (f != null) {
                         String err = s.mna.buyFromFounder(p, target, ctrl, price, f);
                         if (err == null) { note("ISLEM: kurucudan kontrol payi"); return; }
