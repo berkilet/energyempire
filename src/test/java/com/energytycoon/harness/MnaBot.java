@@ -44,7 +44,7 @@ public final class MnaBot {
         if (p.quarters < 8) { note("bot: 8 ceyrek dolmadi"); return; }
         if (s.finance.rating(p).ordinal() > Rating.BB.ordinal()) { note("bot: not BB alti"); return; }
         if (s.finance.leverage(p) > 3.0) { note("bot: ND/FAVOK > 3"); return; }
-        if (p.restructUsed) { note("bot: yapilandirma gecmisi"); return; }
+        if (p.mustSellBy > 0 || p.restructProtectUntil > s.hour) { note("bot: yapilandirma suruyor"); return; }
         for (Loan l : p.loans) if (l.status == Loan.Status.LATE) { note("bot: gecikme"); return; }
         Company target = pick(s, leverageMode);
         if (target == null) { note(leverageMode ? "deger orani 1,0-1,5 bandinda hedef yok" : "hedef yok"); return; }
@@ -125,6 +125,10 @@ public final class MnaBot {
         double cashAvail = Math.max(0, p.cash - reserve);
         Bank b = s.finance.bestAcquisitionBank(p, 10e6, t);
         double loanMax = b == null ? 0 : s.finance.maxAcquisitionLoan(p, b, t);
+        // temkinli alici: birlesik (pro forma) Net borc / FAVOK en fazla 3 (banka siniri 4-4,5)
+        double e4 = s.finance.ebitda4(p) + Math.max(0, s.finance.ebitda4(t));
+        double ndNow = p.debt() - p.cash + Math.max(0, t.debt() - t.cash);
+        loanMax = Math.max(0, Math.min(loanMax, 3.0 * e4 - ndNow));
         if (leverageMode) {
             f.loan = Math.min(loanMax, cost); f.bank = b;
             f.cash = Math.min(cashAvail, cost - f.loan);
