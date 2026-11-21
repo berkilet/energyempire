@@ -366,7 +366,7 @@ public final class Hud {
         lcOwnBtn = btn("Kendin kur", "lineOwn", "accent");
         own.add(lcOwnBtn).width(250).height(34);
         Table op = new Table(skin); op.setBackground("card"); op.pad(10);
-        op.add(l("UŞİ'YE BAŞVUR", "title")).left().row();
+        op.add(UiKit.iconLabel(skin, "org_usi", l("UŞİ'YE BAŞVUR", "title"), 26, 28)).left().row();
         op.add(lcOp).width(250).left().padTop(4).padBottom(8).row();
         lcOpBtn = btn("UŞİ'ye başvur", "lineOp", "default");
         op.add(lcOpBtn).width(250).height(34);

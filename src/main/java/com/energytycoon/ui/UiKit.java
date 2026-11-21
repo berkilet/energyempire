@@ -18,6 +18,14 @@ public final class UiKit {
         return l;
     }
 
+    /** Soldaki kucuk ikon + etiket (logo/rozet satiri). */
+    public static Table iconLabel(Skin skin, String icon, Label l, float w, float h) {
+        Table t = new Table();
+        t.add(new com.badlogic.gdx.scenes.scene2d.ui.Image(skin.getDrawable("icon_" + icon))).size(w, h).padRight(6);
+        t.add(l).left();
+        return t;
+    }
+
     /** Soldaki ikonlu dugme (sekme/menu). Stil, mevcut metin dugmesi stilinden turetilir; secili hali korunur. */
     public static com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton iconButton(Skin skin, String text, String icon, String style, float w, float h) {
         com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton.ImageTextButtonStyle st = new com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton.ImageTextButtonStyle(

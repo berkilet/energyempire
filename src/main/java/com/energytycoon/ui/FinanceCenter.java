@@ -362,7 +362,11 @@ public final class FinanceCenter {
             String[] c = { b.label + (p.bankBanUntil[b.ordinal()] > s.hour ? "\n(kredi yok: " + date(p.bankBanUntil[b.ordinal()]) + "'e kadar)" : ""),
                 String.valueOf(p.bankScore[b.ordinal()]), Bank.tierLabel(p.bankScore[b.ordinal()]), Fmt.money(exp),
                 "%" + Math.round(100 * exp / Math.max(1, cap)) + " (" + Fmt.money(cap) + ")", b.profile };
-            for (int i = 0; i < c.length; i++) { Label lb = new Label(c[i], skin, "small"); lb.setWrap(true); row.add(lb).width(bw[i]).padRight(6); }
+            for (int i = 0; i < c.length; i++) {
+                Label lb = new Label(c[i], skin, "small"); lb.setWrap(true);
+                if (i == 0) { lb.setWrap(false); row.add(UiKit.iconLabel(skin, "bank_" + b.name().toLowerCase(), lb, 26, 28)).width(bw[i]).left().padRight(6); }
+                else row.add(lb).width(bw[i]).padRight(6);
+            }
             loans.add(row).padBottom(2).row();
         }
         Label tiers = new Label("Kademeler: 30+ peşin masrafta %50 indirim · 60+ prim −0,15 puan, peşin masraf yok · 90+ prim −0,30 puan, erken kapama cezası yok. "

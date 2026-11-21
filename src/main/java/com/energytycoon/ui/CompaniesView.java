@@ -59,7 +59,7 @@ public final class CompaniesView {
         for (Company c : rowOrder) {
             if (c.neutral) {
                 Label sep = new Label("Kamu (tarafsız, rakip değil; kapanış takvimiyle devreden çıkar)", skin, "dim");
-                ct.add(sep).colspan(C_HEAD.length).left().padTop(6).padBottom(2).row();
+                ct.add(UiKit.iconLabel(skin, "org_kamu", sep, 24, 26)).colspan(C_HEAD.length).left().padTop(6).padBottom(2).row();
             }
             Table row = new Table(skin);
             if (c.player) row.setBackground("card");

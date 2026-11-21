@@ -145,7 +145,7 @@ public final class LoanWizard {
         Table card = new Table(skin);
         card.setBackground(selected == o.bank ? "rowSel" : "card");
         card.pad(8);
-        card.add(new Label(o.bank.label, skin, "default")).left().row();
+        card.add(UiKit.iconLabel(skin, "bank_" + o.bank.name().toLowerCase(), new Label(o.bank.label, skin, "default"), 26, 28)).left().row();
         String txt = o.available
             ? "Faiz " + Macro.pct(o.rate) + (fixed ? " sabit" : " değişken") + "\nTaksit " + Fmt.money(o.installment) + " / " + (freq == 1 ? "ay" : "3 ay")
               + "\nPeşin masraf " + Fmt.money(o.upfront) + "\nTaahhüt: Net borç/FAVÖK ≤ " + FinanceCenter.num(o.covenant)
