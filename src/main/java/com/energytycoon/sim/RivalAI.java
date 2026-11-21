@@ -108,6 +108,11 @@ public final class RivalAI {
         return true;
     }
 
+    static boolean postAcquisitionHold(GameState s, Company c) {
+        for (Loan l : c.loans) if (l.open() && l.acquisition) return s.finance.leverage(c) > FinanceBalance.POST_ACQ_BUILD_LEVERAGE;
+        return false;
+    }
+
     private static void monthlyInner(GameState s, Company c) {
         if (restructuringSale(s, c)) { ecaCure(s, c); distress(s, c); return; }
         ecaCure(s, c);
@@ -116,6 +121,8 @@ public final class RivalAI {
         tenders(s, c);
         substations(s, c);
         lineUpgrades(s, c);
+        // devralma borcu sindirilmeden yeni santral yok (acik devralma kredisi varken grup ND/FAVOK > 3)
+        if (postAcquisitionHold(s, c)) return;
         // bagli ortaklik: ana sirketin stratejisi (temkinli: dusuk kaldirac ve bol nakitle; nakit uret: yeni santral yok)
         if (c.eq.parent >= 0 && (c.eq.strategy == 2 || c.eq.strategy == 1 && (s.finance.leverage(c) > 2 || c.cash < 2 * reserve(s, c)))) return;
         double rivalMult = s.settings.difficulty.rivalMult;

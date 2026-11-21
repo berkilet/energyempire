@@ -258,6 +258,15 @@ public final class BalanceCheck {
                         if (x.eq.merged && parent[i] != -2) { log.add(s.year() + " birleşme: " + x.name); parent[i] = -2; continue; }
                         if (parent[i] != -2) parent[i] = x.eq.parent;
                     }
+                    if (System.getenv("MNA_TRACE2") != null && s.year() >= 2026) {
+                        Company q = s.player;
+                        StringBuilder sb = new StringBuilder();
+                        for (Company x : s.finance.consolidation(q)) if (x != q) sb.append(String.format(Locale.ROOT, " | bağlı %s nakit %.0fM borç %.0fM ayKâr %.1fM temettü%%%d", x.name, x.cash / 1e6, x.debt() / 1e6, x.lastNet / 1e6, s.capital.effectiveDividendPct(x)));
+                        double svc = 0; for (double v : s.finance.schedule12(q)) svc += v;
+                        log.add(String.format(Locale.ROOT, "%d-%02d nakit %.0fM borç %.0fM (devralma %.0fM) 12ay servis %.0fM ayKâr %.1fM FAVÖK4 %.0fM grupND/FAVÖK %.1f not %s temettüGeliri %.1fM capex %.0fM%s",
+                            s.year(), s.month() + 1, q.cash / 1e6, q.debt() / 1e6, q.loans.stream().filter(l -> l.open() && l.acquisition).mapToDouble(l -> l.outstanding).sum() / 1e6, svc / 1e6,
+                            q.lastNet / 1e6, s.finance.ebitda4(q) / 1e6, s.finance.leverage(q), s.finance.rating(q), q.lastDividendIncome / 1e6, q.lastCapex / 1e6, sb));
+                    }
                     if (System.getenv("MNA_TRACE") != null && s.month() == 0) {
                         Company q = s.player;
                         log.add(String.format(Locale.ROOT, "%d iz: hisse %.2fM temettü %%%d geri alım %.0fM hakim %s tavanlı santral %d nakit %.0fM borç %.0fM ND/FAVÖK %.1f not %s gecikme %d payı olan şirket %d değer %.0fM", s.year() - 1, q.eq.shares / 1e6, q.eq.dividendPct, q.eq.buybackBudget / 1e6, q.eq.dominant, (int) s.plants.stream().filter(x -> x.owner == q && x.priceCap > 0).count(), q.cash / 1e6, q.debt() / 1e6,
