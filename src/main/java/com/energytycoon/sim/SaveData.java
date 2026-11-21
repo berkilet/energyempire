@@ -66,6 +66,13 @@ public class SaveData {
     public List<SubstationD> substations = new ArrayList<>();
     public List<TenderD> tenders = new ArrayList<>();
     public List<ListingD> listings = new ArrayList<>();
+    /** Makro (finans paketi). Yoksa (eski kayit) varsayilan ortamla baslatilir. */
+    public MacroD macro;
+    public static class MacroD {
+        public double policyRate = FinanceBalance.POLICY_START, equityIndex = 100; public String regime, expectedRegime;
+        public String[] future; public String[] eventTypes; public int[] eventMonths; public int lastCrisisYear = -99, lastInflationYear = -99;
+        public boolean energyHikeApplied; public double[] rateHistory, indexHistory, expectedPath;
+    }
     public static class ListingD { public int id, asset, seller = -1, buyer = -1; public double price; public long listed, expires; public String status; }
     public double[] monthlyPrice;
 
@@ -132,6 +139,16 @@ public class SaveData {
             for (Tender.Bid b : t.bids) { BidD bd = new BidD(); bd.company = s.companies.indexOf(b.company); bd.price = b.price; bd.deposit = b.deposit; bd.hour = b.hour; td.bids.add(bd); }
             d.tenders.add(td);
         }
+        MacroD md = new MacroD(); Macro mc = s.macro;
+        md.policyRate = mc.policyRate; md.equityIndex = mc.equityIndex; md.regime = mc.regime.name(); md.expectedRegime = mc.expectedRegime.name();
+        md.future = mc.future.stream().map(Enum::name).toArray(String[]::new);
+        md.eventTypes = mc.events.stream().map(e -> e.type.name()).toArray(String[]::new);
+        md.eventMonths = mc.events.stream().mapToInt(e -> e.monthsLeft).toArray();
+        md.lastCrisisYear = mc.lastCrisisYear; md.lastInflationYear = mc.lastInflationYear; md.energyHikeApplied = mc.energyHikeApplied;
+        md.rateHistory = mc.rateHistory.stream().mapToDouble(Double::doubleValue).toArray();
+        md.indexHistory = mc.indexHistory.stream().mapToDouble(Double::doubleValue).toArray();
+        md.expectedPath = mc.expectedPath.clone();
+        d.macro = md;
         for (Listing l : s.sales.all) {
             ListingD ld = new ListingD(); ld.id = l.id; ld.asset = l.asset.id; ld.seller = s.companies.indexOf(l.seller);
             ld.buyer = l.buyer == null ? -1 : s.companies.indexOf(l.buyer); ld.price = l.price; ld.listed = l.listedHour; ld.expires = l.expiresHour; ld.status = l.status.name();
@@ -255,6 +272,20 @@ public class SaveData {
             l.status = Listing.Status.valueOf(ld.status);
             s.sales.add(l);
         }
+        if (macro != null && macro.regime != null) {
+            Macro mc = s.macro;
+            mc.policyRate = macro.policyRate; mc.equityIndex = macro.equityIndex; mc.regime = Macro.Regime.valueOf(macro.regime);
+            if (macro.expectedRegime != null) mc.expectedRegime = Macro.Regime.valueOf(macro.expectedRegime);
+            if (macro.future != null) for (String r : macro.future) mc.future.add(Macro.Regime.valueOf(r));
+            while (mc.future.size() < 12) mc.future.add(mc.regime);
+            if (macro.eventTypes != null) for (int i = 0; i < macro.eventTypes.length; i++) {
+                Macro.Event e = new Macro.Event(); e.type = Macro.EventType.valueOf(macro.eventTypes[i]); e.monthsLeft = macro.eventMonths[i]; mc.events.add(e);
+            }
+            mc.lastCrisisYear = macro.lastCrisisYear; mc.lastInflationYear = macro.lastInflationYear; mc.energyHikeApplied = macro.energyHikeApplied;
+            if (macro.rateHistory != null) for (double v : macro.rateHistory) mc.rateHistory.add(v);
+            if (macro.indexHistory != null) for (double v : macro.indexHistory) mc.indexHistory.add(v);
+            if (macro.expectedPath != null && macro.expectedPath.length == 12) mc.expectedPath = macro.expectedPath;
+        } else s.macro.init(); // eski kayit: varsayilan makro ortam
         if (monthlyPrice != null) for (double v : monthlyPrice) s.history.monthlyPrice.add(v);
         s.rng.setSeed(seed ^ hour * 31);
         s.updateValuations();

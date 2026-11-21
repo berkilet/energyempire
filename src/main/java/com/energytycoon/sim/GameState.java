@@ -44,6 +44,8 @@ public final class GameState {
     public final TenderBook tenders = new TenderBook(this);
     /** Varlik satis ilanlari. */
     public final SaleBook sales = new SaleBook(this);
+    /** Makro ortam: politika faizi, rejimler, kuresel olaylar. */
+    public final Macro macro = new Macro(this);
     /** Mesaj -> tiklaninca yapilacak eylem (ör. "tender:12"). */
     public final Map<String, String> messageActions = new HashMap<>();
     /** Test/dogrulama: kendi hatlari insaat beklemeden aktif olur (kayda yazilmaz). */
@@ -127,6 +129,7 @@ public final class GameState {
         if (s.settings.rivalsStartWithFleet) s.seedRivals();
         s.scenario.setup.accept(s);
         if (s.settings.legacyFleet) s.placeLegacyFleet(s.scenario.legacyCoverage);
+        s.macro.init();
         s.updateValuations();
         s.notify("Hoş geldiniz! Senaryo: " + s.scenario.title);
         return s;
@@ -1014,6 +1017,7 @@ public final class GameState {
             p.daysTracked = Math.min(30, p.daysTracked + 1);
         }
         markets.hourly(rng);
+        macro.hourly();
         if (hod == 0) { markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); tenders.daily(); sales.daily(); }
 
         boolean changed = false;
@@ -1217,6 +1221,7 @@ public final class GameState {
     // ------------------------------------------------------------ aylik
     private void monthly() {
         refreshComponentStats();
+        macro.monthly();
         operator.monthly();
         for (City c : cities) { c.lastServedRatio = c.monthDemandMWh > 0 ? c.monthServedMWh / c.monthDemandMWh : 1; c.monthDemandMWh = c.monthServedMWh = 0; }
         tenders.monthly();
