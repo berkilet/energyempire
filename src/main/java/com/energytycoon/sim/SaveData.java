@@ -8,7 +8,7 @@ public class SaveData {
     /** Finans (kredi notu, bankalar, krediler). Yoksa (eski kayit) cd.debt Kiyibank ticari kredisine donusturulur. */
     public static class LoanD {
         public int id, linkedPlant, tenorMonths, graceMonths, frequencyMonths, covenantBreaches, daysLate, onTimePayments, dscrLowQuarters;
-        public String type, bank, ecaOrigin, status; public boolean fixed, everLate, covenantPenalty, dscrPenalty, restructured;
+        public String type, bank, ecaOrigin, status; public boolean fixed, everLate, covenantPenalty, dscrPenalty, restructured, acquisition;
         public double principal, outstanding, rate, spread, accrued, dueAmount, demand, pendingPrincipal, limit;
         public long startHour, nextDueHour, maturityHour, graceEndHour, lastResetHour, drawnSinceHour = -1;
     }
@@ -33,7 +33,7 @@ public class SaveData {
                 d.id = l.id; d.linkedPlant = l.linkedPlant; d.tenorMonths = l.tenorMonths; d.graceMonths = l.graceMonths; d.frequencyMonths = l.frequencyMonths;
                 d.covenantBreaches = l.covenantBreaches; d.daysLate = l.daysLate; d.onTimePayments = l.onTimePayments; d.dscrLowQuarters = l.dscrLowQuarters;
                 d.type = l.type.name(); d.bank = l.bank.name(); d.ecaOrigin = l.ecaOrigin; d.status = l.status.name(); d.fixed = l.fixed; d.everLate = l.everLate;
-                d.covenantPenalty = l.covenantPenalty; d.dscrPenalty = l.dscrPenalty; d.restructured = l.restructured;
+                d.covenantPenalty = l.covenantPenalty; d.dscrPenalty = l.dscrPenalty; d.restructured = l.restructured; d.acquisition = l.acquisition;
                 d.principal = l.principal; d.outstanding = l.outstanding; d.rate = l.rate; d.spread = l.spread; d.accrued = l.accrued; d.dueAmount = l.dueAmount;
                 d.demand = l.demand; d.pendingPrincipal = l.pendingPrincipal; d.limit = l.limit;
                 d.startHour = l.startHour; d.nextDueHour = l.nextDueHour; d.maturityHour = l.maturityHour; d.graceEndHour = l.graceEndHour; d.lastResetHour = l.lastResetHour; d.drawnSinceHour = l.drawnSinceHour;
@@ -54,7 +54,7 @@ public class SaveData {
                 l.id = d.id; l.linkedPlant = d.linkedPlant; l.tenorMonths = d.tenorMonths; l.graceMonths = d.graceMonths; l.frequencyMonths = Math.max(1, d.frequencyMonths);
                 l.covenantBreaches = d.covenantBreaches; l.daysLate = d.daysLate; l.onTimePayments = d.onTimePayments; l.dscrLowQuarters = d.dscrLowQuarters;
                 l.type = Loan.Type.valueOf(d.type); l.bank = Bank.valueOf(d.bank); l.ecaOrigin = d.ecaOrigin; l.status = Loan.Status.valueOf(d.status); l.fixed = d.fixed; l.everLate = d.everLate;
-                l.covenantPenalty = d.covenantPenalty; l.dscrPenalty = d.dscrPenalty; l.restructured = d.restructured;
+                l.covenantPenalty = d.covenantPenalty; l.dscrPenalty = d.dscrPenalty; l.restructured = d.restructured; l.acquisition = d.acquisition;
                 l.principal = d.principal; l.outstanding = d.outstanding; l.rate = d.rate; l.spread = d.spread; l.accrued = d.accrued; l.dueAmount = d.dueAmount;
                 l.demand = d.demand; l.pendingPrincipal = d.pendingPrincipal; l.limit = d.limit;
                 l.startHour = d.startHour; l.nextDueHour = d.nextDueHour; l.maturityHour = d.maturityHour; l.graceEndHour = d.graceEndHour; l.lastResetHour = d.lastResetHour; l.drawnSinceHour = d.drawnSinceHour;
@@ -63,6 +63,8 @@ public class SaveData {
         }
     }
 
+    /** Paket 2: birlesme-satin alma ve rekabet kayitlari (yoksa bos). */
+    public DealBook deals;
     public static class CompanyD { public FinD fin; public Equity eq; public String name; public boolean player; public int color; public double cash, debt, valuation, stockPrice;
         public boolean bankrupt; public int negativeMonths;
         public double lastRevenue, lastFuel, lastOm, lastCarbon, lastInterest, lastFines, lastNet, lastMwh, lastCo2;
@@ -82,7 +84,8 @@ public class SaveData {
         /** v3 */ public boolean legacy; public int retireYear, retireMonth; public String customName;
         /** v3 Faz 4 */ public int preferredTm;
         /** ihale */ public int tenderId;
-        /** varliklar */ public double[] dailyMWh, dailyCurt; public int dayIdx, daysTracked; public double yearProfit; }
+        /** varliklar */ public double[] dailyMWh, dailyCurt; public int dayIdx, daysTracked; public double yearProfit;
+        /** rekabet: son 12 ay uretim */ public double[] gen12; public int genIdx; public double monthMWh, monthCost, lastMonthMWh, lastMonthCost, priceCap; }
     /** Trafo merkezi (v3, Faz 4). */
     public static class SubstationD {
         public int id, x, y, owner, level = 1, buildHoursLeft, pendingUpgrade, upgradeHoursLeft;
@@ -146,6 +149,7 @@ public class SaveData {
         SaveData d = new SaveData();
         d.version = CURRENT_VERSION;
         d.seed = s.seed; d.hour = s.hour; d.nextId = s.nextId; d.won = s.won;
+        d.deals = s.deals;
         d.preset = s.settings.preset.name(); d.difficulty = s.settings.difficulty.name(); d.scenario = s.settings.scenarioId;
         d.companyName = s.settings.companyName; d.size = s.settings.size; d.cityCount = s.settings.cities; d.rivals = s.settings.rivals;
         d.rivalsStartWithFleet = s.settings.rivalsStartWithFleet; d.operatorGrowth = s.settings.operatorGrowth; d.legacyFleet = s.settings.legacyFleet;
@@ -179,6 +183,7 @@ public class SaveData {
             pd.builtAt = p.builtAtHour; pd.lifetimeMWh = p.lifetimeMWh; pd.lastMonthProfit = p.lastMonthProfit; pd.monthProfit = p.monthProfit;
             pd.legacy = p.legacy; pd.retireYear = p.retireYear; pd.retireMonth = p.retireMonth; pd.customName = p.customName; pd.preferredTm = p.preferredTm; pd.tenderId = p.tenderId;
             pd.dailyMWh = p.dailyMWh; pd.dailyCurt = p.dailyCurtailMWh; pd.dayIdx = p.dayIdx; pd.daysTracked = p.daysTracked; pd.yearProfit = p.yearProfit;
+            pd.gen12 = p.gen12; pd.genIdx = p.genIdx; pd.monthMWh = p.monthMWh; pd.monthCost = p.monthCost; pd.lastMonthMWh = p.lastMonthMWh; pd.lastMonthCost = p.lastMonthCost; pd.priceCap = p.priceCap;
             pd.equipment = p.equipment.id; pd.ageStart = p.ageStartHour; pd.upgradeLeft = p.upgradeHoursLeft;
             pd.pendingUpgrade = p.pendingUpgrade == null ? null : p.pendingUpgrade.name();
             pd.upgrades = p.upgrades.stream().map(Enum::name).toArray(String[]::new);
@@ -293,6 +298,8 @@ public class SaveData {
             if (pd.dailyMWh != null && pd.dailyMWh.length == 30) p.dailyMWh = pd.dailyMWh;
             if (pd.dailyCurt != null && pd.dailyCurt.length == 30) p.dailyCurtailMWh = pd.dailyCurt;
             p.dayIdx = pd.dayIdx; p.daysTracked = pd.daysTracked; p.yearProfit = pd.yearProfit;
+            if (pd.gen12 != null && pd.gen12.length == 12) p.gen12 = pd.gen12;
+            p.genIdx = Math.floorMod(pd.genIdx, 12); p.monthMWh = pd.monthMWh; p.monthCost = pd.monthCost; p.lastMonthMWh = pd.lastMonthMWh; p.lastMonthCost = pd.lastMonthCost; p.priceCap = pd.priceCap;
             s.map.ensureLand(p.x, p.y);
             s.plants.add(p); s.nodeById.put(p.id, p); s.occ[s.map.idx(p.x, p.y)] = p.id;
         }
@@ -363,6 +370,7 @@ public class SaveData {
                 for (Plant p : s.plants) if (p.id == l.linkedPlant && p.equipment != null) { l.ecaOrigin = p.equipment.supplier.origin; break; }
         if (monthlyPrice != null) for (double v : monthlyPrice) s.history.monthlyPrice.add(v);
         s.rng.setSeed(seed ^ hour * 31);
+        if (deals != null) s.deals = deals;
         s.updateValuations();
         return s;
     }

@@ -95,6 +95,7 @@ public final class Capital {
     void monthly() {
         for (int pass = 0; pass < 2; pass++)
             for (Company c : s.companies) {
+                if (c.bankrupt) { c.eq.fundamental = 0; c.eq.price = 0; continue; } // iflas/birlesme: hisse degersiz
                 c.eq.fundamental = fundamental(c);
                 if (!c.eq.listed) c.eq.price = c.eq.shares > 0 ? c.eq.fundamental / c.eq.shares : 0;
                 else if (c.eq.price <= 0) c.eq.price = targetPrice(c);
@@ -279,6 +280,7 @@ public final class Capital {
         double cost = n * e.price;
         c.cash -= cost; e.buybackBudget -= cost; e.shares -= n;
         impact(c, n);
+        s.mna.buybackDuringOffer(c, FinanceBalance.PRICE_IMPACT * n / e.shares);
         if (e.buybackBudget <= 1 && c.player) s.notify("FİNANS: Geri alım tamamlandı. Kurucu payı %" + Math.round(e.founderPct() * 1000) / 10.0 + ".", "openfin");
     }
 

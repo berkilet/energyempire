@@ -49,6 +49,10 @@ public final class GameState {
     /** Finans motoru: not, bankalar, krediler, tahsilat. */
     public final Finance finance = new Finance(this);
     public final Capital capital = new Capital(this);
+    /** Birlesme-satin alma ve rekabet otoritesi kayitlari. */
+    public DealBook deals = new DealBook();
+    public final Competition competition = new Competition(this);
+    public final Mna mna = new Mna(this);
     /** Mesaj -> tiklaninca yapilacak eylem (ör. "tender:12"). */
     public final Map<String, String> messageActions = new HashMap<>();
     /** Test/dogrulama: kendi hatlari insaat beklemeden aktif olur (kayda yazilmaz). */
@@ -1017,7 +1021,7 @@ public final class GameState {
         macro.hourly();
         if (hod == 0) {
             markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); tenders.daily(); sales.daily();
-            capital.daily();
+            capital.daily(); competition.daily(); mna.daily();
             for (int ci = 0; ci < companies.size(); ci++) { Company c = companies.get(ci); finance.daily(c); finance.dueWarnings(c); }
         }
 
@@ -1163,7 +1167,8 @@ public final class GameState {
                 double out = p.outputMW;
                 if (out <= 0) continue;
                 p.flowMW = out;
-                double rev = tenders.revenue(p, out, comp.price);
+                // hakim durumdaki grubun santrali: fiyat tavani (ortalama uretim maliyeti + %15)
+                double rev = tenders.revenue(p, out, p.priceCap > 0 ? Math.min(comp.price, p.priceCap) : comp.price);
                 double fuelC = out * fuelCostPerMWh(p);
                 double var = out * p.type.varOm;
                 double pco2 = p.co2PerMWh(hour);
@@ -1174,6 +1179,7 @@ public final class GameState {
                 o.mwhGenerated += out; o.co2Tons += out * pco2;
                 if (p.type.renewable) { o.renewMwh += out; renew += out; }
                 p.monthProfit += rev - fuelC - var - carb;
+                p.monthMWh += out; p.monthCost += fuelC + var + carb;
                 // Ucuncu taraf TM: teslim edilen MWh basina erisim bedeli TM sahibine.
                 Substation tm = p.cp.tm;
                 if (tm != null && tm.owner != o && tm.accessFeePerMWh > 0) {
@@ -1197,7 +1203,7 @@ public final class GameState {
             if (!p.operational()) continue;
             p.dailyMWh[p.dayIdx] += p.outputMW; p.dailyCurtailMWh[p.dayIdx] += p.curtailedMW;
             double fx = p.fixedOmPerHour();
-            p.owner.cash -= fx; p.owner.omCost += fx; p.monthProfit -= fx;
+            p.owner.cash -= fx; p.owner.omCost += fx; p.monthProfit -= fx; p.monthCost += fx;
         }
         statDemand = totDemand; statServed = totServed;
         monthDemandMWh += totDemand; monthServedMWh += totServed;
@@ -1251,6 +1257,8 @@ public final class GameState {
             while (c.netHistory.size() > 12) c.netHistory.pollFirst();
         }
         for (Plant p : plants) {
+            p.gen12[p.genIdx] = p.monthMWh; p.genIdx = (p.genIdx + 1) % 12;
+            p.lastMonthMWh = p.monthMWh; p.lastMonthCost = p.monthCost; p.monthMWh = 0; p.monthCost = 0;
             p.lastMonthProfit = p.monthProfit; p.yearProfit += p.monthProfit; p.qProfitAcc += p.monthProfit; p.monthProfit = 0;
             if (month() % 3 == 0) { p.qProfitLast = p.qProfitAcc; p.qProfitAcc = 0; }
             if (month() == 0) p.yearProfit = 0; // biten ay Aralik: yeni yil
@@ -1273,6 +1281,8 @@ public final class GameState {
         retireLegacy();
         // Ceyrek sonu: kredi notu, taahhutler. Iflas yalnizca finans akisiyla (gecikme -> temerrut -> yapilandirma/iflas).
         if (month() % 3 == 0) for (int ci = 0; ci < companies.size(); ci++) { finance.quarterly(companies.get(ci)); capital.quarterly(companies.get(ci)); }
+        competition.monthly();
+        mna.monthly();
         if (player.cash < 0 && !player.bankrupt) notify("FİNANS: Nakit eksi! İşletme kredisi limiti dolu; 60 gün içinde düzelmezse temerrüt süreci başlar.", "finance");
         evaluateScenario();
         for (Company c : companies) if ((!c.player || aiPlayer) && !c.neutral && !c.bankrupt) RivalAI.monthly(this, c);

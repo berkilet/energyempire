@@ -18,6 +18,13 @@ public final class Plant extends GridNode {
     public double availableMW;
     /** Bu aydaki net kar (gelir - degisken - sabit). */
     public double monthProfit, lastMonthProfit;
+    /** Rekabet: bu ayin uretimi ve degisken+sabit maliyeti; son 12 ayin aylik uretimi (halka); hakim durum fiyat tavani (0 = yok). */
+    public double monthMWh, monthCost, lastMonthMWh, lastMonthCost, priceCap;
+    public double[] gen12 = new double[12];
+    public int genIdx;
+
+    public double gen12() { double t = 0; for (double v : gen12) t += v; return t; }
+
     public double lifetimeMWh;
     /** Kamu eski filosu: yakit maliyeti GridBalance.LEGACY_FUEL_MULT ile carpilir, retireYear'da kapanir. */
     public boolean legacy;

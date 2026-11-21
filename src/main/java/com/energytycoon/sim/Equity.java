@@ -40,6 +40,15 @@ public final class Equity {
     public int parent = -1, strategy;
     /** Birlesip ana sirkete katildi (ortakliktan cikarma). */
     public boolean merged;
+    /** Rekabet: son 12 ayin aylik geliri (halka), hakim durum, kamu hizmeti modunda tuketiciye iade. */
+    public double[] rev12 = new double[12];
+    public int revIdx;
+    public boolean dominant;
+    public double refunds, lastRefund;
+    /** Esik bildirimleri: disc[j] = j sirketinin bu sirkette gectigi son esik indeksi (+1). */
+    public int[] disc = new int[0];
+    /** Kurucu pazarlik payi tohumu (0..1, aylik yenilenir). */
+    public double askSeed = 0.5;
     /** Savunma modu (esik bildirimi veya cagri sonrasi) bitis saati. */
     public long defenseUntil = -1;
 

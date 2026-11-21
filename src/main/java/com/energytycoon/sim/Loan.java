@@ -33,6 +33,8 @@ public final class Loan {
     /** Isletme kredisi: limit ve kullanimin basladigi saat. */
     public double limit;
     public long drawnSinceHour = -1;
+    /** Devralma kredisi (ticari kredi kurallari; genel kredi limitinin disinda). */
+    public boolean acquisition;
 
     public boolean open() { return status != Status.CLOSED && status != Status.DEFAULTED; }
 
@@ -57,6 +59,6 @@ public final class Loan {
     }
 
     public String name() {
-        return type == Type.ECA ? ecaOrigin + " İhracat Kredi Kuruluşu · " + bank.label : type.label + " · " + bank.label;
+        return type == Type.ECA ? ecaOrigin + " İhracat Kredi Kuruluşu · " + bank.label : (acquisition ? "Devralma kredisi" : type.label) + " · " + bank.label;
     }
 }

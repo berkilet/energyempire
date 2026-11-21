@@ -13,7 +13,7 @@ public final class RivalAI {
         if (c.eq.listed && c.eq.dividendPct == 0 && c.eq.ipoHour >= 0 && s.hour - c.eq.ipoHour < Balance.HOURS_PER_MONTH * 2)
             s.capital.setDividend(c, FinanceBalance.RIVAL_DIVIDEND_AFTER_IPO);
         financing = true;
-        try { monthlyInner(s, c); } finally { financing = false; }
+        try { monthlyInner(s, c); s.mna.rivalMonthly(c); } finally { financing = false; }
     }
 
     // ------------------------------------------------------------ finans (oyuncuyla ayni urunler ve kurallar)
@@ -104,6 +104,8 @@ public final class RivalAI {
         tenders(s, c);
         substations(s, c);
         lineUpgrades(s, c);
+        // bagli ortaklik: ana sirketin stratejisi (temkinli: dusuk kaldirac ve bol nakitle; nakit uret: yeni santral yok)
+        if (c.eq.parent >= 0 && (c.eq.strategy == 2 || c.eq.strategy == 1 && (s.finance.leverage(c) > 2 || c.cash < 2 * reserve(s, c)))) return;
         double rivalMult = s.settings.difficulty.rivalMult;
         if (c.cash < GridBalance.RIVAL_DECISION_CASH / rivalMult) return;
         Random r = s.rng;

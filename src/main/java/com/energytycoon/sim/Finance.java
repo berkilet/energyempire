@@ -22,13 +22,13 @@ public final class Finance {
     /** Limit kapsamindaki bakiye: ticari + isletme kredisi (ECA haric). */
     public double limitUsage(Company c) {
         double v = 0;
-        for (Loan l : c.loans) if (l.open() && l.type != Loan.Type.ECA) v += l.outstanding;
+        for (Loan l : c.loans) if (l.open() && l.type != Loan.Type.ECA && !l.acquisition) v += l.outstanding;
         return v;
     }
 
     public double bankExposure(Company c, Bank b) {
         double v = 0;
-        for (Loan l : c.loans) if (l.open() && l.type != Loan.Type.ECA && l.bank == b) v += l.outstanding;
+        for (Loan l : c.loans) if (l.open() && l.type != Loan.Type.ECA && !l.acquisition && l.bank == b) v += l.outstanding;
         return v;
     }
 
@@ -145,6 +145,70 @@ public final class Finance {
         double fee = amount * FinanceBalance.COMMERCIAL_FEE * Bank.feeMult(c.bankScore[b.ordinal()]);
         c.cash += amount - fee; c.fees += fee;
         c.loans.add(l);
+        return l;
+    }
+
+    // ------------------------------------------------------------ devralma kredisi (paket 2)
+    /** Devralma kredisi faizi: ticari faiz + 1 puan; Lemon Brothers 0,5 puan ucuz. Degisken. */
+    public double acquisitionRate(Company c, Bank b) {
+        return s.macro.policyRate + commercialSpread(c, b, false, false) + FinanceBalance.ACQ_SPREAD - (b == Bank.DEMIRTAS ? FinanceBalance.ACQ_DEMIRTAS_DISCOUNT : 0);
+    }
+
+    /** Devralma kredisi engeli: banka kurallari, tutar hedef degerinin %50'si, birlesik (pro forma) Net borc / FAVOK taahhut esiginde. */
+    public String acquisitionRefusal(Company c, Bank b, double amount, Company target) {
+        if (exempt(c)) return "Kamu kredi kullanmaz";
+        if (c.bankBanUntil[b.ordinal()] > s.hour) return "Temerrüt sonrası " + FinanceBalance.REL_BAN_YEARS + " yıl kredi vermez";
+        if (!b.lendsTo(rating(c))) return "CCC nota yalnızca " + Bank.DEMIRTAS.label + " kredi verir";
+        if (c.bankCovenantBreach[b.ordinal()]) return "Taahhüt ihlali: yeni kredi yok";
+        if (c.restructUsed && c.restructProtectUntil > s.hour) return "Yapılandırma sürüyor";
+        if (b == Bank.YESIL && fossilShare(target) > 0.5) return b.label + " fosil ağırlıklı şirketin devralınmasını finanse etmez";
+        double max = FinanceBalance.ACQ_MAX_SHARE * s.capital.value(target);
+        if (amount > max + 1) return "En fazla hedef değerinin %50'si (" + money(max) + ")";
+        double e4 = ebitda4(c) + Math.max(0, ebitda4(target));
+        double nd = c.debt() - c.cash + amount + Math.max(0, target.debt() - target.cash);
+        if (e4 <= 0) return "Birleşik FAVÖK yok";
+        if (nd / e4 > b.covenantLimit()) return "Birleşik Net borç / FAVÖK " + String.format(java.util.Locale.ROOT, "%.1f", nd / e4).replace('.', ',') + " > " + b.covenantLimit();
+        return null;
+    }
+
+    double fossilShare(Company c) {
+        double f = 0, t = 0;
+        for (Plant p : s.plants) if (p.owner == c && p.operational()) { t += p.capacityMW(); if (!p.type.renewable) f += p.capacityMW(); }
+        return t > 0 ? f / t : 0;
+    }
+
+    /** Uygun en ucuz banka ve verebilecegi en yuksek tutar (amount'a kadar); null: hicbiri vermez. */
+    public Bank bestAcquisitionBank(Company c, double amount, Company target) {
+        Bank best = null;
+        for (Bank b : Bank.values()) {
+            if (acquisitionRefusal(c, b, amount, target) != null) continue;
+            if (best == null || acquisitionRate(c, b) < acquisitionRate(c, best)) best = b;
+        }
+        return best;
+    }
+
+    /** Onaylanabilecek en yuksek devralma kredisi (50M adimlarla asagi). */
+    public double maxAcquisitionLoan(Company c, Bank b, Company target) {
+        double a = Math.floor(FinanceBalance.ACQ_MAX_SHARE * s.capital.value(target) / 10e6) * 10e6;
+        while (a > 0 && acquisitionRefusal(c, b, a, target) != null) a -= Math.max(10e6, a * 0.1);
+        return Math.max(0, a);
+    }
+
+    public Loan signAcquisition(Company c, Bank b, double amount, Company target) {
+        if (amount <= 0 || acquisitionRefusal(c, b, amount, target) != null) return null;
+        Loan l = new Loan();
+        l.id = s.nextId++; l.type = Loan.Type.COMMERCIAL; l.acquisition = true; l.bank = b; l.fixed = false;
+        l.spread = acquisitionRate(c, b) - s.macro.policyRate;
+        l.rate = s.macro.policyRate + l.spread;
+        l.principal = l.outstanding = amount;
+        l.tenorMonths = FinanceBalance.ACQ_YEARS * 12; l.frequencyMonths = 3;
+        l.startHour = s.hour; l.lastResetHour = s.hour;
+        l.nextDueHour = s.hour + 3L * HPM;
+        l.maturityHour = s.hour + (long) l.tenorMonths * HPM;
+        double fee = amount * FinanceBalance.COMMERCIAL_FEE * Bank.feeMult(c.bankScore[b.ordinal()]);
+        c.cash += amount - fee; c.fees += fee;
+        c.loans.add(l);
+        notifyFin(c, (c.player ? "Devralma kredisi" : c.name + " devralma kredisi") + ": " + money(amount) + " · " + b.label + " · %" + String.format(java.util.Locale.ROOT, "%.2f", l.rate * 100).replace('.', ','));
         return l;
     }
 
@@ -586,6 +650,10 @@ public final class Finance {
         if (c.bankrupt) return;
         c.bankrupt = true;
         for (Loan l : c.loans) if (l.open()) l.status = Loan.Status.DEFAULTED;
+        // iflas eden ana sirketin bagli ortakliklari bagimsiz kalir
+        int ci = s.companies.indexOf(c);
+        for (Company x : s.companies) if (x.eq.parent == ci && !x.eq.merged) x.eq.parent = -1;
+        s.deals.orders.removeIf(o -> o.buyer == ci || o.target == ci);
         if (c.player) { s.gameOver = true; s.gameOverReason = "Şirketiniz iflas etti: " + why + "."; }
         else s.sales.bankruptcy(c);
         notifyFin(c, c.name + " iflas etti: " + why + ".");

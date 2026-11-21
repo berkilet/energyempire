@@ -113,4 +113,51 @@ public final class FinanceBalance {
     public static final double DAILY_TRADE_MAX = 0.02, PRICE_IMPACT = 1.5;
     public static final int[] DIVIDEND_OPTIONS = { 0, 30, 50 };
     public static final double CONTROL = 0.50;
+
+    // ---- 5. Rekabet otoritesi
+    /** Bildirim esigi: birlesik yillik gelir ve hedefin yillik geliri. */
+    public static final double NOTIFY_COMBINED_REVENUE = 500e6, NOTIFY_TARGET_REVENUE = 50e6;
+    /** Olcek farki muafiyeti: devralan degeri / hedef degeri. */
+    public static final double SCALE_EXEMPTION_RATIO = 1.5;
+    /** Bolgesel birlesik pay esigi, batan sirket savunmasinda esik, ulusal tekel siniri; gevsek (Konsolidasyon) bolgesel esik. */
+    public static final double REGIONAL_LIMIT = 0.60, FAILING_LIMIT = 0.75, NATIONAL_LIMIT = 0.80, RELAXED_REGIONAL = 0.80;
+    public static final int PRE_REVIEW_DAYS = 30, FINAL_REVIEW_MONTHS = 4, DIVEST_MONTHS = 12, COMMENT_EXTRA_MONTHS = 1;
+    /** Taahhut ihlali cezasi: yillik gelirin orani. */
+    public static final double DIVEST_FINE = 0.02;
+    /** Rakip, satilacak MW birlesik grubun ilgili pazardaki kapasitesinin bu oranini asmiyorsa taahhudu kabul eder. */
+    public static final double AI_ACCEPT_DIVEST = 0.5;
+    /** Hakim durum: pazar payi esigi ve fiyat tavani (ortalama uretim maliyeti + %15). */
+    public static final double DOMINANCE = 0.50, DOMINANCE_MARKUP = 0.15;
+    /** Duzenlenmis tekel: ulusal pay esigi ve izin verilen yillik varlik getirisi. */
+    public static final double REGULATED_SHARE = 0.80, REGULATED_RETURN = 0.08;
+
+    // ---- 4. Pay alimi ve devralma
+    /** Kurucunun istedigi prim: kontrolu koruyan satis %15-25, kontrol kaybi >= %60, zor durumda %0-10, nakit ihtiyacinda %5-15. */
+    public static final double ASK_BASE_MIN = 0.15, ASK_BASE_MAX = 0.25, ASK_CONTROL_MIN = 0.60, ASK_CONTROL_MAX = 0.70;
+    public static final double ASK_DISTRESS_MAX = 0.10, ASK_CASH_MIN = 0.05, ASK_CASH_MAX = 0.15;
+    /** Teklif istenen fiyatin bu oranindan dusukse dogrudan ret; aradaysa bir kez karsi teklif. */
+    public static final double COUNTER_BAND = 0.85;
+    /** Bildirim esikleri; esik gecisinde hedef hissesi %5-10 yukselir; hedef YZ savunma modu (gun). */
+    public static final double[] DISCLOSURE = { 0.05, 0.10, 0.15, 0.20, 0.25, 0.33, 0.50, 0.67 };
+    public static final double DISCLOSE_JUMP_MIN = 0.05, DISCLOSE_JUMP_MAX = 0.10;
+    public static final int DEFENSE_DAYS = 90;
+    /** Pay oranina gore haklar. */
+    public static final double ASSOCIATE = 0.20, BOARD_SEAT = 0.25, SQUEEZE_OUT = 0.90;
+    /** Cagri: piyasa fiyatinin en az %20 ustu, 30 gun; zorunlu teklif son 6 ayin en yuksek fiyatindan. */
+    public static final double TENDER_MIN_PREMIUM = 0.20;
+    public static final int TENDER_DAYS = 30, MANDATORY_LOOKBACK_MONTHS = 6;
+    /** Kabul egrisi (prim -> serbest dolasim kabul orani). */
+    public static final double[] ACCEPT_PREMIUM = { 0.0, 0.20, 0.35, 0.50, 0.80 };
+    public static final double[] ACCEPT_RATE = { 0.05, 0.40, 0.65, 0.85, 0.95 };
+    /** Savunma: temettu artisi kabulu dusurur; beyaz sovalye en az bu kadar yuksek teklif verir. */
+    public static final double DIVIDEND_DEFENSE = 0.05, KNIGHT_STEP = 0.05;
+    /** YZ savunma geri alimi: rezerv ustu nakdin %30'u, en fazla hisselerin %5'i. */
+    public static final double AI_BUYBACK_CASH = 0.30, AI_BUYBACK_SHARES = 0.05;
+    /** Diger sirket ortaklar teklifi hisse basina deger x bu oranin ustundeyse kabul eder. */
+    public static final double HOLDER_ACCEPT = 1.10;
+    /** Devralma kredisi: ticari faiz + 1 puan (Lemon Brothers 0,5 puan ucuz), hedef degerinin en fazla %50'si, 7 yil, ceyreklik. */
+    public static final double ACQ_SPREAD = 0.01, ACQ_DEMIRTAS_DISCOUNT = 0.005, ACQ_MAX_SHARE = 0.50;
+    public static final int ACQ_YEARS = 7;
+    /** Rakip YZ: aylik deneme olasiligi (stil carpani: fosil 1,5 saldirgan, dengeli 1, yesil 0,6), cagri primi araligi, ilk pay. */
+    public static final double RIVAL_MNA_CHANCE = 0.08, RIVAL_TENDER_PREMIUM_MIN = 0.25, RIVAL_TENDER_PREMIUM_MAX = 0.40, RIVAL_TOEHOLD = 0.05;
 }
