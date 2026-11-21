@@ -282,6 +282,9 @@ public final class BalanceCheck {
             System.out.printf(Locale.ROOT, "== %dx%d, %d tohum: bot (a) %%20+ pay %d, (b) devralma %d, (c) koşullu onayla devralma %d · halka arz %d · otorite: başvuru %d, onay %d, koşullu %d, ret %d · kontrol devri %d · sonuçsuz teklif %d%n",
                 cfg[0], cfg[0], seeds, a, b, c, ipos, attempts, appr, cond, rej, tk, failed);
             System.out.println("   ret sebepleri: " + reasons);
+            System.out.println("   bot ay sebepleri: " + MnaBot.why);
+            System.out.println("   koşullu onay fırsatı varken: " + MnaBot.whyCond);
+            MnaBot.why.clear(); MnaBot.whyCond.clear();
         }
     }
 }

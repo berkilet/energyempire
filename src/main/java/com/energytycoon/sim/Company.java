@@ -40,6 +40,8 @@ public final class Company {
     public long negativeSinceHour = -1;
     public boolean restructUsed, restructOfferPending;
     public int plantsAtRestruct;
+    /** Satilan santral sayisi (toplam) ve yapilandirma anindaki deger (-1: eski kayit, santral sayisiyla olculur). */
+    public int plantsSold, soldAtRestruct = -1;
     /** Pesin masraflar, sigorta primleri, erken kapama cezalari (bu ay / gecen ay). */
     public double fees, lastFees;
     /** Nakit akisi: kredilere odenen (anapara+faiz) ve yatirim harcamasi (bu ay / gecen ay). */

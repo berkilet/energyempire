@@ -85,7 +85,7 @@ public final class SaleBook {
             if (ln.owner == null) { ln.requester = null; ln.annualCharge = 0; }
         }
         if (asset instanceof Plant p) {
-            if (from != null) s.finance.settleLinkedEca(from, p); // satistan once santrale bagli ECA kapatilir
+            if (from != null) { s.finance.settleLinkedEca(from, p); from.plantsSold++; } // satistan once santrale bagli ECA kapatilir
             p.owner = to; p.preferredTm = 0;
             if (toNeutral) { p.legacy = false; p.retireYear = 0; }
         } else if (asset instanceof Substation t) {
@@ -111,7 +111,9 @@ public final class SaleBook {
         for (Listing l : all) {
             if (l.status != Listing.Status.OPEN || s.hour < l.expiresHour) continue;
             double floor = floorPrice(l.asset, l.seller);
-            if (l.asset instanceof Plant p && kamuWants(p)) {
+            // yapilandirmadaki sirketin zorunlu satisi: alici cikmazsa kreditor gozetiminde devlet varlik fonu (Kamu) taban fiyattan alir
+            boolean forced = l.seller.mustSellBy > 0 && l.seller.restructUsed;
+            if (l.asset instanceof Plant p && (kamuWants(p) || forced && s.neutral != null)) {
                 s.neutral.cash -= floor; l.seller.cash += floor;
                 transfer(l.asset, l.seller, s.neutral);
                 l.buyer = s.neutral; l.price = floor; l.status = Listing.Status.SOLD;

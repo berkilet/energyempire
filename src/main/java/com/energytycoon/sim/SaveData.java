@@ -18,6 +18,7 @@ public class SaveData {
         public double qEbitdaAcc, qInterestAcc, qRenewAcc, qGenAcc, fees, lastFees;
         public double[] qEbitda, qInterest, qRenew, qGen; public int[] bankScore, bankBreachQuarters; public long[] bankBanUntil; public boolean[] bankCovenantBreach;
         public long defaultCapUntil, restructProtectUntil, mustSellBy, restructOfferHour, negativeSinceHour = -1;
+        public int plantsSold, soldAtRestruct = -1;
         public List<LoanD> loans = new ArrayList<>();
 
         static FinD from(Company c, GameState s) {
@@ -27,7 +28,7 @@ public class SaveData {
             f.qEbitdaAcc = c.qEbitdaAcc; f.qInterestAcc = c.qInterestAcc; f.qRenewAcc = c.qRenewAcc; f.qGenAcc = c.qGenAcc; f.fees = c.fees; f.lastFees = c.lastFees;
             f.qEbitda = c.qEbitda; f.qInterest = c.qInterest; f.qRenew = c.qRenew; f.qGen = c.qGen; f.bankScore = c.bankScore; f.bankBreachQuarters = c.bankBreachQuarters;
             f.bankBanUntil = c.bankBanUntil; f.bankCovenantBreach = c.bankCovenantBreach;
-            f.defaultCapUntil = c.defaultCapUntil; f.restructProtectUntil = c.restructProtectUntil; f.mustSellBy = c.mustSellBy; f.restructOfferHour = c.restructOfferHour; f.negativeSinceHour = c.negativeSinceHour;
+            f.defaultCapUntil = c.defaultCapUntil; f.restructProtectUntil = c.restructProtectUntil; f.mustSellBy = c.mustSellBy; f.restructOfferHour = c.restructOfferHour; f.negativeSinceHour = c.negativeSinceHour; f.plantsSold = c.plantsSold; f.soldAtRestruct = c.soldAtRestruct;
             for (Loan l : c.loans) {
                 LoanD d = new LoanD();
                 d.id = l.id; d.linkedPlant = l.linkedPlant; d.tenorMonths = l.tenorMonths; d.graceMonths = l.graceMonths; d.frequencyMonths = l.frequencyMonths;
@@ -48,7 +49,7 @@ public class SaveData {
             c.qEbitdaAcc = qEbitdaAcc; c.qInterestAcc = qInterestAcc; c.qRenewAcc = qRenewAcc; c.qGenAcc = qGenAcc; c.fees = fees; c.lastFees = lastFees;
             if (qEbitda != null && qEbitda.length == 4) { c.qEbitda = qEbitda; c.qInterest = qInterest; c.qRenew = qRenew; c.qGen = qGen; }
             if (bankScore != null && bankScore.length == 3) { c.bankScore = bankScore; c.bankBreachQuarters = bankBreachQuarters; c.bankBanUntil = bankBanUntil; c.bankCovenantBreach = bankCovenantBreach; }
-            c.defaultCapUntil = defaultCapUntil; c.restructProtectUntil = restructProtectUntil; c.mustSellBy = mustSellBy; c.restructOfferHour = restructOfferHour; c.negativeSinceHour = negativeSinceHour;
+            c.defaultCapUntil = defaultCapUntil; c.restructProtectUntil = restructProtectUntil; c.mustSellBy = mustSellBy; c.restructOfferHour = restructOfferHour; c.negativeSinceHour = negativeSinceHour; c.plantsSold = plantsSold; c.soldAtRestruct = soldAtRestruct;
             if (loans != null) for (LoanD d : loans) {
                 Loan l = new Loan();
                 l.id = d.id; l.linkedPlant = d.linkedPlant; l.tenorMonths = d.tenorMonths; l.graceMonths = d.graceMonths; l.frequencyMonths = Math.max(1, d.frequencyMonths);

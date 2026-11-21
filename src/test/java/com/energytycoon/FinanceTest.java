@@ -211,4 +211,23 @@ class FinanceTest {
         for (int h = 0; h < HPM; h++) g.tick();
         assertTrue(g.player.debt() > 0);
     }
+
+    @Test
+    void restructuringForcedSaleCompletesViaAssetFund() {
+        GameState s = game(1);
+        Company r = rival(s);
+        days(s, 40);
+        Plant p = s.plants.stream().filter(x -> x.owner == r && x.operational()).findFirst().orElse(null);
+        if (p == null) { Plant b = RivalAI.buildNear(s, r, s.catalog.get("at-cc"), s.cities.get(0)); assertNotNull(b); b.buildHoursLeft = 0; p = b; }
+        assertNotNull(s.neutral, "Kamu (devlet varlik fonu) var");
+        r.cash = 1e9;
+        s.finance.acceptRestructuring(r);
+        assertTrue(r.mustSellBy > s.hour);
+        assertNull(s.sales.list(r, p));
+        days(s, Balance.SALE_DAYS + 2);
+        assertNotSame(r, p.owner, "alici cikmazsa zorunlu satis Kamu'ya taban fiyattan tamamlanir");
+        assertTrue(r.plantsSold > r.soldAtRestruct);
+        days(s, FinanceBalance.RESTRUCT_SELL_MONTHS * 30 + 5);
+        assertFalse(r.bankrupt, "satis sarti yerine getirildi");
+    }
 }

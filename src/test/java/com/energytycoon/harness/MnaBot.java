@@ -2,12 +2,28 @@ package com.energytycoon.harness;
 
 import com.energytycoon.sim.*;
 
+import java.util.Map;
+import java.util.TreeMap;
+
 /**
  * Kullanilabilirlik botu (oyuncu tarafi, oyuncunun arayuzde kullandigi ayni API): halka arz yap, ucuz hedefi sec,
- * kredi ve nakitle cagri yap; hedef kapali sirketse kurucuya teklif gotur; halka acik ama kurucusu kontrolde ise piyasadan pay topla.
+ * kredi ve nakitle cagri yap; kurucu kontrolundeki hedefte kurucudan kontrol payi; finanse edilemiyorsa piyasadan pay.
+ * Her ay islem yapilmadiysa sebebi sayilir (why): kredili devralma ve kosullu onayin neden olmadigini olcmek icin.
  */
 public final class MnaBot {
     private MnaBot() {}
+
+    /** Ay basina "islem yapilmadi / yapildi" sebepleri. */
+    public static final Map<String, Integer> why = new TreeMap<>();
+    /** Kosullu onay firsati varken (onizleme kosullu) botu durduran sebepler. */
+    public static final Map<String, Integer> whyCond = new TreeMap<>();
+
+    static boolean condAvailable;
+
+    static void note(String r) {
+        why.merge(r, 1, Integer::sum);
+        if (condAvailable) whyCond.merge(r, 1, Integer::sum);
+    }
 
     /** Aylik cagrilir. leverageMode: degeri kendisine yakin (oran 1,0-1,5) bir rakibi agirlikla krediyle devralmayi dener. */
     public static void monthly(GameState s, boolean leverageMode) {
@@ -15,19 +31,25 @@ public final class MnaBot {
         if (p.bankrupt || s.gameOver) return;
         if (System.getenv("MNA_NOIPO") == null && !p.eq.listed && !s.capital.ipoPreparing(p) && s.capital.ipoBlocker(p) == null) s.capital.startIpo(p, 0.30);
         if (s.capital.ipoPreparing(p) && p.eq.ipoCrisisPending) s.capital.postponeIpo(p);
+        condAvailable = false;
+        for (Company c : s.companies)
+            if (s.mna.active(c) && c != p && !s.competition.sameGroup(p, c) && s.competition.preview(p, c).outcome == Competition.CONDITIONAL) condAvailable = true;
         int pi = s.companies.indexOf(p);
-        for (DealBook.TenderOffer t : s.deals.offers) if (!t.closed && t.bidder == pi) return; // acik teklifimiz var
+        for (DealBook.TenderOffer t : s.deals.offers) if (!t.closed && t.bidder == pi) { note("acik teklif bekleniyor"); return; }
         for (DealBook.Review r : s.deals.reviews) {
-            if (!r.decided && r.acquirer == pi) return; // inceleme suruyor
-            if (r.decided && r.acquirer == pi && s.hour - r.endHour < 24L * Balance.HOURS_PER_MONTH) return; // devralma sonrasi 24 ay sindirme
+            if (!r.decided && r.acquirer == pi) { note("rekabet incelemesi bekleniyor"); return; }
+            if (r.decided && r.acquirer == pi && s.hour - r.endHour < 24L * Balance.HOURS_PER_MONTH) { note("devralma sonrasi 24 ay"); return; }
         }
-        // temkin: oturmus, notu en az BB, gecikmesiz, kaldiraci makul sirket
-        if (p.quarters < 8 || s.finance.rating(p).ordinal() > Rating.BB.ordinal() || s.finance.leverage(p) > 3.0 || p.restructUsed) return;
-        for (Loan l : p.loans) if (l.status == Loan.Status.LATE) return;
+        // temkin: oturmus, notu en az BB, gecikmesiz, kaldiraci makul sirket (halka arz kosullariyla ayni esikler)
+        if (p.quarters < 8) { note("bot: 8 ceyrek dolmadi"); return; }
+        if (s.finance.rating(p).ordinal() > Rating.BB.ordinal()) { note("bot: not BB alti"); return; }
+        if (s.finance.leverage(p) > 3.0) { note("bot: ND/FAVOK > 3"); return; }
+        if (p.restructUsed) { note("bot: yapilandirma gecmisi"); return; }
+        for (Loan l : p.loans) if (l.status == Loan.Status.LATE) { note("bot: gecikme"); return; }
         Company target = pick(s, leverageMode);
-        if (target == null) return;
+        if (target == null) { note(leverageMode ? "deger orani 1,0-1,5 bandinda hedef yok" : "hedef yok"); return; }
         Competition.Preview pv = s.competition.preview(p, target);
-        if (pv.outcome == Competition.REJECT) return;
+        if (pv.outcome == Competition.REJECT) { note("rekabet: ret"); return; }
         double svc = 0;
         for (double v : s.finance.schedule12(p)) svc += v;
         double reserve = 250e6 + svc / 2;
@@ -35,7 +57,9 @@ public final class MnaBot {
             double price = target.eq.price * 1.32;
             double cost = price * s.mna.tenderShares(p, target, price);
             Mna.Financing f = financing(s, p, target, cost, reserve, leverageMode);
-            if (f != null) s.mna.launchTender(p, target, price, f);
+            if (f == null) { note("cagri: finansman yetmedi"); return; }
+            String err = s.mna.launchTender(p, target, price, f);
+            note(err == null ? "ISLEM: cagri" : "cagri engeli: " + err.replaceAll("[0-9.,]+", "#"));
             return;
         }
         // kurucu kontrolde (kapali veya halka acik): finansman yetiyorsa kurucudan kontrol payi (%51), istedigi primle
@@ -47,30 +71,31 @@ public final class MnaBot {
                 double price = r.kind == Mna.COUNTER ? r.perShare : r.kind == Mna.ACCEPT ? ask.perShare * 0.92 : -1;
                 if (price > 0) {
                     Mna.Financing f = financing(s, p, target, ctrl * price, reserve, true);
-                    if (f != null && s.mna.buyFromFounder(p, target, ctrl, price, f) == null) return;
-                }
+                    if (f != null) {
+                        String err = s.mna.buyFromFounder(p, target, ctrl, price, f);
+                        if (err == null) { note("ISLEM: kurucudan kontrol payi"); return; }
+                        note("kurucu kontrol engeli: " + err.replaceAll("[0-9.,]+", "#"));
+                    } else note("kurucu kontrol payi: finansman yetmedi");
+                } else note("kurucu teklifi reddetti");
             }
         }
         if (target.eq.listed) {
             // kontrol payi finanse edilemiyorsa: piyasadan pay topla (en fazla %25; finansal yatirim nakitle)
             if (s.mna.stake(p, target) < 0.25 && s.mna.order(p, target) == null) {
                 double n = Math.min(target.eq.free(), target.eq.shares * 0.25 - target.eq.held(s.companies.indexOf(p)));
-                if (n > 0 && n * target.eq.price < p.cash - reserve) s.mna.placeOrder(p, target, n);
+                if (n > 0 && n * target.eq.price < p.cash - reserve) { s.mna.placeOrder(p, target, n); note("ISLEM: piyasadan pay"); }
             }
             return;
         }
-        // kapali sirket: kurucudan pay (zor durumdaysa kontrol, degilse %25)
-        double want = s.mna.distressed(target) ? target.eq.shares * 0.51 : target.eq.shares * 0.25;
-        want = Math.min(want, target.eq.founder);
-        if (want <= 0) return;
+        // kapali sirket: kurucudan %25 pay (finansal yatirim, nakitle)
+        double want = Math.min(target.eq.founder, target.eq.shares * 0.25);
+        if (want <= 0 || s.mna.stake(p, target) >= 0.25) return;
         Mna.Ask a = s.mna.founderAsk(target, want);
         Mna.Reply r = s.mna.founderReply(target, want, a.perShare * 0.92, false);
         double price = r.kind == Mna.COUNTER ? r.perShare : r.kind == Mna.ACCEPT ? a.perShare * 0.92 : -1;
-        if (price <= 0) return;
-        boolean takesControl = s.mna.groupStake(p, target) + want / target.eq.shares > FinanceBalance.CONTROL;
-        if (!takesControl && want * price > p.cash - reserve) return; // kontrol getirmeyen pay krediyle alinmaz
-        Mna.Financing f = financing(s, p, target, want * price, reserve, leverageMode && takesControl);
-        if (f != null) s.mna.buyFromFounder(p, target, want, price, f);
+        if (price <= 0 || want * price > p.cash - reserve) { note("azinlik payi: nakit yetmedi"); return; }
+        Mna.Financing f = new Mna.Financing(); f.cash = want * price;
+        if (s.mna.buyFromFounder(p, target, want, price, f) == null) note("ISLEM: kurucudan azinlik payi");
     }
 
     static Company pick(GameState s, boolean leverageMode) {

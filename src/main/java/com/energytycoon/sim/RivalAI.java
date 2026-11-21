@@ -97,7 +97,19 @@ public final class RivalAI {
         }
     }
 
+    /** Yapilandirma: 6 ayda santral satisi sarti. En az karli santral hemen satisa cikarilir; bu surede yeni yatirim yapilmaz. */
+    static boolean restructuringSale(GameState s, Company c) {
+        if (c.mustSellBy <= 0 || !c.restructUsed) return false;
+        if (c.soldAtRestruct >= 0 && c.plantsSold > c.soldAtRestruct) return true;
+        for (Listing l : s.sales.open()) if (l.seller == c && l.asset instanceof Plant) return true;
+        Plant worst = null;
+        for (Plant p : s.plants) if (p.owner == c && p.operational() && (worst == null || p.lastMonthProfit < worst.lastMonthProfit)) worst = p;
+        if (worst != null) s.sales.list(c, worst);
+        return true;
+    }
+
     private static void monthlyInner(GameState s, Company c) {
+        if (restructuringSale(s, c)) { ecaCure(s, c); distress(s, c); return; }
         ecaCure(s, c);
         distress(s, c);
         buyListings(s, c);

@@ -499,7 +499,8 @@ public final class Finance {
         // yapilandirma kosulu: 6 ayda en az bir santral satisi
         if (c.mustSellBy > 0 && s.hour > c.mustSellBy) {
             c.mustSellBy = 0;
-            if (s.totalPlantsOf(c) >= c.plantsAtRestruct) bankrupt(c, "Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi");
+            boolean sold = c.soldAtRestruct >= 0 ? c.plantsSold > c.soldAtRestruct : s.totalPlantsOf(c) < c.plantsAtRestruct;
+            if (!sold) bankrupt(c, "Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi");
         }
     }
 
@@ -611,6 +612,7 @@ public final class Finance {
         c.restructProtectUntil = s.hour + (long) FinanceBalance.RESTRUCT_PROTECT_MONTHS * HPM;
         c.mustSellBy = s.hour + (long) FinanceBalance.RESTRUCT_SELL_MONTHS * HPM;
         c.plantsAtRestruct = s.totalPlantsOf(c);
+        c.soldAtRestruct = c.plantsSold;
         for (Loan l : new ArrayList<>(c.loans)) {
             if (l.type != Loan.Type.COMMERCIAL && l.type != Loan.Type.REVOLVER) continue;
             if (l.status == Loan.Status.CLOSED) continue;
