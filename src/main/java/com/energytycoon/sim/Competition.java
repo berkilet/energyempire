@@ -338,7 +338,7 @@ public final class Competition {
                 Set<Company> g = group(t);
                 if (share(comp, g) <= FinanceBalance.DOMINANCE) continue;
                 double mwh = 0, cost = 0;
-                for (Plant p : comp.plants) if (g.contains(p.owner)) { mwh += p.lastMonthMWh; cost += p.lastMonthCost; }
+                for (Plant p : comp.plants) if (g.contains(p.owner)) { mwh += p.lastMonthMWh; cost += p.lastMonthCost + capitalCostMonthly(p); }
                 if (mwh <= 0) continue;
                 double cap = cost / mwh * (1 + FinanceBalance.DOMINANCE_MARKUP);
                 for (Plant p : comp.plants) if (g.contains(p.owner)) p.priceCap = cap;
@@ -347,6 +347,14 @@ public final class Competition {
         }
         if (playerDominant && !s.player.eq.dominant) s.notify("REKABET: Bir pazarda payınız %50'yi aştı: hakim durumdasınız. Satış fiyatınız ortalama üretim maliyeti + %15 ile sınırlı.", "openmna");
         s.player.eq.dominant = playerDominant;
+    }
+
+    /** Santralin aylik sermaye maliyeti: bedel x CRF(%8, omur) / 12 (ortalama uretim maliyetinin parcasi). */
+    public static double capitalCostMonthly(Plant p) {
+        double r = FinanceBalance.DOMINANCE_CAPITAL_RATE;
+        int n = Math.max(1, p.type.lifeYears);
+        double crf = r / (1 - Math.pow(1 + r, -n));
+        return p.equipment.capex() * crf / 12;
     }
 
     /** Organik buyumeyle ulusal payi %80'i gecen grup: kamu hizmeti modu, kar varlik getirisinin %8'iyle sinirli. */

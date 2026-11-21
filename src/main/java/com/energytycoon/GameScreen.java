@@ -106,8 +106,54 @@ public final class GameScreen implements Screen, Hud.Listener {
         }
         for (int h = 0; h < 24 * 95; h++) state.tick();
         state.messages.clear();
+        if (tab.equals("CAPITAL") || tab.equals("MNA") || tab.equals("deal") || tab.equals("defense")) devCapitalSetup();
         if (tab.equals("wizard")) hud.devWizard();
+        else if (tab.equals("deal")) devDeal();
+        else if (tab.equals("defense")) devDefense();
         else hud.openFinance(com.energytycoon.ui.FinanceCenter.Tab.valueOf(tab));
+    }
+
+    private Company devRival(int k) {
+        int n = 0;
+        for (Company c : state.companies) if (!c.player && !c.neutral && n++ == k) return c;
+        return null;
+    }
+
+    /** Dogrulama: halka acik oyuncu, payli rakip, rekabet basvurusu ve alim emri. */
+    public void devCapitalSetup() {
+        Company p = state.player, a = devRival(0), b = devRival(1);
+        state.updateValuations();
+        Equity e = p.eq;
+        e.listed = true; e.shares = 13e6; e.price = e.fundamental / e.shares; e.ipoHour = state.hour - 60 * 24; e.ipoPrice = e.price * 0.9; e.ipoProceeds = 3e6 * e.ipoPrice * 0.97;
+        e.add(state.companies.indexOf(a), 0.4e6); e.dividendPct = 30;
+        if (a != null) {
+            a.eq.listed = true; a.eq.price = a.eq.fundamental / a.eq.shares; a.eq.founder = a.eq.shares * 0.45;
+            a.eq.add(state.companies.indexOf(p), a.eq.shares * 0.12);
+            if (b != null) a.eq.add(state.companies.indexOf(b), a.eq.shares * 0.06);
+            state.mna.placeOrder(p, a, a.eq.shares * 0.03);
+            hud.selectMnaCompany(state.companies.indexOf(a));
+        }
+        if (a != null && b != null) state.competition.file(b, a, true);
+        state.messages.clear();
+    }
+
+    /** Dogrulama: kurucuya teklif, karsi teklif asamasinda. */
+    public void devDeal() {
+        Company b = devRival(1) != null ? devRival(1) : devRival(0);
+        hud.openDeal(b, com.energytycoon.ui.DealWindow.Mode.FOUNDER);
+        hud.devDealCounter();
+    }
+
+    /** Dogrulama: rakibin oyuncuya cagrisi ve savunma ekrani. */
+    public void devDefense() {
+        Company a = devRival(0), p = state.player;
+        a.cash = 20e9;
+        p.eq.founder = p.eq.shares * 0.46; // dagnik ortakli: kurucu %46
+        Mna.Financing f = new Mna.Financing(); f.cash = 19e9;
+        String err = state.mna.launchTender(a, p, p.eq.price * 1.35, f);
+        if (err != null) System.out.println("devDefense: " + err);
+        state.messages.clear();
+        hud.showDefense();
     }
     public Hud devHud() { return hud; }
     public String devLinePick() { return wr.devLinePickTest(); }
@@ -230,6 +276,7 @@ public final class GameScreen implements Screen, Hud.Listener {
     @Override public void speed(int s) { speed = s; if (s > 0) lastSpeed = s; }
     @Override public void layer(Layer l) { wr.terrain.setLayer(l); }
     @Override public void action(String a) {
+        if (capitalAction(a)) return;
         if (a.startsWith("upgrade:")) { upgradeSelected(Upgrade.valueOf(a.substring(8))); return; }
         if (a.startsWith("assets:")) {
             hud.openAssets(switch (a.substring(7)) { case "tenders" -> com.energytycoon.ui.AssetsView.Tab.TENDERS; case "lines" -> com.energytycoon.ui.AssetsView.Tab.LINES;
@@ -922,6 +969,8 @@ public final class GameScreen implements Screen, Hud.Listener {
             String act = state.messageActions.remove(m);
             if (act == null && m.startsWith("FİNANS:")) act = "openfin"; // Finans kategorisi: tiklaninca Finans merkezi
             hud.toast(m, act);
+            // sirketinize cagri: oyun durur, savunma ekrani acilir
+            if ("defense".equals(act)) { speed(0); hud.showDefense(); }
         }
         // Yapilandirma teklifi: oyun durur, oyuncu karar verir
         if (state.player.restructOfferPending) { if (speed != 0) speed(0); hud.showRestructuring(true); } else hud.showRestructuring(false);
@@ -963,4 +1012,106 @@ public final class GameScreen implements Screen, Hud.Listener {
     @Override public void resume() {}
     @Override public void hide() {}
     @Override public void dispose() { hud.dispose(); wr.dispose(); }
+
+    // ------------------------------------------------------------ sermaye ve birlesme-satin alma eylemleri
+    private Company companyAt(String idx) {
+        int i = Integer.parseInt(idx);
+        return i >= 0 && i < state.companies.size() ? state.companies.get(i) : null;
+    }
+
+    private static Mna.Financing fin(String[] f, int from) {
+        Mna.Financing x = new Mna.Financing();
+        x.cash = Double.parseDouble(f[from]); x.loan = Double.parseDouble(f[from + 1]);
+        x.bank = f[from + 2].equals("-") ? null : Bank.valueOf(f[from + 2]);
+        x.swapValue = Double.parseDouble(f[from + 3]);
+        return x;
+    }
+
+    /** Sermaye ve devralma eylemleri; true: islendi. Kurucu payini %50'nin altina dusurecek islemler once onaya gelir. */
+    private boolean capitalAction(String a) {
+        Company p = state.player;
+        String[] f = a.split(":");
+        String err;
+        switch (f[0]) {
+            case "openmna" -> hud.openFinance(com.energytycoon.ui.FinanceCenter.Tab.MNA);
+            case "ipocrisis" -> hud.openFinance(com.energytycoon.ui.FinanceCenter.Tab.CAPITAL);
+            case "defense" -> { speed(0); hud.showDefense(); }
+            case "ipo" -> {
+                if (f[1].equals("postpone")) { state.capital.postponeIpo(p); return true; }
+                if (f[1].equals("cancel")) { state.capital.cancelIpo(p); return true; }
+                if (f.length > 2 && f[2].equals("confirm")) {
+                    hud.confirm("Bu halka arz kurucu payınızı %50'nin altına düşürür. Şirketiniz dağınık ortaklı olur ve düşmanca devralmaya açık hale gelir. Devam edilsin mi?", "ipo:" + f[1]);
+                    return true;
+                }
+                err = state.capital.startIpo(p, Double.parseDouble(f[1]));
+                if (err != null) hud.toast(err);
+            }
+            case "issue" -> {
+                if (f.length > 2 && f[2].equals("confirm")) {
+                    hud.confirm("Bu sermaye artırımı kurucu payınızı %50'nin altına düşürür. Şirketiniz düşmanca devralmaya açık hale gelir. Devam edilsin mi?", "issue:" + f[1]);
+                    return true;
+                }
+                err = state.capital.issue(p, Double.parseDouble(f[1]));
+                if (err != null) hud.toast(err);
+            }
+            case "buyback" -> {
+                err = state.capital.setBuyback(p, Double.parseDouble(f[1]));
+                hud.toast(err != null ? err : Double.parseDouble(f[1]) > 0 ? "Geri alım başladı: bütçe " + Fmt.money(Double.parseDouble(f[1])) : "Geri alım durduruldu.");
+            }
+            case "div" -> state.capital.setDividend(p, Integer.parseInt(f[1]));
+            case "deal" -> {
+                Company t = companyAt(f[2]);
+                if (t != null) hud.openDeal(t, com.energytycoon.ui.DealWindow.Mode.valueOf(switch (f[1]) { case "founder" -> "FOUNDER"; case "market" -> "MARKET"; case "sell" -> "SELL"; default -> "TENDER"; }));
+            }
+            case "founder" -> {
+                Company t = companyAt(f[1]);
+                err = t == null ? "Şirket yok" : state.mna.buyFromFounder(p, t, Double.parseDouble(f[2]), Double.parseDouble(f[3]), fin(f, 4));
+                hud.toast(err != null ? err : "Anlaşma imzalandı: " + t.name + " payınız %" + Math.round(state.mna.stake(p, t) * 1000) / 10.0);
+            }
+            case "order" -> {
+                Company t = companyAt(f[1]);
+                err = t == null ? "Şirket yok" : state.mna.placeOrder(p, t, Double.parseDouble(f[2]));
+                hud.toast(err != null ? err : "Alım emri verildi: " + t.name + " (günde en fazla hisselerin %2'si)");
+            }
+            case "sell" -> {
+                Company t = companyAt(f[1]);
+                err = t == null ? "Şirket yok" : state.mna.sellShares(p, t, Double.parseDouble(f[2]));
+                hud.toast(err != null ? err : "Pay satıldı.");
+            }
+            case "takeover" -> {
+                Company t = companyAt(f[1]);
+                if (t == null) return true;
+                Mna.Financing fi = fin(f, 3);
+                boolean ok = f.length > 7 && f[7].equals("ok");
+                if (!ok && fi.swapValue > 0 && p.eq.price > 0) {
+                    double after = p.eq.founder / (p.eq.shares + fi.swapValue / p.eq.price);
+                    if (after < FinanceBalance.CONTROL && p.eq.founderPct() >= FinanceBalance.CONTROL) {
+                        hud.confirm("Pay takası kurucu payınızı %" + Math.round(after * 100) + "'e düşürür (%50'nin altı). Şirketiniz düşmanca devralmaya açık hale gelir. Devam edilsin mi?", a + ":ok");
+                        return true;
+                    }
+                }
+                err = state.mna.launchTender(p, t, Double.parseDouble(f[2]), fi);
+                hud.toast(err != null ? err : "Pay alım teklifi başladı: " + t.name + " (30 gün)");
+            }
+            case "strategy" -> {
+                Company t = companyAt(f[1]);
+                err = t == null ? "Şirket yok" : state.mna.setStrategy(p, t, Integer.parseInt(f[2]));
+                if (err != null) hud.toast(err);
+            }
+            case "comment" -> {
+                for (DealBook.Review r : state.deals.reviews) if (r.id == Integer.parseInt(f[1])) { err = state.competition.comment(r); if (err != null) hud.toast(err); }
+            }
+            case "tenderme" -> { for (DealBook.TenderOffer t : state.deals.offers) if (t.id == Integer.parseInt(f[1])) t.playerTenders = !t.playerTenders; }
+            case "def" -> {
+                err = switch (f[1]) {
+                    case "buyback" -> state.mna.defendBuyback(p, Double.parseDouble(f[2]));
+                    case "div" -> state.mna.defendDividend(p);
+                    default -> { Company k = companyAt(f[2]); yield k == null ? "Şirket yok" : state.mna.inviteKnight(p, k); }
+                };
+                hud.toast(err != null ? err : "Savunma uygulandı.");
+            }
+            default -> { return false; }
+        }
+        return true;
+    }
 }

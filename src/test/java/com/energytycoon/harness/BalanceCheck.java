@@ -3,6 +3,7 @@ package com.energytycoon.harness;
 import com.energytycoon.sim.*;
 
 import java.util.*;
+import java.util.Arrays;
 
 /**
  * Denge olcumu (render yok).
@@ -12,12 +13,13 @@ import java.util.*;
 public final class BalanceCheck {
     public static void main(String[] args) {
         String mode = "decade"; int seeds = 3; int years = 10;
+        for (int i = 0; i < args.length - 1; i++) if (args[i].equals("--size")) onlySize = Integer.parseInt(args[i + 1]);
         for (int i = 0; i < args.length - 1; i++) {
             if (args[i].equals("--mode")) mode = args[i + 1];
             if (args[i].equals("--seeds")) seeds = Integer.parseInt(args[i + 1]);
             if (args[i].equals("--years")) years = Integer.parseInt(args[i + 1]);
         }
-        if (mode.equals("valuation")) valuation(seeds); else if (mode.equals("shares")) shares(seeds); else if (mode.equals("finance")) finance(seeds); else decade(seeds, years);
+        if (mode.equals("mna")) mna(seeds, false); else if (mode.equals("leverage")) mna(seeds, true); else if (mode.equals("valuation")) valuation(seeds); else if (mode.equals("shares")) shares(seeds); else if (mode.equals("finance")) finance(seeds); else decade(seeds, years);
     }
 
     static GameState game(long seed, int size, int cities, String scenario) {
@@ -207,6 +209,69 @@ public final class BalanceCheck {
                 }
                 System.out.println(sc + " tohum " + seed + " değer milyar $ yeni/eski(F/K):" + b);
             }
+        }
+    }
+
+    /**
+     * Devralma kullanilabilirligi: oyuncu botu (MnaBot) + rakip YZ, NORMAL, 2040'a kadar.
+     * leverage: bot degeri kendisine yakin (oran 1,0-1,5) rakibi agirlikla krediyle devralmayi dener; sonraki 3 yil izlenir.
+     */
+    static int onlySize;
+
+    static void mna(int seeds, boolean leverage) {
+        for (int[] cfg : new int[][] { { 64, 5 }, { 96, 12 } }) {
+            if (onlySize > 0 && cfg[0] != onlySize) continue;
+            int a = 0, b = 0, c = 0, attempts = 0, appr = 0, cond = 0, rej = 0, tk = 0, failed = 0, ipos = 0;
+            Map<String, Integer> reasons = new TreeMap<>();
+            for (long seed = 1; seed <= seeds; seed++) {
+                if (System.getenv("ONLY_SEED") != null && seed != Long.parseLong(System.getenv("ONLY_SEED"))) continue;
+                GameState s = game(seed, cfg[0], cfg[1], "free");
+                s.aiPlayer = true;
+                int pi = s.companies.indexOf(s.player);
+                boolean gotA = false; int playerTk = 0, playerCond = 0;
+                List<String> log = new ArrayList<>();
+                int[] parent = new int[s.companies.size()]; Arrays.fill(parent, -1);
+                boolean[] listed = new boolean[s.companies.size()];
+                int trackFrom = -1; StringBuilder track = new StringBuilder();
+                while (s.year() < 2041 && !s.gameOver) {
+                    s.tick(); s.messages.clear();
+                    if (s.hour % Balance.HOURS_PER_MONTH != 0) continue;
+                    MnaBot.monthly(s, leverage);
+                    for (Company x : s.companies) if (x != s.player && s.mna.stake(s.player, x) > 0.20) gotA = true;
+                    for (int i = 0; i < s.companies.size(); i++) {
+                        Company x = s.companies.get(i);
+                        if (x.eq.listed && !listed[i]) { listed[i] = true; log.add(String.format(Locale.ROOT, "%d halka arz: %s (kurucu %%%.0f)", s.year(), x.player ? "Oyuncu" : x.name, x.eq.founderPct() * 100)); }
+                        if (x.eq.parent != parent[i] && x.eq.parent >= 0 && !x.eq.merged) {
+                            Company acq = s.companies.get(x.eq.parent);
+                            log.add(String.format(Locale.ROOT, "%d devralma: %s → %s", s.year(), acq.player ? "Oyuncu" : acq.name, x.player ? "Oyuncu" : x.name));
+                            if (acq.player) { playerTk++; if (trackFrom < 0) trackFrom = (int) s.year(); }
+                        }
+                        if (x.eq.merged && parent[i] != -2) { log.add(s.year() + " birleşme: " + x.name); parent[i] = -2; continue; }
+                        if (parent[i] != -2) parent[i] = x.eq.parent;
+                    }
+                    if (System.getenv("MNA_TRACE") != null && s.month() == 0) {
+                        Company q = s.player;
+                        log.add(String.format(Locale.ROOT, "%d iz: hakim %s tavanlı santral %d nakit %.0fM borç %.0fM ND/FAVÖK %.1f not %s gecikme %d payı olan şirket %d değer %.0fM", s.year() - 1, q.eq.dominant, (int) s.plants.stream().filter(x -> x.owner == q && x.priceCap > 0).count(), q.cash / 1e6, q.debt() / 1e6,
+                            s.finance.leverage(q), s.finance.rating(q), q.lateEvents, (int) s.companies.stream().filter(x -> x != q && s.mna.stake(q, x) > 0).count(), s.capital.value(q) / 1e6));
+                    }
+                    if (leverage && trackFrom > 0 && s.month() == 0 && s.year() <= trackFrom + 3) {
+                        double lev = s.finance.leverage(s.player);
+                        track.append(String.format(Locale.ROOT, " %d: ND/FAVÖK %s not %s gecikme %d", s.year() - 1, Double.isInfinite(lev) ? "∞" : String.format(Locale.ROOT, "%.1f", lev), s.finance.rating(s.player), s.player.lateEvents));
+                    }
+                }
+                for (DealBook.Review r : s.deals.reviews) if (r.acquirer == pi && r.decided && r.outcome == Competition.CONDITIONAL && r.commitmentAccepted) playerCond++;
+                if (gotA) a++; if (playerTk > 0) b++; if (playerCond > 0) c++;
+                attempts += s.deals.attempts; appr += s.deals.approvals; cond += s.deals.conditionals; rej += s.deals.rejections; tk += s.deals.takeovers; failed += s.deals.failedOffers;
+                for (String r : s.deals.rejectReasons) reasons.merge(r.replaceAll("[0-9]+", "#"), 1, Integer::sum);
+                for (boolean l : listed) if (l) ipos++;
+                System.out.println("-- " + cfg[0] + "x" + cfg[0] + " tohum " + seed + (s.gameOver ? " (" + s.gameOverReason + ")" : "") + ": bot %20+ pay " + gotA + ", bot devralma " + playerTk + ", koşullu " + playerCond
+                    + " · oyuncu kurucu payı %" + Math.round(s.player.eq.founderPct() * 100));
+                for (String l : log) System.out.println("   " + l);
+                if (leverage) System.out.println("   devralma sonrası:" + (track.length() == 0 ? " devralma yok" : track));
+            }
+            System.out.printf(Locale.ROOT, "== %dx%d, %d tohum: bot (a) %%20+ pay %d, (b) devralma %d, (c) koşullu onayla devralma %d · halka arz %d · otorite: başvuru %d, onay %d, koşullu %d, ret %d · kontrol devri %d · sonuçsuz teklif %d%n",
+                cfg[0], cfg[0], seeds, a, b, c, ipos, attempts, appr, cond, rej, tk, failed);
+            System.out.println("   ret sebepleri: " + reasons);
         }
     }
 }

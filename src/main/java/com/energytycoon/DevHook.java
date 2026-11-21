@@ -110,7 +110,7 @@ final class DevHook {
     private final String[] scanSteps = { "hud", "invest-santral", "invest-baglanti", "invest-ihale", "finance", "market", "companies", "help", "menu",
         "settings", "assets-PLANTS", "assets-LINES", "assets-SUBSTATIONS", "assets-OPERATOR", "assets-TENDERS", "equip-COAL", "equip-GAS", "equip-SOLAR",
         "equip-WIND", "equip-HYDRO", "equip-NUCLEAR", "linechoice", "tender", "sel-plant", "sel-plant-tm", "sel-tm", "sel-line", "sel-city", "tool-line", "tool-plant",
-        "fin-SUMMARY", "fin-SCHEDULE", "fin-LOANS", "fin-MARKET", "fin-wizard" };
+        "fin-SUMMARY", "fin-SCHEDULE", "fin-LOANS", "fin-MARKET", "fin-wizard", "cap-setup", "fin-CAPITAL", "fin-MNA", "deal", "defense" };
     private int scanIdx = -1, scanTotal;
 
     private void clipScan() {
@@ -146,6 +146,9 @@ final class DevHook {
                 default -> {
                     if (s.startsWith("assets-")) hud.openAssets(com.energytycoon.ui.AssetsView.Tab.valueOf(s.substring(7)));
                     else if (s.equals("fin-wizard")) hud.devWizard();
+                    else if (s.equals("cap-setup")) gs.devCapitalSetup();
+                    else if (s.equals("deal")) gs.devDeal();
+                    else if (s.equals("defense")) gs.devDefense();
                     else if (s.startsWith("fin-")) hud.openFinance(com.energytycoon.ui.FinanceCenter.Tab.valueOf(s.substring(4)));
                     else if (s.startsWith("equip-")) gs.devOpenEquipment(PlantType.valueOf(s.substring(6)));
                 }

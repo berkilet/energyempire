@@ -345,6 +345,7 @@ public final class Mna {
         if (!target.eq.listed) return "Çağrı yalnızca halka açık şirkete yapılır (kapalı şirkette kurucuya teklif götürün)";
         if (s.competition.sameGroup(bidder, target)) return "Aynı grup";
         if (bidder.eq.parent >= 0) return "Bağlı ortaklık çağrı yapamaz";
+        if (target.eq.founderPct() >= FinanceBalance.CONTROL) return "Kurucu payı %" + Math.round(target.eq.founderPct() * 100) + ": şirket dağınık ortaklı değil, düşmanca çağrıya kapalı (kurucuya teklif götürün)";
         DealBook.TenderOffer open = openOffer(target);
         if (open != null && !knight) return "Hedefe açık bir teklif var (" + co(open.bidder).name + ")";
         if (knight && open != null && price < open.price * (1 + FinanceBalance.KNIGHT_STEP) - 1e-9) return "Rakip tekliften en az %5 yüksek olmalı";
@@ -545,11 +546,21 @@ public final class Mna {
         s.notify("DEVRALMA: Ret nedeniyle " + acq.name + " " + target.name + " payını %50'nin altına indirdi.", involved(acq, target) ? "openmna" : null);
     }
 
-    /** %90'in ustu: kalan hisseler son fiyattan zorla alinir, sirketler birlesir. */
+    /**
+     * %90'in ustu: kalan hisseler son fiyattan zorla alinir, sirketler birlesir. Bir haktir: ana sirket bedeli nakit
+     * (rezerv ustu) ve devralma kredisiyle karsilayamiyorsa sirket bagli ortaklik olarak kalir.
+     */
     void squeezeOut(Company parent, Company target) {
         if (target.eq.merged || !active(target)) return;
         double px = target.eq.listed ? target.eq.price : fundamentalPerShare(target);
         Set<Company> g = s.competition.group(parent);
+        double rest = (target.eq.free() + target.eq.founder) * px;
+        for (int j = 0; j < s.companies.size(); j++) if (!g.contains(co(j))) rest += target.eq.held(j) * px;
+        double spare = parent.cash - RivalAI.reserve(s, parent);
+        if (rest > spare) {
+            Bank b = s.finance.bestAcquisitionBank(parent, Math.min(rest - Math.max(0, spare), 10e6), target);
+            if (b == null || s.finance.signAcquisition(parent, b, rest - Math.max(0, spare), target) == null) return;
+        }
         double cost = 0;
         for (int j = 0; j < s.companies.size(); j++) {
             Company h = co(j);
@@ -667,6 +678,13 @@ public final class Mna {
         if (p.outcome == Competition.REJECT || p.outcome == Competition.CONDITIONAL && !s.competition.aiAcceptsCommitment(p)) return;
         // a) zor durumdaki kapali sirket: kurucudan kontrol payi
         if (!t.player && !t.eq.listed && distressed(t) && t.eq.founder > t.eq.shares * 0.52) {
+            double need = t.eq.shares * 0.51 - groupStake(c, t) * t.eq.shares;
+            Ask a = founderAsk(t, need);
+            Financing f = aiFinancing(c, t, need * a.perShare);
+            if (f != null && buyFromFounder(c, t, need, a.perShare, f) == null) return;
+        }
+        // a2) kurucu kontrolundeki sirket (oyuncu disinda): finansman yetiyorsa kurucudan kontrol payi (istenen primle)
+        if (!t.player && t.eq.founder >= t.eq.shares * FinanceBalance.CONTROL) {
             double need = t.eq.shares * 0.51 - groupStake(c, t) * t.eq.shares;
             Ask a = founderAsk(t, need);
             Financing f = aiFinancing(c, t, need * a.perShare);

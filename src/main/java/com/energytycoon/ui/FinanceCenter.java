@@ -16,7 +16,7 @@ import java.util.function.Consumer;
  * eylemler), Piyasa ve Faiz (politika faizi, beklenti, olaylar, endeks). Butun metinler sarilir; uzun tablolar kaydirilir.
  */
 public final class FinanceCenter {
-    public enum Tab { SUMMARY("Özet"), SCHEDULE("Ödeme Takvimi"), LOANS("Krediler"), MARKET("Piyasa ve Faiz");
+    public enum Tab { SUMMARY("Özet"), SCHEDULE("Ödeme Takvimi"), LOANS("Krediler"), MARKET("Piyasa ve Faiz"), CAPITAL("Sermaye"), MNA("Birleşme ve Satın Alma");
         final String label; Tab(String l) { label = l; } }
 
     public final Table root = new Table();
@@ -27,6 +27,8 @@ public final class FinanceCenter {
     private final Table tabs = new Table();
     private final Table summary = new Table(), schedule = new Table(), loans = new Table(), market = new Table();
     private final Cell<Table> bodyCell;
+    public final CapitalTab capitalTab;
+    public final MnaTab mnaTab;
     public final LineChart valueChart, policyChart, indexChart;
     public final ScheduleChart scheduleChart;
     private String loansKey = "";
@@ -35,9 +37,10 @@ public final class FinanceCenter {
     // ozet
     private final Label kCash, kValue, kRating, kNet, kNetSub, kRatingSub;
     private static final String[] PL_ROWS = { "Elektrik satışı", "Erişim geliri", "Yakıt", "İşletme ve bakım", "Karbon vergisi", "Faiz",
-        "Finansman masrafları", "Kesinti cezası", "Erişim gideri", "Bağlantı bedeli (UŞİ)", "", "Net kâr" };
-    private static final int NET = 11;
+        "Finansman masrafları", "Kesinti cezası", "Erişim gideri", "Bağlantı bedeli (UŞİ)", "Temettü geliri", "İştirak kâr payı (nakitsiz)", "", "Net kâr" };
+    private static final int NET = 13, DIV = 10, AFF = 11;
     private final Label[][] pl = new Label[PL_ROWS.length][2];
+    private final Label invest;
     private final Label assets, cashB, debtB, equity, cfOp, cfDebt, cfCapex, cfNet, dayNote;
     // takvim
     private final Label scheduleNote;
@@ -48,6 +51,8 @@ public final class FinanceCenter {
     public FinanceCenter(Skins skins, Consumer<String> action) {
         this.skin = skins.skin;
         this.action = action;
+        capitalTab = new CapitalTab(skins, action);
+        mnaTab = new MnaTab(skins, action);
         root.defaults().left();
         ButtonGroup<TextButton> g = new ButtonGroup<>();
         settingTab = true;
@@ -67,7 +72,7 @@ public final class FinanceCenter {
         kNetSub.setWrap(true); kRatingSub.setWrap(true);
         Table kpis = new Table();
         kpis.add(UiKit.card(skin, "Nakit", kCash, null)).width(150).padRight(6);
-        kpis.add(UiKit.card(skin, "Piyasa değeri", kValue, null)).width(150).padRight(6);
+        kpis.add(UiKit.card(skin, "Şirket değeri", kValue, null)).width(150).padRight(6);
         kpis.add(UiKit.card(skin, "Kredi notu", kRating, kRatingSub)).width(150).padRight(6);
         kpis.add(UiKit.card(skin, "Geçen ay net kâr", kNet, kNetSub)).width(160);
         summary.add(kpis).left().padBottom(10).row();
@@ -88,7 +93,8 @@ public final class FinanceCenter {
         bal.defaults().left().padBottom(2);
         bal.add(UiKit.section(skin, "BİLANÇO")).colspan(2).row();
         assets = UiKit.money(skin); cashB = UiKit.money(skin); debtB = UiKit.money(skin); equity = UiKit.money(skin);
-        row(bal, "Tesisler ve hatlar (defter)", assets); row(bal, "Nakit", cashB); row(bal, "Borç (krediler)", debtB); row(bal, "Özsermaye", equity);
+        invest = UiKit.money(skin);
+        row(bal, "Tesisler ve hatlar (defter)", assets); row(bal, "Finansal yatırımlar (paylar)", invest); row(bal, "Nakit", cashB); row(bal, "Borç (krediler)", debtB); row(bal, "Özsermaye", equity);
         bal.add(UiKit.section(skin, "NAKİT AKIŞI (geçen ay)")).colspan(2).padTop(10).row();
         cfOp = UiKit.money(skin); cfDebt = UiKit.money(skin); cfCapex = UiKit.money(skin); cfNet = UiKit.money(skin);
         row(bal, "Faaliyet nakdi (FAVÖK)", cfOp); row(bal, "Kredi ödemeleri", cfDebt); row(bal, "Yatırım harcaması", cfCapex); row(bal, "Toplam", cfNet);
@@ -133,7 +139,9 @@ public final class FinanceCenter {
         settingTab = true;
         for (int i = 0; i < tabs.getChildren().size; i++) ((TextButton) tabs.getChildren().get(i)).setChecked(Tab.values()[i] == t);
         settingTab = false;
-        bodyCell.setActor(switch (t) { case SUMMARY -> summary; case SCHEDULE -> schedule; case LOANS -> loans; case MARKET -> market; });
+        bodyCell.setActor(switch (t) { case SUMMARY -> summary; case SCHEDULE -> schedule; case LOANS -> loans; case MARKET -> market;
+            case CAPITAL -> capitalTab.root; case MNA -> mnaTab.root; });
+        capitalTab.invalidate(); mnaTab.invalidate();
         loansKey = "";
         root.invalidateHierarchy();
     }
@@ -178,6 +186,8 @@ public final class FinanceCenter {
             case SCHEDULE -> updateSchedule(s);
             case LOANS -> updateLoans(s);
             case MARKET -> updateMarket(s);
+            case CAPITAL -> capitalTab.update(s);
+            case MNA -> mnaTab.update(s);
         }
     }
 
@@ -185,7 +195,7 @@ public final class FinanceCenter {
         Company p = s.player;
         double assetsV = s.assetValue(p);
         kCash.setText(Fmt.money(p.cash)); kCash.setStyle(skin.get(p.cash < 0 ? "kpiBad" : "kpi", Label.LabelStyle.class));
-        kValue.setText(Fmt.money(p.valuation));
+        kValue.setText(Fmt.money(s.capital.value(p)));
         Rating r = s.finance.rating(p);
         kRating.setText(r.name()); kRating.setStyle(skin.get(r.ordinal() <= 1 ? "kpiGood" : r.ordinal() >= 3 ? "kpiBad" : "kpi", Label.LabelStyle.class));
         kRatingSub.setText((p.quarters < 4 ? "yeni şirket · " : "") + "prim +" + Fmt.f1(r.premium() * 100) + " puan");
@@ -193,15 +203,17 @@ public final class FinanceCenter {
         kNet.setText(anyMonth ? Fmt.money(p.lastNet) : "—");
         kNet.setStyle(skin.get(!anyMonth ? "kpi" : p.lastNet >= 0 ? "kpiGood" : "kpiBad", Label.LabelStyle.class));
         kNetSub.setText(anyMonth ? "Son " + p.netHistory.size() + " ay: " + Fmt.money(p.trailingNet()) : "Henüz kapanmış ay yok");
-        double[] last = { p.lastRevenue, p.lastAccessIncome, p.lastFuel, p.lastOm, p.lastCarbon, p.lastInterest, p.lastFees, p.lastFines, p.lastAccessCost, p.lastConnectionCharge, 0, p.lastNet };
-        double[] now = { p.revenue, p.accessIncome, p.fuelCost, p.omCost, p.carbonCost, p.interest, p.fees, p.fines, p.accessCost, p.connectionCharge, 0, p.monthNetSoFar() };
+        double[] last = { p.lastRevenue, p.lastAccessIncome, p.lastFuel, p.lastOm, p.lastCarbon, p.lastInterest, p.lastFees, p.lastFines, p.lastAccessCost, p.lastConnectionCharge,
+            p.lastDividendIncome, p.lastAffiliateIncome, 0, p.lastNet + p.lastDividendIncome + p.lastAffiliateIncome };
+        double[] now = { p.revenue, p.accessIncome, p.fuelCost, p.omCost, p.carbonCost, p.interest, p.fees, p.fines, p.accessCost, p.connectionCharge,
+            p.dividendIncome, p.affiliateIncome, 0, p.monthNetSoFar() + p.dividendIncome + p.affiliateIncome };
         for (int i = 0; i < PL_ROWS.length; i++) {
             if (pl[i][0] == null) continue;
             for (int k = 0; k < 2; k++) {
                 double v = k == 0 ? last[i] : now[i];
                 Label l = pl[i][k];
                 if (i == 0) UiKit.setMoney(skin, l, v, false);
-                else if (i == 1) { if (v < 1) UiKit.setCost(skin, l, 0); else UiKit.setMoney(skin, l, v, true); }
+                else if (i == 1 || i == DIV || i == AFF) { if (Math.abs(v) < 1) UiKit.setCost(skin, l, 0); else UiKit.setMoney(skin, l, v, true); }
                 else if (i == NET) UiKit.setMoney(skin, l, v, true);
                 else UiKit.setCost(skin, l, v);
                 if (k == 0 && !anyMonth) { l.setText("—"); l.setStyle(skin.get("dimValue", Label.LabelStyle.class)); }
@@ -211,7 +223,9 @@ public final class FinanceCenter {
         UiKit.setMoney(skin, assets, assetsV, false);
         UiKit.setMoney(skin, cashB, p.cash, true);
         debtB.setText(p.debt() > 0 ? "−" + Fmt.money(p.debt()) : "—");
-        UiKit.setMoney(skin, equity, p.cash + assetsV - p.debt(), true);
+        double inv = s.capital.holdingsValue(p);
+        if (inv < 1) { invest.setText("—"); invest.setStyle(skin.get("dimValue", Label.LabelStyle.class)); } else UiKit.setMoney(skin, invest, inv, false);
+        UiKit.setMoney(skin, equity, p.cash + assetsV + inv - p.debt(), true);
         double op = p.lastRevenue - p.lastFuel - p.lastOm - p.lastCarbon - p.lastFines + p.lastAccessIncome - p.lastAccessCost - p.lastConnectionCharge;
         UiKit.setMoney(skin, cfOp, op, true);
         UiKit.setCost(skin, cfDebt, p.lastDebtService);

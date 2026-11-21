@@ -18,7 +18,7 @@ public final class Equity {
     public double[] qNet = new double[8];
     public int qNetCount;
     public double qNetAcc;
-    /** Son 24 ayin endeks degeri (duyarlilik icin). */
+    /** Aylik hisse fiyati gecmisi (son 120 ay; kapalida temel deger / hisse). */
     public double[] priceMonthly = new double[0];
 
     // ---- halka arz ve sermaye islemleri

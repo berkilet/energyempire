@@ -13,7 +13,7 @@ public final class RivalAI {
         if (c.eq.listed && c.eq.dividendPct == 0 && c.eq.ipoHour >= 0 && s.hour - c.eq.ipoHour < Balance.HOURS_PER_MONTH * 2)
             s.capital.setDividend(c, FinanceBalance.RIVAL_DIVIDEND_AFTER_IPO);
         financing = true;
-        try { monthlyInner(s, c); s.mna.rivalMonthly(c); } finally { financing = false; }
+        try { monthlyInner(s, c); if (!c.player) s.mna.rivalMonthly(c); } finally { financing = false; }
     }
 
     // ------------------------------------------------------------ finans (oyuncuyla ayni urunler ve kurallar)

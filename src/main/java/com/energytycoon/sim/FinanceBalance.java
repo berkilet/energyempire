@@ -128,6 +128,8 @@ public final class FinanceBalance {
     public static final double AI_ACCEPT_DIVEST = 0.5;
     /** Hakim durum: pazar payi esigi ve fiyat tavani (ortalama uretim maliyeti + %15). */
     public static final double DOMINANCE = 0.50, DOMINANCE_MARKUP = 0.15;
+    /** Uretim maliyetine yatirimin geri donusu de girer: santral bedeli x sermaye geri kazanim faktoru (bu faiz, santral omru). */
+    public static final double DOMINANCE_CAPITAL_RATE = 0.08;
     /** Duzenlenmis tekel: ulusal pay esigi ve izin verilen yillik varlik getirisi. */
     public static final double REGULATED_SHARE = 0.80, REGULATED_RETURN = 0.08;
     /** Konsolidasyon senaryosu: hedef ulusal pay, son tarih ve ara hedefler (simulasyonla ayarlandi). */

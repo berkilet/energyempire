@@ -90,7 +90,11 @@ public final class Hud {
     private final Label gameOverLbl;
     private final FinanceCenter financeView;
     private LoanWizard wizard;
-    private Window wizardWin, restructWin;
+    private Window wizardWin, restructWin, dealWin, defenseWin, confirmWin;
+    private DealWindow deal;
+    private DefenseWindow defense;
+    private Label confirmText;
+    private String confirmAction;
     private long financeRefreshAt;
     /** Ekipman penceresinde ECA secimi: acik mi, banka, taksit sikligi (ay). */
     private boolean ecaOn;
@@ -286,7 +290,23 @@ public final class Hud {
             else cb.action(a);
         });
         finance.add(scrolled(finance, financeView.root)).pad(4);
-        charts.add(financeView.valueChart); charts.add(financeView.policyChart); charts.add(financeView.indexChart);
+        charts.add(financeView.valueChart); charts.add(financeView.policyChart); charts.add(financeView.indexChart); charts.add(financeView.capitalTab.priceChart);
+        dealWin = window("İşlem");
+        deal = new DealWindow(skin, dealWin, cb::action);
+        dealWin.setVisible(false);
+        defenseWin = window("Savunma — pay alım teklifi");
+        defense = new DefenseWindow(skin, defenseWin, cb::action);
+        defenseWin.setVisible(false);
+        confirmWin = window("Onay");
+        confirmText = l("", "default"); confirmText.setWrap(true);
+        confirmWin.add(confirmText).width(480).pad(8).row();
+        Table cbt = new Table();
+        TextButton okB = new TextButton("Onayla", skin, "accent"), noB = new TextButton("Vazgeç", skin);
+        okB.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { confirmWin.setVisible(false); if (confirmAction != null) cb.action(confirmAction); } });
+        noB.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { confirmWin.setVisible(false); } });
+        cbt.add(okB).width(180).height(34).padRight(8); cbt.add(noB).width(180).height(34);
+        confirmWin.add(cbt).padBottom(6);
+        confirmWin.setVisible(false);
         wizardWin = window("Yeni Kredi");
         wizard = new LoanWizard(skin, wizardWin, cb::action);
         wizardWin.setVisible(false);
@@ -361,7 +381,7 @@ public final class Hud {
         equipWin = new EquipmentWindow(skin);
         skins.decorateWindow(equipWin, () -> equipWin.setVisible(false));
 
-        stage.addActor(wizardWin); stage.addActor(restructWin);
+        stage.addActor(wizardWin); stage.addActor(restructWin); stage.addActor(dealWin); stage.addActor(defenseWin); stage.addActor(confirmWin);
         for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, lineChoice, assetsWin }) {
             stage.addActor(w);
             w.setVisible(false);
@@ -444,6 +464,23 @@ public final class Hud {
 
     /** Dogrulama: sihirbazi Kiyibank teklifi secili halde acar. */
     public void devWizard() { if (st != null) { wizard.show(st); wizard.devSelect(Bank.KIYI); } }
+
+    /** Islem penceresi (kurucuya teklif, piyasadan alim/satis, cagri). */
+    public void openDeal(Company target, DealWindow.Mode mode) { if (st != null) deal.show(st, target, mode); }
+
+    public void devDealCounter() { deal.devCounter(); }
+
+    /** Savunma ekrani (sirketinize cagri). */
+    public void showDefense() { if (st != null) defense.show(st); }
+    public boolean defenseOpen() { return defenseWin.isVisible(); }
+
+    /** Onay penceresi: onaylanirsa action calisir. */
+    public void confirm(String text, String action) {
+        confirmText.setText(text); confirmAction = action;
+        confirmWin.pack(); center(confirmWin); confirmWin.setVisible(true); confirmWin.toFront();
+    }
+
+    public void selectMnaCompany(int idx) { financeView.mnaTab.select(idx); }
 
     public void openFinance(FinanceCenter.Tab tab) {
         financeView.setTab(tab);
@@ -757,6 +794,8 @@ public final class Hud {
             finance.setPosition(Math.max(0, Math.min(finance.getX(), stage.getWidth() - finance.getWidth())), Math.max(0, finance.getY() + h0 - finance.getHeight()));
         }
         if (wizardWin.isVisible()) wizard.refresh();
+        if (dealWin.isVisible()) deal.refresh();
+        if (defenseWin.isVisible()) defense.refresh();
         if (market.isVisible()) marketView.update(s);
         if (companies.isVisible()) companiesView.update(s);
         if (assetsWin.isVisible() && System.currentTimeMillis() >= assetsRefreshAt) {
@@ -806,12 +845,13 @@ public final class Hud {
 
     public boolean anyWindowOpen() {
         return finance.isVisible() || market.isVisible() || companies.isVisible() || help.isVisible() || menu.isVisible() || equipWin.isVisible()
-            || lineChoice.isVisible() || assetsWin.isVisible() || wizardWin.isVisible()
+            || lineChoice.isVisible() || assetsWin.isVisible() || wizardWin.isVisible() || dealWin.isVisible() || defenseWin.isVisible() || confirmWin.isVisible()
             || (settingsWin != null && settingsWin.isVisible());
     }
     public void closeWindows() {
         finance.setVisible(false); market.setVisible(false); companies.setVisible(false); help.setVisible(false);
         menu.setVisible(false); equipWin.setVisible(false); lineChoice.setVisible(false); assetsWin.setVisible(false); wizardWin.setVisible(false);
+        dealWin.setVisible(false); defenseWin.setVisible(false); confirmWin.setVisible(false);
         if (settingsWin != null) settingsWin.setVisible(false);
     }
     public void hideHelp() { help.setVisible(false); }

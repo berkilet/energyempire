@@ -315,13 +315,17 @@ class MnaTest {
         Object[] m = market(0.70, 0.10);
         GameState s = (GameState) m[0]; Company a = (Company) m[1];
         GameState.Component comp = null;
-        for (Plant x : s.plants) if (x.owner == a) { comp = s.componentOf(x); x.lastMonthMWh = 1000; x.lastMonthCost = 50_000; }
+        for (Plant x : s.plants) if (x.owner == a) { comp = s.componentOf(x); x.lastMonthMWh = 1e5; x.lastMonthCost = 5e6; }
         // ayin sonuna kadar ilerle (aylik hesap)
         int m0 = (int) (s.hour / HPM);
-        while ((int) (s.hour / HPM) == m0) { s.tick(); s.messages.clear(); for (Plant x : s.plants) if (x.owner == a) { x.monthMWh = 1000; x.monthCost = 50_000; } }
+        while ((int) (s.hour / HPM) == m0) { s.tick(); s.messages.clear(); for (Plant x : s.plants) if (x.owner == a) { x.monthMWh = 1e5; x.monthCost = 5e6; } }
         Plant pa = s.plants.stream().filter(x -> x.owner == a).findFirst().orElseThrow();
-        System.out.printf("hakim durum tavanı %.1f $/MWh (maliyet 50 + %%15)%n", pa.priceCap);
-        assertEquals(57.5, pa.priceCap, 1.0, "son saatin gercek uretimi de ayliga girer");
+        System.out.printf("hakim durum tavanı %.1f $/MWh%n", pa.priceCap);
+        double mwh = 0, cost = 0;
+        for (Plant x : s.componentOf(pa).plants) if (x.owner == a) { mwh += x.lastMonthMWh; cost += x.lastMonthCost + Competition.capitalCostMonthly(x); }
+        System.out.printf("beklenen tavan %.2f (yakıt+işletme 50 $/MWh + sermaye maliyeti, +%%15)%n", cost / mwh * 1.15);
+        assertEquals(cost / mwh * 1.15, pa.priceCap, 1e-6, "ortalama uretim maliyeti (sermaye dahil) + %15");
+        assertTrue(pa.priceCap > 57.5, "sermaye maliyeti tavani yukseltir");
         Company b = (Company) m[2];
         Plant pb = s.plants.stream().filter(x -> x.owner == b).findFirst().orElseThrow();
         assertEquals(0, pb.priceCap, "%10 pay: tavan yok");

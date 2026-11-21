@@ -68,3 +68,8 @@ tasks.register('balanceCheck', JavaExec) {
     workingDir = projectDir
     jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
 }
+
+tasks.register('printTestClasspath') {
+    description = 'Ölçümleri paralel çalıştırmak için test sınıf yolunu yazar.'
+    doLast { println sourceSets.test.runtimeClasspath.asPath }
+}

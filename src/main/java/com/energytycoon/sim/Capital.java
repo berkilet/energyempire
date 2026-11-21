@@ -100,7 +100,14 @@ public final class Capital {
                 if (!c.eq.listed) c.eq.price = c.eq.shares > 0 ? c.eq.fundamental / c.eq.shares : 0;
                 else if (c.eq.price <= 0) c.eq.price = targetPrice(c);
             }
-        for (Company c : s.companies) { c.valuation = value(c); c.stockPrice = c.eq.price; }
+        for (Company c : s.companies) {
+            c.valuation = value(c); c.stockPrice = c.eq.price;
+            // aylik hisse fiyati gecmisi (grafik): son 120 ay
+            double[] h = c.eq.priceMonthly;
+            double[] n = java.util.Arrays.copyOfRange(h, Math.max(0, h.length - 119), h.length + 1);
+            n[n.length - 1] = c.eq.price;
+            c.eq.priceMonthly = n;
+        }
     }
 
     double targetPrice(Company c) {
