@@ -141,10 +141,11 @@ class MnaTest {
         // pazardaki diger tum santraller: kalan pay
         double other = Math.max(0, 1 - shareA - shareB);
         List<Plant> rest = comp.plants.stream().filter(x -> x != pa && x != pb).toList();
-        pa.gen12[0] = shareA * 1000; pb.gen12[0] = shareB * 1000;
-        for (Plant x : rest) x.gen12[0] = other * 1000 / Math.max(1, rest.size());
+        // tum aylara yazilir (aylik devirde bir ay gercek uretimle degisir)
+        java.util.Arrays.fill(pa.gen12, shareA * 1e6); java.util.Arrays.fill(pb.gen12, shareB * 1e6);
+        for (Plant x : rest) java.util.Arrays.fill(x.gen12, other * 1e6 / Math.max(1, rest.size()));
         // diger pazarlar: ulusal payi dusuk tutmak icin buyuk uretim
-        for (Plant x : s.plants) if (!comp.plants.contains(x)) x.gen12[0] = 3000.0 / Math.max(1, s.plants.size() - comp.plants.size());
+        for (Plant x : s.plants) if (!comp.plants.contains(x)) java.util.Arrays.fill(x.gen12, 3e6 / Math.max(1, s.plants.size() - comp.plants.size()));
         if (rest.isEmpty() && other > 0) fail("pazarda baska santral yok");
         for (Company x : List.of(a, b)) java.util.Arrays.fill(x.eq.rev12, 100e6);
         return new Object[] { s, a, b };
@@ -307,5 +308,74 @@ class MnaTest {
         Plant p0 = s.plants.get(0);
         Plant q0 = back.plants.stream().filter(x -> x.id == p0.id).findFirst().orElseThrow();
         assertArrayEquals(p0.gen12, q0.gen12, 1e-9);
+    }
+
+    @Test
+    void dominanceCapsPriceAtCostPlus15() {
+        Object[] m = market(0.70, 0.10);
+        GameState s = (GameState) m[0]; Company a = (Company) m[1];
+        GameState.Component comp = null;
+        for (Plant x : s.plants) if (x.owner == a) { comp = s.componentOf(x); x.lastMonthMWh = 1000; x.lastMonthCost = 50_000; }
+        // ayin sonuna kadar ilerle (aylik hesap)
+        int m0 = (int) (s.hour / HPM);
+        while ((int) (s.hour / HPM) == m0) { s.tick(); s.messages.clear(); for (Plant x : s.plants) if (x.owner == a) { x.monthMWh = 1000; x.monthCost = 50_000; } }
+        Plant pa = s.plants.stream().filter(x -> x.owner == a).findFirst().orElseThrow();
+        System.out.printf("hakim durum tavanı %.1f $/MWh (maliyet 50 + %%15)%n", pa.priceCap);
+        assertEquals(57.5, pa.priceCap, 1.0, "son saatin gercek uretimi de ayliga girer");
+        Company b = (Company) m[2];
+        Plant pb = s.plants.stream().filter(x -> x.owner == b).findFirst().orElseThrow();
+        assertEquals(0, pb.priceCap, "%10 pay: tavan yok");
+    }
+
+    @Test
+    void regulatedMonopolyAboveEightyPercent() {
+        Object[] m = market(0.45, 0.45);
+        GameState s = (GameState) m[0]; Company a = (Company) m[1];
+        for (Plant x : s.plants) java.util.Arrays.fill(x.gen12, x.owner == a ? 1e6 : 1);
+        days(s, 31);
+        assertEquals(s.companies.indexOf(a), s.deals.regulated, "organik %80 ustu: kamu hizmeti modu");
+        assertFalse(s.deals.achievements.isEmpty());
+        assertNotNull(s.competition.regulatedScore());
+    }
+
+    @Test
+    void commitmentBreachAuctionsAndFines() {
+        Object[] m = market(0.40, 0.30);
+        GameState s = (GameState) m[0]; Company a = (Company) m[1], b = (Company) m[2];
+        a.eq.fundamental = 1e9; b.eq.fundamental = 1e9;
+        b.eq.add(s.companies.indexOf(a), b.eq.shares * 0.51); b.eq.founder = b.eq.shares * 0.49;
+        s.competition.file(a, b, true);
+        days(s, 4 * 30 + 2);
+        DealBook.Commitment c = s.deals.commitments.get(0);
+        double fines0 = a.fines + a.lastFines;
+        c.deadline = s.hour + 24;
+        days(s, 2);
+        assertTrue(c.enforced, "sure doldu: otorite ihaleye cikarir");
+        assertTrue(s.competition.commitmentLeft(c) <= 0.5, "eksik MW satildi");
+        assertTrue(a.fines + a.lastFines > fines0, "yillik gelirin %2'si ceza");
+    }
+
+    @Test
+    void thirdPartyCommentExtendsReviewOnce() {
+        Object[] m = market(0.35, 0.30);
+        GameState s = (GameState) m[0]; Company a = (Company) m[1], b = (Company) m[2];
+        a.eq.fundamental = 1e9; b.eq.fundamental = 1e9;
+        b.eq.add(s.companies.indexOf(a), b.eq.shares * 0.51); b.eq.founder = b.eq.shares * 0.49;
+        DealBook.Review r = s.competition.file(a, b, true);
+        long end = r.endHour;
+        assertNull(s.competition.comment(r));
+        assertEquals(end + HPM, r.endHour);
+        assertNotNull(s.competition.comment(r), "islem basina bir kez");
+    }
+
+    @Test
+    void consolidationScenarioRelaxesAuthority() {
+        GameSettings g = SimHarness.reference(1);
+        g.scenarioId = "consolidation";
+        GameState s = GameState.newGame(g);
+        assertTrue(s.deals.relaxed);
+        assertEquals(0.80, s.competition.regionalLimit(s.player), 1e-9);
+        assertEquals(1, s.scenario.objectives.size());
+        assertEquals(FinanceBalance.CONSOLIDATION_DEADLINE, s.scenario.deadlineYear);
     }
 }

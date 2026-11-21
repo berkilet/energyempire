@@ -310,6 +310,21 @@ public final class Competition {
         }
         dominance();
         regulated();
+        milestones();
+    }
+
+    /** Senaryo ara hedefleri: yil sonunda (ocak basinda) ulusal pay kontrolu. */
+    void milestones() {
+        Scenario sc = s.scenario;
+        if (s.month() != 0) return;
+        for (int i = 0; i < sc.milestoneYears.length; i++) {
+            if (sc.milestoneYears[i] != s.year() - 1) continue;
+            double share = nationalShare(group(s.player));
+            boolean ok = share >= sc.milestoneShares[i];
+            s.notify("SENARYO ara hedefi (" + sc.milestoneYears[i] + " sonu, ulusal pay %" + pctS(sc.milestoneShares[i]) + "): "
+                + (ok ? "tutturuldu" : "tutturulamadı") + " (payınız %" + pctS(share) + ").", "openmna");
+            if (ok) d().achievements.add("Ara hedef " + sc.milestoneYears[i] + ": %" + pctS(share));
+        }
     }
 
     /** Hakim durum: bir pazarda payi %50'yi asan grubun santrallerine o pazarda fiyat tavani (ortalama uretim maliyeti + %15). */

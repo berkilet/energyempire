@@ -130,6 +130,11 @@ public final class FinanceBalance {
     public static final double DOMINANCE = 0.50, DOMINANCE_MARKUP = 0.15;
     /** Duzenlenmis tekel: ulusal pay esigi ve izin verilen yillik varlik getirisi. */
     public static final double REGULATED_SHARE = 0.80, REGULATED_RETURN = 0.08;
+    /** Konsolidasyon senaryosu: hedef ulusal pay, son tarih ve ara hedefler (simulasyonla ayarlandi). */
+    public static final double CONSOLIDATION_TARGET = 0.80;
+    public static final int CONSOLIDATION_DEADLINE = 2040;
+    public static final int[] CONSOLIDATION_MILESTONE_YEARS = { 2030, 2035 };
+    public static final double[] CONSOLIDATION_MILESTONE_SHARES = { 0.35, 0.60 };
 
     // ---- 4. Pay alimi ve devralma
     /** Kurucunun istedigi prim: kontrolu koruyan satis %15-25, kontrol kaybi >= %60, zor durumda %0-10, nakit ihtiyacinda %5-15. */

@@ -21,6 +21,7 @@ public final class Scenarios {
     static Objective renewShare(double t) { return new Objective("Üretiminizde yenilenebilir payı (aylık)", s -> s.player.lastRenewShare(), t, false, Scenarios::pct); }
     static Objective marketShare(double t) { return new Objective("Pazar payınız (aylık)", GameState::lastPlayerMarketShare, t, false, Scenarios::pct); }
     static Objective served(double t) { return new Objective("Karşılanan talep (aylık)", s -> s.lastServedRatio, t, false, Scenarios::pct); }
+    static Objective nationalShare(double t) { return new Objective("Ulusal üretim payınız (grup, 12 ay)", s -> s.competition.nationalShare(s.competition.group(s.player)), t, false, Scenarios::pct); }
     static Objective noCoal() { return new Objective("Kömür santraliniz", s -> s.countPlants(s.player, PlantType.COAL), 0, true, Scenarios::num); }
 
     static {
@@ -49,6 +50,18 @@ public final class Scenarios {
     }
 
     private static void reg(Scenario s) { ALL.put(s.id, s); }
+
+    static {
+        Scenario k = new Scenario("consolidation", "Konsolidasyon",
+            "Rekabet otoritesi gevşek: bölgesel eşik %80, ulusal sınır yok. Rakipleri satın alarak ve büyüyerek "
+          + FinanceBalance.CONSOLIDATION_DEADLINE + " sonuna kadar ulusal üretimin %" + Math.round(FinanceBalance.CONSOLIDATION_TARGET * 100)
+          + "'ine ulaşın. Ara hedefler: " + FinanceBalance.CONSOLIDATION_MILESTONE_YEARS[0] + " sonunda %" + Math.round(FinanceBalance.CONSOLIDATION_MILESTONE_SHARES[0] * 100)
+          + ", " + FinanceBalance.CONSOLIDATION_MILESTONE_YEARS[1] + " sonunda %" + Math.round(FinanceBalance.CONSOLIDATION_MILESTONE_SHARES[1] * 100) + ".",
+            null, FinanceBalance.CONSOLIDATION_DEADLINE, List.of(nationalShare(FinanceBalance.CONSOLIDATION_TARGET)), s -> s.deals.relaxed = true);
+        k.milestoneYears = FinanceBalance.CONSOLIDATION_MILESTONE_YEARS;
+        k.milestoneShares = FinanceBalance.CONSOLIDATION_MILESTONE_SHARES;
+        reg(k);
+    }
 
     static {
         // Kendi eski filosunu oyuncuya veren senaryolarda kamu filosu daha kucuk (oyuncu filosu da sayilir).
