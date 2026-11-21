@@ -44,6 +44,8 @@ public final class MnaBot {
         if (p.quarters < 8) { note("bot: 8 ceyrek dolmadi"); return; }
         if (s.finance.rating(p).ordinal() > Rating.BB.ordinal()) { note("bot: not BB alti"); return; }
         if (s.finance.leverage(p) > 3.0) { note("bot: ND/FAVOK > 3"); return; }
+        // gercek alici: elinde bagli ortaklik varken yeni devralmayi ancak grup borcu sindirildiyse (konsolide ND/FAVOK <= 2,5) dener
+        if (s.finance.consolidation(p).size() > 1 && s.finance.leverage(p) > FinanceBalance.SERIAL_ACQ_LEVERAGE) { note("bot: grup borcu sindirilmedi (ND/FAVOK > 2,5)"); return; }
         if (p.mustSellBy > 0 || p.restructProtectUntil > s.hour) { note("bot: yapilandirma suruyor"); return; }
         for (Loan l : p.loans) if (l.status == Loan.Status.LATE) { note("bot: gecikme"); return; }
         Company target = pick(s, leverageMode);

@@ -172,5 +172,7 @@ public final class FinanceBalance {
     /** Bagli ortakligin ana sirkete temettusu (kar orani, %): buyume, temkinli, nakit uret. Halka kapali olsa da odenir. */
     public static final int[] SUB_DIVIDEND = { 50, 60, 80 };
     /** Rakip YZ: aylik deneme olasiligi (stil carpani: fosil 1,5 saldirgan, dengeli 1, yesil 0,6), cagri primi araligi, ilk pay. */
+    /** Elinde bagli ortaklik olan alici yeni devralmayi ancak konsolide Net borc / FAVOK bu degerin altindaysa dener (YZ ve olcum botu). */
+    public static final double SERIAL_ACQ_LEVERAGE = 2.5;
     public static final double RIVAL_MNA_CHANCE = 0.08, RIVAL_TENDER_PREMIUM_MIN = 0.25, RIVAL_TENDER_PREMIUM_MAX = 0.40, RIVAL_TOEHOLD = 0.05;
 }

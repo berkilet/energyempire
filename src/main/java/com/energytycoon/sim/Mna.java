@@ -679,6 +679,8 @@ public final class Mna {
     /** Rakip devralma davranisi: notu dusuk, ucuz (fiyat / temel deger) ve kendi pazarindaki hedefler; saldirgan stil daha sik dener. */
     public void rivalMonthly(Company c) {
         if (!active(c) || c.eq.parent >= 0 || distressed(c)) return;
+        // gercek alici: bagli ortakligi varken grup borcu sindirilmeden yeni devralma yok
+        if (s.finance.consolidation(c).size() > 1 && s.finance.leverage(c) > FinanceBalance.SERIAL_ACQ_LEVERAGE) return;
         if (s.rng.nextDouble() >= FinanceBalance.RIVAL_MNA_CHANCE * appetite(c)) return;
         Company best = null; double bestScore = -1e9;
         for (Company t : s.companies) {
