@@ -48,6 +48,7 @@ public final class GameState {
     public final Macro macro = new Macro(this);
     /** Finans motoru: not, bankalar, krediler, tahsilat. */
     public final Finance finance = new Finance(this);
+    public final Capital capital = new Capital(this);
     /** Mesaj -> tiklaninca yapilacak eylem (ör. "tender:12"). */
     public final Map<String, String> messageActions = new HashMap<>();
     /** Test/dogrulama: kendi hatlari insaat beklemeden aktif olur (kayda yazilmaz). */
@@ -1016,6 +1017,7 @@ public final class GameState {
         macro.hourly();
         if (hod == 0) {
             markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); tenders.daily(); sales.daily();
+            capital.daily();
             for (int ci = 0; ci < companies.size(); ci++) { Company c = companies.get(ci); finance.daily(c); finance.dueWarnings(c); }
         }
 
@@ -1039,6 +1041,7 @@ public final class GameState {
                     p.outageHoursLeft = p.type == PlantType.NUCLEAR ? 200 + rng.nextInt(200) : 24 + rng.nextInt(72);
                     double repair = p.underWarranty(hour) ? 0 : p.equipment.listCapex() * (p.type.renewable ? 0.006 : 0.012);
                     p.owner.cash -= repair; p.owner.omCost += repair; p.monthProfit -= repair;
+                    if (p.capacityMW() >= FinanceBalance.NEWS_OUTAGE_MW) capital.news(p.owner, FinanceBalance.NEWS_OUTAGE, "büyük arıza (" + p.type.label + ", " + Math.round(p.capacityMW()) + " MW)");
                     if (p.owner.player) notify("ARIZA: " + p.type.label + " devre dışı. "
                         + (repair > 0 ? "Onarım " + Math.round(repair / 1e6 * 10) / 10.0 + "M $" : "Garanti kapsamında (" + p.equipment.supplier.name + ")"));
                 }
@@ -1243,6 +1246,7 @@ public final class GameState {
             c.revenue = c.fuelCost = c.omCost = c.carbonCost = c.interest = c.fines = c.capexSpent = 0;
             c.mwhGenerated = 0; c.co2Tons = 0; c.renewMwh = 0;
             c.netHistory.addLast(net);
+            c.eq.qNetAcc += net;
             while (c.netHistory.size() > 12) c.netHistory.pollFirst();
         }
         for (Plant p : plants) {
@@ -1267,7 +1271,7 @@ public final class GameState {
 
         retireLegacy();
         // Ceyrek sonu: kredi notu, taahhutler. Iflas yalnizca finans akisiyla (gecikme -> temerrut -> yapilandirma/iflas).
-        if (month() % 3 == 0) for (int ci = 0; ci < companies.size(); ci++) finance.quarterly(companies.get(ci));
+        if (month() % 3 == 0) for (int ci = 0; ci < companies.size(); ci++) { finance.quarterly(companies.get(ci)); capital.quarterly(companies.get(ci)); }
         if (player.cash < 0 && !player.bankrupt) notify("FİNANS: Nakit eksi! İşletme kredisi limiti dolu; 60 gün içinde düzelmezse temerrüt süreci başlar.", "finance");
         evaluateScenario();
         for (Company c : companies) if ((!c.player || aiPlayer) && !c.neutral && !c.bankrupt) RivalAI.monthly(this, c);
@@ -1289,17 +1293,11 @@ public final class GameState {
         }
     }
 
-    public void updateValuations() {
-        for (Company c : companies) {
-            double assets = assetValue(c);
-            double equity = c.cash + assets - c.debt();
-            int n = c.netHistory.size();
-            double annual = n == 0 ? 0 : c.trailingNet() / n * 12;
-            c.valuation = Math.max(0, equity + 4 * Math.max(0, annual));
-            double target = c.valuation / Balance.SHARES;
-            c.stockPrice = c.stockPrice <= 0 ? target : c.stockPrice * 0.8 + target * 0.2;
-        }
-    }
+    /** Sirket degerleri ve hisse fiyatlari (Capital: temel deger, halka acikta piyasa fiyati). */
+    public void updateValuations() { capital.monthly(); }
+
+    /** Oyuncunun bu sirkette payi var mi. */
+    public boolean playerHolds(Company c) { return c != player && c.eq.held(companies.indexOf(player)) > 0; }
 
     public int totalPlantsOf(Company c) {
         int n = 0;

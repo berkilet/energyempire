@@ -16,7 +16,8 @@ public final class Scenarios {
     static String pct(double v) { return String.format(Locale.ROOT, "%%%.0f", v * 100); }
     static String num(double v) { return String.format(Locale.ROOT, "%.0f", v); }
 
-    static Objective valuation(double t) { return new Objective("Piyasa değeri", s -> s.player.valuation, t, false, Scenarios::money); }
+    /** Halka acik sirkette fiyat x hisse, kapalida temel deger (Capital.value). */
+    static Objective valuation(double t) { return new Objective("Piyasa değeri", s -> s.capital.value(s.player), t, false, Scenarios::money); }
     static Objective renewShare(double t) { return new Objective("Üretiminizde yenilenebilir payı (aylık)", s -> s.player.lastRenewShare(), t, false, Scenarios::pct); }
     static Objective marketShare(double t) { return new Objective("Pazar payınız (aylık)", GameState::lastPlayerMarketShare, t, false, Scenarios::pct); }
     static Objective served(double t) { return new Objective("Karşılanan talep (aylık)", s -> s.lastServedRatio, t, false, Scenarios::pct); }
@@ -24,8 +25,8 @@ public final class Scenarios {
 
     static {
         reg(new Scenario("free", "Serbest Oyun",
-            "Süre sınırı yok. Şirketinizi dilediğiniz gibi büyütün. Hedef: $4 milyar piyasa değeri.",
-            null, 0, List.of(valuation(4e9)), s -> {}));
+            "Süre sınırı yok. Şirketinizi dilediğiniz gibi büyütün. Hedef: $7 milyar piyasa değeri.",
+            null, 0, List.of(valuation(7e9)), s -> {}));
         reg(new Scenario("green", "Yeşil Dönüşüm",
             "Karbon vergisi iki kat hızlı artıyor. " + Balance.SHARE_SCENARIO_DEADLINE + " sonuna kadar üretiminizin %60'ı yenilenebilir olsun, "
           + "pazarın en az %25'ini tutun ve bölgenin talebinin %95'i karşılansın.",
@@ -38,11 +39,11 @@ public final class Scenarios {
             null, Balance.SHARE_SCENARIO_DEADLINE, List.of(noCoal(), marketShare(0.30), served(0.95)), Scenarios::setupCoal));
         reg(new Scenario("crisis", "Enerji Krizi",
             "Doğalgaz fiyatı kalıcı olarak ikiye katlandı, kömür de pahalı. 2030 sonuna kadar iflas etmeden "
-          + "$3 milyar değere ulaşın. Elinizdeki eski açık çevrim gaz santralleri krizde zarar ediyor.",
-            null, 2030, List.of(valuation(3e9)), Scenarios::setupCrisis));
+          + "$5,5 milyar değere ulaşın. Elinizdeki eski açık çevrim gaz santralleri krizde zarar ediyor.",
+            null, 2030, List.of(valuation(5.5e9)), Scenarios::setupCrisis));
         reg(new Scenario("islands", "Ada Şebekesi",
-            "Dağınık adalarda ithal yakıt %80 pahalı. 2033 sonuna kadar talebin %97'sini karşılayın ve $2 milyar değere ulaşın.",
-            MapPreset.ARCHIPELAGO, 2033, List.of(served(0.97), valuation(2e9)), s -> {
+            "Dağınık adalarda ithal yakıt %80 pahalı. 2033 sonuna kadar talebin %97'sini karşılayın ve $3,5 milyar değere ulaşın.",
+            MapPreset.ARCHIPELAGO, 2033, List.of(served(0.97), valuation(3.5e9)), s -> {
                 s.markets.coalMult = 1.8; s.markets.gasMult = 1.8; s.markets.uraniumMult = 1.8;
             }));
     }

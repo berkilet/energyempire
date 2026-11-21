@@ -63,7 +63,7 @@ public class SaveData {
         }
     }
 
-    public static class CompanyD { public FinD fin; public String name; public boolean player; public int color; public double cash, debt, valuation, stockPrice;
+    public static class CompanyD { public FinD fin; public Equity eq; public String name; public boolean player; public int color; public double cash, debt, valuation, stockPrice;
         public boolean bankrupt; public int negativeMonths;
         public double lastRevenue, lastFuel, lastOm, lastCarbon, lastInterest, lastFines, lastNet, lastMwh, lastCo2;
         public double[] netHistory; public double[] valHist, cashHist;
@@ -158,6 +158,7 @@ public class SaveData {
             CompanyD cd = new CompanyD();
             cd.name = c.name; cd.player = c.player; cd.color = c.colorRgb; cd.cash = c.cash; cd.debt = 0; // eski alan: borc artik kredilerde
             cd.fin = FinD.from(c, s);
+            cd.eq = c.eq;
             cd.valuation = c.valuation; cd.stockPrice = c.stockPrice; cd.bankrupt = c.bankrupt; cd.negativeMonths = c.negativeMonths;
             cd.lastRevenue = c.lastRevenue; cd.lastFuel = c.lastFuel; cd.lastOm = c.lastOm; cd.lastCarbon = c.lastCarbon;
             cd.lastInterest = c.lastInterest; cd.lastFines = c.lastFines; cd.lastNet = c.lastNet; cd.lastMwh = c.lastMwhGenerated; cd.lastCo2 = c.lastCo2;
@@ -254,6 +255,7 @@ public class SaveData {
         for (CompanyD cd : companies) {
             Company c = new Company(cd.name, cd.player, cd.color, cd.cash);
             c.valuation = cd.valuation; c.stockPrice = cd.stockPrice; c.bankrupt = cd.bankrupt; c.negativeMonths = cd.negativeMonths;
+            if (cd.eq != null) c.eq = cd.eq; // eski kayit: halka kapali, kurucuya %100 ait
             c.lastRevenue = cd.lastRevenue; c.lastFuel = cd.lastFuel; c.lastOm = cd.lastOm; c.lastCarbon = cd.lastCarbon;
             c.lastInterest = cd.lastInterest; c.lastFines = cd.lastFines; c.lastNet = cd.lastNet; c.lastMwhGenerated = cd.lastMwh; c.lastCo2 = cd.lastCo2;
             if (cd.netHistory != null) for (double v : cd.netHistory) c.netHistory.add(v);

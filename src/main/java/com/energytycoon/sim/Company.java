@@ -69,6 +69,8 @@ public final class Company {
     public final List<Double> cashHistory = new ArrayList<>();
     public double valuation;
     public double stockPrice;
+    /** Ortaklik tablosu, hisse fiyati, halka arz ve kontrol durumu. */
+    public Equity eq = new Equity();
 
     public Company(String name, boolean player, int colorRgb, double cash) {
         this.name = name; this.player = player; this.colorRgb = colorRgb; this.cash = cash;

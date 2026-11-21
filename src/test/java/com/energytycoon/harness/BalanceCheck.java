@@ -17,7 +17,7 @@ public final class BalanceCheck {
             if (args[i].equals("--seeds")) seeds = Integer.parseInt(args[i + 1]);
             if (args[i].equals("--years")) years = Integer.parseInt(args[i + 1]);
         }
-        if (mode.equals("shares")) shares(seeds); else if (mode.equals("finance")) finance(seeds); else decade(seeds, years);
+        if (mode.equals("valuation")) valuation(seeds); else if (mode.equals("shares")) shares(seeds); else if (mode.equals("finance")) finance(seeds); else decade(seeds, years);
     }
 
     static GameState game(long seed, int size, int cities, String scenario) {
@@ -186,6 +186,27 @@ public final class BalanceCheck {
             System.out.printf(Locale.ROOT, "   krediler: ECA %d adet %.0fM$ (%%%.0f hacim) · ticari %d adet %.0fM$ · işletme kredisi en yüksek kullanım %.0fM$%n",
                 ecaN, ecaVol / 1e6, 100 * ecaVol / Math.max(1, ecaVol + comVol), comN, comVol / 1e6, revPeak / 1e6);
             System.out.println("   temerrüde düşen krediler: " + defByType);
+        }
+    }
+
+    /** Degerleme: oyuncu botu degeri (yeni F/K) ve eski formul (ozsermaye + 4 x yillik kar), senaryo hedefleri icin. */
+    static void valuation(int seeds) {
+        for (String sc : new String[] { "free", "crisis", "islands" }) {
+            for (long seed = 1; seed <= seeds; seed++) {
+                GameState s = game(seed, 64, 5, sc);
+                s.aiPlayer = true;
+                StringBuilder b = new StringBuilder();
+                while (s.year() < 2036 && !s.gameOver) {
+                    s.tick(); s.messages.clear();
+                    if (s.hour % Balance.HOURS_PER_YEAR == 0) {
+                        Company p = s.player;
+                        double eq = p.cash + s.assetValue(p) - p.debt(), annual = s.capital.normalizedProfit(p);
+                        double old = Math.max(0, eq + 4 * Math.max(0, annual));
+                        b.append(String.format(Locale.ROOT, " %d:%.2f/%.2f(x%.1f)", s.year() - 1, p.valuation / 1e9, old / 1e9, s.capital.multiple(p)));
+                    }
+                }
+                System.out.println(sc + " tohum " + seed + " değer milyar $ yeni/eski(F/K):" + b);
+            }
         }
     }
 }

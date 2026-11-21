@@ -75,4 +75,24 @@ public final class FinanceBalance {
     public static final int RIVAL_BUFFER_MONTHS = 6;
     /** Faiz bu seviyenin ustunde ve beklenti dususteyse buyuk yatirim ertelenir (olasilik). */
     public static final double RIVAL_DEFER_RATE = 0.065, RIVAL_DEFER_CHANCE = 0.6;
+
+    // ================================================================ Paket 2: sermaye, devralma, rekabet
+    // ---- 1. Sahiplik ve fiyat
+    public static final double SHARES = 10e6;
+    /** F/K carpani: politika faizi PE_RATE_REF iken PE_BASE; her 1 puan dususte +PE_PER_POINT, artista -PE_PER_POINT; sinirlar. */
+    public static final double PE_BASE = 12, PE_RATE_REF = 0.045, PE_PER_POINT = 1.5, PE_MIN = 6, PE_MAX = 20;
+    /** Not (A..CCC) ve buyume etkisi; toplam en fazla +-PE_ADJ_MAX. */
+    public static final double[] PE_RATING_ADJ = { 0.10, 0.05, 0, -0.07, -0.15 };
+    public static final double PE_GROWTH_K = 0.25, PE_ADJ_MAX = 0.20;
+    /** Zarar eden sirket: yillik zarar bu kat kadar degerden duser. */
+    public static final double LOSS_MULT = 2;
+    /** Gunluk fiyat gurultusu, piyasa duyarliligi (endeks / 24 ay ortalamasi) ussu ve sinirlari. */
+    public static final double PRICE_NOISE = 0.012, SENTIMENT_EXP = 0.6, SENTIMENT_MIN = 0.65, SENTIMENT_MAX = 1.35;
+    /** Haber etkisi gunluk bu oranda notre doner; ceyrek surprizi katsayisi ve siniri. */
+    public static final double NEWS_DECAY = 0.04, SURPRISE_K = 0.10, SURPRISE_MAX = 0.10;
+    public static final double NEWS_RATING_UP = 0.04, NEWS_RATING_DOWN = -0.06, NEWS_OUTAGE = -0.02, NEWS_LATE = -0.05, NEWS_DEFAULT = -0.15;
+    /** Buyuk ariza haberi: bu kapasitenin ustundeki santral. */
+    public static final double NEWS_OUTAGE_MW = 300;
+    /** Temettu politikasinin (0/30/50) duyarliliga destegi. */
+    public static final double[] DIVIDEND_SUPPORT = { 0, 0.01, 0.02 };
 }

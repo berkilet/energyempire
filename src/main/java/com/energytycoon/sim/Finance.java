@@ -471,6 +471,7 @@ public final class Finance {
             c.lateNotch = true;
             rel(c, l.bank, FinanceBalance.REL_LATE);
             c.lateEvents++;
+            s.capital.news(c, FinanceBalance.NEWS_LATE, "kredi taksiti gecikti");
             notifyFin(c, "GECİKME: " + l.name() + " taksiti (" + money(due) + ") ödenemedi. 30 gün tolerans; gecikme faizi +2 puan, not bir kademe düştü.");
         }
         l.daysLate++;
@@ -496,6 +497,7 @@ public final class Finance {
         for (Bank o : Bank.values()) if (o != b) rel(c, o, FinanceBalance.REL_DEFAULT_OTHERS);
         c.defaultCapUntil = s.hour + (long) FinanceBalance.DEFAULT_CAP_YEARS * Balance.HOURS_PER_YEAR;
         c.defaults++;
+        s.capital.news(c, FinanceBalance.NEWS_DEFAULT, "kredi temerrüdü");
     }
 
     /** ECA temerrudu: banka bagli santrale el koyar; rakiplerden en yuksek teklif, yoksa defterin %60'i (Kamu varlik fonuna). Diger krediler etkilenmez. */
@@ -600,6 +602,7 @@ public final class Finance {
         Rating old = rating(c);
         c.rating = computeRating(c);
         c.lateNotch = anyLate(c);
+        if (rating(c) != old) s.capital.news(c, rating(c).ordinal() < old.ordinal() ? FinanceBalance.NEWS_RATING_UP : FinanceBalance.NEWS_RATING_DOWN, "kredi notu " + old + " → " + rating(c));
         if (rating(c) != old) notifyFin(c, (c.player ? "Kredi notunuz " : c.name + " kredi notu ") + old + " → " + rating(c) + (c.quarters < 4 ? " (yeni şirket)" : ""));
         Loan r = revolver(c);
         if (r != null) r.limit = Math.max(r.outstanding, revolverLimitFor(c));
