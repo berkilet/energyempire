@@ -9,6 +9,97 @@ public final class RivalAI {
     private RivalAI() {}
 
     public static void monthly(GameState s, Company c) {
+        financing = true;
+        try { monthlyInner(s, c); } finally { financing = false; }
+    }
+
+    // ------------------------------------------------------------ finans (oyuncuyla ayni urunler ve kurallar)
+    /** YZ kararlari sirasinda: santral siparisinde ECA, gerekirse ticari kredi kullanilir (dogrudan cagrilarda kullanilmaz). */
+    private static boolean financing;
+
+    /** Nakit tamponu: en az onumuzdeki 6 ayin taksitleri (ve sabit yedek). */
+    static double reserve(GameState s, Company c) {
+        if (c.neutral) return GridBalance.RIVAL_BUILD_RESERVE;
+        double[] sch = s.finance.schedule12(c);
+        double six = 0;
+        for (int i = 0; i < FinanceBalance.RIVAL_BUFFER_MONTHS; i++) six += sch[i];
+        return Math.max(GridBalance.RIVAL_BUILD_RESERVE, six);
+    }
+
+    /** ECA icin banka: yesil stil Yesilvadi'yi, digerleri iliski puani en yuksek (pesin masraf indirimi) bankayi secer. */
+    static Bank ecaBank(GameState s, Company c, Equipment e) {
+        if (c.aiStyle.equals("green") && c.bankBanUntil[Bank.YESIL.ordinal()] <= s.hour) return Bank.YESIL;
+        Bank best = Bank.KIYI;
+        for (Bank b : Bank.values()) if (c.bankBanUntil[b.ordinal()] <= s.hour && c.bankScore[b.ordinal()] > c.bankScore[best.ordinal()]) best = b;
+        return best;
+    }
+
+    /** ECA'nin saglayacagi net nakit (kredi - prim - masraf); uygun degilse 0. */
+    /** Rakip ECA'yi yalnizca beklenen DSCR bu esigin ustundeyse kullanir (taahhut 1,20 + guvenlik payi). */
+    static final double ECA_MIN_DSCR = 2.0; // denge: 1,5 iken 2 tohumda 64 ve 96 haritada 2+2 iflas; 2,0 ile 1+1
+    private static int[] siteHint = { -1, -1 };
+
+    static boolean useEca(GameState s, Company c, Equipment e) {
+        if (!financing || c.neutral || !Finance.ecaEligible(e)) return false;
+        int x = siteHint[0] >= 0 ? siteHint[0] : s.cities.get(0).x, y = siteHint[0] >= 0 ? siteHint[1] : s.cities.get(0).y;
+        return s.finance.expectedDscr(c, e, x, y, ecaBank(s, c, e), 6) >= ECA_MIN_DSCR;
+    }
+
+    static double ecaNet(GameState s, Company c, Equipment e) {
+        if (!useEca(s, c, e)) return 0;
+        Finance.EcaQuote q = s.finance.ecaQuote(c, e, ecaBank(s, c, e), 6);
+        return q == null ? 0 : q.amount - q.premium - q.bankFee;
+    }
+
+    static double netCapex(GameState s, Company c, Equipment e) { return e.capex() - ecaNet(s, c, e); }
+
+    /** Santral siparisi: ECA uygunsa ECA ile (6 ayda bir taksit). */
+    static Plant buildPlant(GameState s, Company c, Equipment e, int x, int y) {
+        siteHint = new int[] { x, y };
+        if (useEca(s, c, e)) {
+            Finance.EcaQuote q = s.finance.ecaQuote(c, e, ecaBank(s, c, e), 6);
+            c.cash += q.amount; // kredi siparisle birlikte kullandirilir
+            Plant p = s.buildPlant(c, e, x, y);
+            c.cash -= q.amount;
+            if (p != null) s.finance.signEca(c, p, ecaBank(s, c, e), 6);
+            return p;
+        }
+        return s.buildPlant(c, e, x, y);
+    }
+
+    /** Yatirim icin ticari kredi: en ucuz teklif (yesil stil Yesilvadi'yi tercih eder); kaldirac Net borc/FAVOK <= 3,5 kalmali. */
+    static boolean borrowFor(GameState s, Company c, double need) {
+        if (need <= 0) return true;
+        double amount = Math.ceil(need / FinanceBalance.LOAN_STEP) * FinanceBalance.LOAN_STEP;
+        if (c.quarters >= 4) {
+            double e4 = s.finance.ebitda4(c);
+            if (e4 <= 0 || (c.debt() + amount - c.cash) / e4 > 3.5) return false;
+        } else if (c.debt() + amount > 0.5 * s.finance.creditLimit(c)) return false;
+        Finance.Offer best = null;
+        for (Finance.Offer o : s.finance.commercialOffers(c, amount, 5, 3, false, null)) {
+            if (!o.available) continue;
+            if (c.aiStyle.equals("green") && o.bank == Bank.YESIL) { best = o; break; }
+            if (best == null || o.rate < best.rate) best = o;
+        }
+        return best != null && s.finance.signCommercial(c, best.bank, amount, 5, 3, false, null) != null;
+    }
+
+    /**
+     * ECA taahhut riski: DSCR iki ceyrek dusukse (nakit yetiyorsa) krediyi erken kapatir; uc ceyrek dusukse el konmadan
+     * once santrali satisa cikarir. Oyuncu da ayni araclara sahip (Krediler sekmesi, santral paneli).
+     */
+    static void ecaCure(GameState s, Company c) {
+        for (Loan l : new ArrayList<>(c.loans)) {
+            if (!l.open() || l.type != Loan.Type.ECA || l.dscrLowQuarters < 2) continue;
+            double cost = s.finance.prepayCost(c, l);
+            if (c.cash >= cost + reserve(s, c)) { s.finance.prepay(c, l); continue; }
+            if (l.dscrLowQuarters >= 3 && s.nodeById(l.linkedPlant) instanceof Plant p && p.owner == c && s.sales.openListingOf(p) == null)
+                s.sales.list(c, p);
+        }
+    }
+
+    private static void monthlyInner(GameState s, Company c) {
+        ecaCure(s, c);
         distress(s, c);
         buyListings(s, c);
         tenders(s, c);
@@ -40,9 +131,14 @@ public final class RivalAI {
         if (first.type == PlantType.NUCLEAR && c.cash < first.capex() * 1.4) first = pick(s, c, PlantType.GAS);
         Equipment second = pick(s, c, c.aiStyle.equals("green") ? PlantType.WIND : PlantType.GAS);
         Equipment third = s.catalog.cheapest(second.type, s.year());
+        // Faiz yuksek ve beklenti dususteyse buyuk yatirimi erteleme egilimi
+        if (first.capex() > 200e6 && s.macro.policyRate >= FinanceBalance.RIVAL_DEFER_RATE && s.macro.expectingCuts()
+            && r.nextDouble() < FinanceBalance.RIVAL_DEFER_CHANCE) return;
         for (Equipment e : new Equipment[] { first, second, third }) {
-            if (e == null || e.capex() + GridBalance.RIVAL_BUILD_RESERVE > c.cash) continue;
-            if (buildNear(s, c, e, target, GridBalance.RIVAL_BUILD_RESERVE) != null) return;
+            if (e == null) continue;
+            double need = netCapex(s, c, e) + reserve(s, c) + 15e6; // + tahmini hat
+            if (need > c.cash && !borrowFor(s, c, need - c.cash)) continue;
+            if (buildNear(s, c, e, target, reserve(s, c)) != null) return;
         }
     }
 
@@ -50,7 +146,7 @@ public final class RivalAI {
     /** Nakit eksiye dusunce en az kazandiran varliklarindan baslayarak, acigi + yedegi kapatacak kadarini satisa cikarir. */
     static void distress(GameState s, Company c) {
         if (c.cash >= Balance.DISTRESS_CASH) return;
-        double need = -c.cash + GridBalance.RIVAL_BUILD_RESERVE, listed = 0;
+        double need = -c.cash + reserve(s, c), listed = 0;
         for (Listing l : s.sales.open()) if (l.seller == c) listed += l.price;
         if (listed >= need) return;
         List<GridNode> cand = new ArrayList<>();
@@ -68,13 +164,13 @@ public final class RivalAI {
         if (!p.operational() || p.lastMonthProfit <= 0) return 0;
         double byYield = p.lastMonthProfit * 12 / Balance.RIVAL_BUY_YIELD;
         double bid = Math.min(byYield, p.bookValue(s.hour) * 0.9);
-        return c.cash >= bid + GridBalance.RIVAL_BUILD_RESERVE ? bid : 0;
+        return c.cash >= bid + reserve(s, c) ? bid : 0;
     }
 
     /** Ilanlardan alim: santral yillik kari / fiyat >= esik; TM yaricapinda kendi santrali varsa. Ayda en fazla bir alim. */
     static void buyListings(GameState s, Company c) {
         for (Listing l : s.sales.open()) {
-            if (l.seller == c || c.cash < l.price + GridBalance.RIVAL_BUILD_RESERVE) continue;
+            if (l.seller == c || c.cash < l.price + reserve(s, c)) continue;
             boolean want = false;
             if (l.asset instanceof Plant p) want = p.operational() && p.lastMonthProfit * 12 / Math.max(1, l.price) >= Balance.RIVAL_BUY_YIELD;
             else if (l.asset instanceof Substation t) for (Plant p : s.plants) if (p.owner == c && t.inRange(p.x, p.y)) { want = true; break; }
@@ -90,9 +186,8 @@ public final class RivalAI {
     static void substations(GameState s, Company c) {
         for (Substation t : s.substations)
             if (t.owner == c && t.operational() && t.level < 2 && t.pendingUpgrade == 0 && t.cp != null
-                && t.cp.installedMW() > GridBalance.RIVAL_TM380_MW && c.cash >= GridBalance.TM380_UPGRADE_COST + GridBalance.RIVAL_BUILD_RESERVE)
+                && t.cp.installedMW() > GridBalance.RIVAL_TM380_MW && c.cash >= GridBalance.TM380_UPGRADE_COST + reserve(s, c))
                 s.upgradeSubstation(t, 2);
-        if (c.cash < GridBalance.TM154_COST + GridBalance.RIVAL_BUILD_RESERVE) return;
         s.components();
         List<Plant> free = new ArrayList<>();
         boolean anyFull = false;
@@ -114,9 +209,12 @@ public final class RivalAI {
         Probe at = new Probe(bx, by);
         // Alternatif: (A) yeni santral icin ayri hat, (B) dolu noktaya paralel hat (indirimli). TM: bedel + (B'de) TM'den yeni hat.
         double line = s.lineCost(at, city, LineTier.YG);
-        double alt = condA ? line : line * (1 - GridBalance.PARALLEL_DISCOUNT);
+        // (A) kumeye planlanan sonraki iki santralin her biri ayri hat gerektirirdi; TM bunlari ortak baglantiya alir.
+        double alt = condA ? 2 * line : line * (1 - GridBalance.PARALLEL_DISCOUNT);
         double tmCost = GridBalance.TM154_COST + (condA ? 0 : line);
-        if (tmCost > alt || c.cash < tmCost + GridBalance.RIVAL_BUILD_RESERVE) return;
+        if (tmCost > alt) return;
+        // nakit yetmezse oyuncuyla ayni ticari kredi kurallariyla finanse eder
+        if (c.cash < tmCost + reserve(s, c) && !borrowFor(s, c, tmCost + reserve(s, c) - c.cash)) return;
         Substation t = s.buildSubstation(c, 1, bx, by);
         if (t == null) return;
         // Erisim: bolgede kendisinden buyuk bir rakip varsa kapali, yoksa varsayilan bedelle acik.
@@ -165,12 +263,12 @@ public final class RivalAI {
             int nPar = (int) Math.ceil(need / l.capacityMW());
             double par = dup + nPar <= 3 && s.checkLine(c, l.a, l.b, l.tier) == null ? nPar * s.lineCost(l.a, l.b, l.tier) : Double.MAX_VALUE;
             if (up <= par && up < Double.MAX_VALUE) {
-                if (c.cash < up + GridBalance.RIVAL_BUILD_RESERVE) continue;
+                if (c.cash < up + reserve(s, c)) continue;
                 if (s.upgradeLine(c, l) == null) {
                     if (!c.player) s.statRivalUpgrades++;
                     s.statUpgradeLog.add(new long[] { s.hour, l.id, second ? 1 : 0, l.buildHoursLeft });
                 }
-            } else if (par < Double.MAX_VALUE && c.cash >= par + GridBalance.RIVAL_BUILD_RESERVE) {
+            } else if (par < Double.MAX_VALUE && c.cash >= par + reserve(s, c)) {
                 if (s.buildLine(c, l.a, l.b, l.tier) != null && !c.player) s.statRivalParallel++;
             }
         }
@@ -200,8 +298,8 @@ public final class RivalAI {
             if (t.bidOf(c) != null) continue;
             Equipment e = tenderEquipment(s, c);
             int units = (int) Math.ceil(t.mw / e.capacityMW);
-            double capex = units * e.capex(), dep = s.tenders.depositFor(t);
-            if (c.cash < dep + capex + GridBalance.RIVAL_BUILD_RESERVE) continue; // teminat + yatirim karsilanamiyor
+            double capex = units * netCapex(s, c, e), dep = s.tenders.depositFor(t);
+            if (c.cash < dep + capex + reserve(s, c)) continue; // teminat + yatirim karsilanamiyor
             double price = tenderPrice(s, c, e, t, units);
             s.tenders.bid(c, t, price);
         }
@@ -280,8 +378,8 @@ public final class RivalAI {
             bestTm = t; tmSite = st; bestCost = access;
         }
         if (bestTm != null) {
-            if (c.cash < e.capex() + reserve) return null;
-            Plant p = s.buildPlant(c, e, tmSite[0], tmSite[1]);
+            if (c.cash < netCapex(s, c, e) + reserve) return null;
+            Plant p = buildPlant(s, c, e, tmSite[0], tmSite[1]);
             if (p != null && bestTm.owner != c) s.setPreferredSubstation(p, bestTm.id);
             return p;
         }
@@ -292,18 +390,18 @@ public final class RivalAI {
         Plant est = new Plant();
         est.type = e.type; est.equipment = e; est.owner = c; est.x = bx; est.y = by; est.builtAtHour = s.hour; est.ageStartHour = s.hour;
         GridOperator.Choice ch = s.operator.compare(probe, city, tier, e.buildDays() / 30.0, s.operator.expectedMonthlyMargin(est, tier) * nLines);
-        boolean ownAffordable = c.cash >= e.capex() + lineCost + reserve;
-        boolean opAffordable = c.cash >= e.capex() + GridOperator.applicationCost(lineCost / nLines) + reserve;
+        boolean ownAffordable = c.cash >= netCapex(s, c, e) + lineCost + reserve;
+        boolean opAffordable = c.cash >= netCapex(s, c, e) + GridOperator.applicationCost(lineCost / nLines) + reserve;
         if (ownAffordable && (ch.ownBetter() || !opAffordable)) {
-            Plant p = s.buildPlant(c, e, bx, by);
+            Plant p = buildPlant(s, c, e, bx, by);
             if (p == null) return null;
             if (s.buildLine(c, p, city, tier) == null) s.buildLine(c, p, city);
             else if (nLines > 1) s.buildLine(c, p, city, tier);
             return p;
         }
         double opPay = GridOperator.applicationCost(lineCost / nLines);
-        if (c.cash < e.capex() + opPay + reserve) return null;
-        Plant p = s.buildPlant(c, e, bx, by);
+        if (c.cash < netCapex(s, c, e) + opPay + reserve) return null;
+        Plant p = buildPlant(s, c, e, bx, by);
         if (p == null) return null;
         if (s.operator.apply(c, p, city, tier) == null) s.operator.apply(c, p, city, LineTier.YG);
         return p;
@@ -311,7 +409,7 @@ public final class RivalAI {
 
     /** Kendi kumesinin yanina veya kendi TM yaricapina, ihracat kapasitesinde yer varsa hatsiz kurar. */
     private static Plant buildInCluster(GameState s, Company c, Equipment e, City city, double reserve, double maxDist) {
-        if (c.cash < e.capex() + reserve) return null;
+        if (c.cash < netCapex(s, c, e) + reserve) return null;
         int[] normal = findSite(s, e, city, 4, 16);
         double minScore = e.type.renewable && normal != null ? s.siteScore(e, normal[0], normal[1]) * 0.85 : 0;
         int[] best = null; double bs = -1;
@@ -333,7 +431,7 @@ public final class RivalAI {
                 if (sc >= minScore && sc > bs) { bs = sc; best = t; }
             }
         }
-        return best == null ? null : s.buildPlant(c, e, best[0], best[1]);
+        return best == null ? null : buildPlant(s, c, e, best[0], best[1]);
     }
 
     /** TM yaricapinda uygun yer; yenilenebilirde saha puani normal sahanin %85'inden az olmamali. */

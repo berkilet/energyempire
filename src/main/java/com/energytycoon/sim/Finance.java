@@ -187,6 +187,20 @@ public final class Finance {
     }
 
     /** Santral siparisiyle ECA kredisi (kredi insaat suresince kullandirilir; burada siparis aninda santral bedeline mahsup edilir). */
+    /** Santralin beklenen DSCR'si: yillik beklenen nakit akisi / ECA yillik borc servisi (rakip YZ ve oyuncu penceresi ayni hesap). */
+    public double expectedDscr(Company c, Equipment e, int x, int y, Bank b, int freqMonths) {
+        EcaQuote q = ecaQuote(c, e, b, freqMonths);
+        if (q == null) return Double.NaN;
+        Plant probe = new Plant();
+        probe.type = e.type; probe.equipment = e; probe.owner = c; probe.x = x; probe.y = y; probe.builtAtHour = s.hour; probe.ageStartHour = s.hour;
+        double cf = switch (e.type) { case SOLAR -> s.siteScore(e, x, y); case WIND -> s.siteScore(e, x, y); case HYDRO -> s.siteScore(e, x, y);
+            case NUCLEAR -> 0.9; case COAL -> 0.7; default -> 0.55; };
+        double margin = Math.max(0, s.statPrice - s.marginalCost(probe));
+        double cash = e.capacityMW * cf * Balance.HOURS_PER_YEAR * margin - e.fixedOmPerHour() * Balance.HOURS_PER_YEAR;
+        double service = q.installment * 12.0 / freqMonths;
+        return service <= 0 ? Double.POSITIVE_INFINITY : cash / service;
+    }
+
     public Loan signEca(Company c, Plant p, Bank b, int freqMonths) {
         if (exempt(c) || c.bankBanUntil[b.ordinal()] > s.hour) return null;
         EcaQuote q = ecaQuote(c, p.equipment, b, freqMonths);
@@ -291,6 +305,19 @@ public final class Finance {
         return null;
     }
 
+    /** Santral satilinca ona bagli ECA kredisi (cezasiz) kapatilir; nakit yetmezse isletme kredisi kullanilir. */
+    void settleLinkedEca(Company c, Plant p) {
+        for (Loan l : c.loans) {
+            if (!l.open() || l.type != Loan.Type.ECA || l.linkedPlant != p.id) continue;
+            double owed = l.outstanding + l.accrued + l.dueAmount - l.pendingPrincipal + l.demand;
+            if (c.cash < owed) drawRevolver(c, owed - c.cash);
+            c.cash -= owed;
+            l.outstanding = 0; l.accrued = 0; l.dueAmount = 0; l.pendingPrincipal = 0; l.demand = 0;
+            close(c, l);
+            notifyFin(c, "Santral satışıyla " + l.name() + " kapatıldı (" + money(owed) + ").");
+        }
+    }
+
     private void close(Company c, Loan l) {
         l.status = Loan.Status.CLOSED;
         if (!l.everLate) rel(c, l.bank, FinanceBalance.REL_CLOSED);
@@ -350,7 +377,8 @@ public final class Finance {
             if (protect) continue;
             collect(c, l);
         }
-        // eksi nakit (isletme kredisi doluyken): 60 gunde temerrut sureci
+        // eksi nakit once isletme kredisinden karsilanir; yalnizca limit doluyken eksi kalir (60 gunde temerrut sureci)
+        if (c.cash < 0 && !protect) drawRevolver(c, -c.cash);
         if (c.cash < 0) {
             if (c.negativeSinceHour < 0) c.negativeSinceHour = s.hour;
             else if (!protect && s.hour - c.negativeSinceHour >= FinanceBalance.NEGATIVE_CASH_DAYS * 24L) {
@@ -428,6 +456,7 @@ public final class Finance {
     void ecaDefault(Company c, Loan l) {
         Plant p = s.nodeById(l.linkedPlant) instanceof Plant pp ? pp : null;
         double owed = l.outstanding + l.accrued + l.dueAmount - l.pendingPrincipal + l.demand;
+        l.status = Loan.Status.DEFAULTED; // satis sirasinda kapatma (settleLinkedEca) bu krediyi atlar
         double proceeds = 0;
         String buyerName = "Kamu varlık fonu";
         if (p != null && p.owner == c) {
@@ -557,7 +586,8 @@ public final class Finance {
         for (boolean b : c.bankCovenantBreach) c.dividendBan |= b;
         // ECA DSCR
         for (Loan l : new ArrayList<>(c.loans)) {
-            if (!l.open() || l.type != Loan.Type.ECA || s.hour < l.graceEndHour) continue;
+            // DSCR: odemesiz donem bittikten bir ceyrek sonra (tam bir faaliyet ceyregi) olculur
+            if (!l.open() || l.type != Loan.Type.ECA || s.hour < l.graceEndHour + 3L * HPM) continue;
             Plant p = s.nodeById(l.linkedPlant) instanceof Plant pp ? pp : null;
             if (p == null) continue;
             double service = Loan.annuity(l.outstanding, l.effectiveRate(), 12 / l.frequencyMonths, l.remainingPeriods()) * 3.0 / l.frequencyMonths;

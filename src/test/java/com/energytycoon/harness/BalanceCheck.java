@@ -17,7 +17,7 @@ public final class BalanceCheck {
             if (args[i].equals("--seeds")) seeds = Integer.parseInt(args[i + 1]);
             if (args[i].equals("--years")) years = Integer.parseInt(args[i + 1]);
         }
-        if (mode.equals("shares")) shares(seeds); else decade(seeds, years);
+        if (mode.equals("shares")) shares(seeds); else if (mode.equals("finance")) finance(seeds); else decade(seeds, years);
     }
 
     static GameState game(long seed, int size, int cities, String scenario) {
@@ -134,6 +134,54 @@ public final class BalanceCheck {
                 }
                 System.out.println(sb);
             }
+        }
+    }
+
+    /** Finans dengesi: NORMAL, 2040'a kadar; faiz yolu, yillik notlar, Net borc/FAVOK, gecikme/temerrut/iflas, kredi turu oranlari. */
+    static void finance(int seeds) {
+        for (int[] cfg : new int[][] { { 64, 5 }, { 96, 12 } }) {
+            int late = 0, def = 0, restr = 0, bankrupt = 0, firms = 0, bankruptFirst10 = 0;
+            double ecaVol = 0, comVol = 0, revPeak = 0; int ecaN = 0, comN = 0;
+            Map<String, Integer> defByType = new TreeMap<>();
+            for (long seed = 1; seed <= seeds; seed++) {
+                GameState s = game(seed, cfg[0], cfg[1], "free");
+                s.aiPlayer = true;
+                StringBuilder rates = new StringBuilder(), ratings = new StringBuilder();
+                java.util.Map<Company, StringBuilder> rt = new java.util.LinkedHashMap<>();
+                for (Company c : s.companies) if (!c.neutral) rt.put(c, new StringBuilder());
+                while (s.year() < 2041 && !s.gameOver) {
+                    s.tick(); s.messages.clear();
+                    if (s.hour % Balance.HOURS_PER_YEAR == 0) {
+                        rates.append(String.format(Locale.ROOT, " %d:%.2f", s.year() - 1, s.macro.policyRate * 100));
+                        for (Map.Entry<Company, StringBuilder> e : rt.entrySet()) {
+                            Company c = e.getKey();
+                            double lev = s.finance.leverage(c);
+                            e.getValue().append(String.format(Locale.ROOT, " %s(%s)", c.bankrupt ? "İFLAS" : s.finance.rating(c).name(),
+                                Double.isInfinite(lev) ? "∞" : String.format(Locale.ROOT, "%.1f", lev)));
+                        }
+                        for (Company c : s.companies) for (Loan l : c.loans) if (l.type == Loan.Type.REVOLVER) revPeak = Math.max(revPeak, l.outstanding);
+                    }
+                    if (s.year() == Balance.START_YEAR + 10 && s.hour % Balance.HOURS_PER_YEAR == 0)
+                        for (Company c : s.companies) if (!c.player && !c.neutral && c.bankrupt) bankruptFirst10++;
+                }
+                System.out.println("-- " + cfg[0] + "x" + cfg[0] + " tohum " + seed + (s.gameOver ? " (oyun bitti: " + s.gameOverReason + ")" : ""));
+                System.out.println("   politika faizi (yıl sonu %):" + rates);
+                for (Map.Entry<Company, StringBuilder> e : rt.entrySet()) {
+                    Company c = e.getKey();
+                    System.out.println("   " + String.format("%-15s", c.player ? "Oyuncu botu" : c.name) + " not(Net borç/FAVÖK):" + e.getValue());
+                    firms++; late += c.lateEvents; def += c.defaults; restr += c.restructures; if (c.bankrupt) bankrupt++;
+                    for (Loan l : c.loans) {
+                        if (l.status == Loan.Status.DEFAULTED) defByType.merge(l.type.label + (l.type == Loan.Type.ECA && l.dscrLowQuarters >= FinanceBalance.ECA_DSCR_DEFAULT_QUARTERS ? " (DSCR)" : l.daysLate >= FinanceBalance.DEFAULT_DAYS ? " (90 gün)" : " (iflas/çapraz)"), 1, Integer::sum);
+                        if (l.type == Loan.Type.ECA) { ecaN++; ecaVol += l.principal; }
+                        else if (l.type == Loan.Type.COMMERCIAL) { comN++; comVol += l.principal; }
+                    }
+                }
+            }
+            System.out.printf(Locale.ROOT, "== %dx%d, %d tohum, 2025–2040: %d şirket · gecikme %d · temerrüt %d · yapılandırma %d · iflas %d (ilk 10 yılda iflas eden rakip %d)%n",
+                cfg[0], cfg[0], seeds, firms, late, def, restr, bankrupt, bankruptFirst10);
+            System.out.printf(Locale.ROOT, "   krediler: ECA %d adet %.0fM$ (%%%.0f hacim) · ticari %d adet %.0fM$ · işletme kredisi en yüksek kullanım %.0fM$%n",
+                ecaN, ecaVol / 1e6, 100 * ecaVol / Math.max(1, ecaVol + comVol), comN, comVol / 1e6, revPeak / 1e6);
+            System.out.println("   temerrüde düşen krediler: " + defByType);
         }
     }
 }

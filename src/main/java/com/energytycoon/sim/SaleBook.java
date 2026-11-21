@@ -85,6 +85,7 @@ public final class SaleBook {
             if (ln.owner == null) { ln.requester = null; ln.annualCharge = 0; }
         }
         if (asset instanceof Plant p) {
+            if (from != null) s.finance.settleLinkedEca(from, p); // satistan once santrale bagli ECA kapatilir
             p.owner = to; p.preferredTm = 0;
             if (toNeutral) { p.legacy = false; p.retireYear = 0; }
         } else if (asset instanceof Substation t) {

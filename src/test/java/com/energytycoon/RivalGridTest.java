@@ -20,7 +20,7 @@ class RivalGridTest {
         s.aiPlayer = true;
         for (int h = 0; h < 10 * HPY && !s.gameOver; h++) { s.tick(); s.messages.clear(); }
         System.out.printf("%dx%d tohum %d: 10 yılda rakiplerin kurduğu TM %d, şu an haritada %d%n", size, size, seed,
-            s.statRivalTms, s.substations.stream().filter(t -> !t.owner.player).count());
+            s.statRivalTms, s.substations.stream().filter(t -> t.owner != null && !t.owner.player).count());
         return s.statRivalTms;
     }
 
