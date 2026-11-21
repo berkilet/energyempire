@@ -49,7 +49,7 @@ public final class Hud {
     private Label.LabelStyle badgeStyle;
     private final ImageButton investBtn, financeBtn, assetsBtn, selectBtn, demBtn, layerBtn;
     private final TextTooltip layerTip;
-    private final Map<Layer, TextButton> layerBtns = new EnumMap<>(Layer.class);
+    private final Map<Layer, Button> layerBtns = new EnumMap<>(Layer.class);
     private final InvestMenu invest;
     private final Label ctxTitle;
     @SuppressWarnings("rawtypes") private com.badlogic.gdx.scenes.scene2d.ui.Cell ctxTitleCell, placeInfoCell;
@@ -71,8 +71,8 @@ public final class Hud {
     public boolean substationsEnabled = true, operatorEnabled = true;
     private int curTmLevel;
     private static final Map<PlantType, String> PLANT_ICONS = new EnumMap<>(Map.of(
-        PlantType.COAL, "icon_factory", PlantType.GAS, "icon_factory", PlantType.SOLAR, "icon_solar",
-        PlantType.WIND, "icon_wind", PlantType.HYDRO, "icon_hydro", PlantType.NUCLEAR, "icon_bolt"));
+        PlantType.COAL, "icon_coal", PlantType.GAS, "icon_gas", PlantType.SOLAR, "icon_solar",
+        PlantType.WIND, "icon_wind", PlantType.HYDRO, "icon_hydro", PlantType.NUCLEAR, "icon_nuclear"));
     private final Map<PlantType, Equipment> chosen = new EnumMap<>(PlantType.class);
     private final ImageButton[] speedBtns = new ImageButton[4];
     private Label speedLbl;
@@ -147,7 +147,7 @@ public final class Hud {
         speedLbl = l("", "value");
         top.add(speedLbl).width(34).padLeft(4).padRight(6);
         String[][] wins = { { "icon_coin", "finance", "Finans (F)" }, { "icon_bolt", "market", "Piyasa ve tedarikçiler (M)" },
-                            { "icon_city", "companies", "Şirketler ve şehirler (C)" }, { null, "help", "Nasıl oynanır? (H)" },
+                            { "icon_city", "companies", "Şirketler ve şehirler (C)" }, { "icon_ui_help", "help", "Nasıl oynanır? (H)" },
                             { "icon_gear", "menu", "Menü: kaydet, yükle, ayarlar (Esc)" } };
         for (String[] w : wins) {
             final String a = w[1];
@@ -182,7 +182,9 @@ public final class Hud {
         layerPop.pad(6);
         layerPop.add(l("HARİTA KATMANI (L)", "dim")).left().padBottom(4).row();
         for (Layer ly : Layer.values()) {
-            TextButton b = new TextButton(ly.label, skin, "small");
+            com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = UiKit.iconButton(skin, ly.label, "layer_" + ly.name().toLowerCase(), "small", 22, 23);
+            b.getLabel().setAlignment(Align.left);
+            b.getLabelCell().padLeft(4).left().expandX();
             b.setProgrammaticChangeEvents(false);
             final Layer fl = ly;
             b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { cb.layer(fl); layerPop.setVisible(false); } });
@@ -198,7 +200,7 @@ public final class Hud {
             .add(plantGroup("Yenilenebilir", PlantType.SOLAR, PlantType.WIND, PlantType.HYDRO))
             .add(plantGroup("Nükleer", PlantType.NUCLEAR));
         InvestMenu.Group lineGroup = new InvestMenu.Group("Hat Çek");
-        for (LineTier t : LineTier.values()) lineGroup.add(new InvestMenu.Item("icon_pylon", t.label + "  (en çok " + (int) t.maxLength + " kare)",
+        for (LineTier t : LineTier.values()) lineGroup.add(new InvestMenu.Item("icon_inv_line", t.label + "  (en çok " + (int) t.maxLength + " kare)",
             () -> Fmt.mw(t.capacityMW) + " · " + Fmt.money(t.costPerTile) + "/kare",
             () -> true, () -> st == null || st.player.cash >= t.costPerTile * 3,
             () -> curTool == Tool.LINE && curTier == t,
@@ -211,11 +213,11 @@ public final class Hud {
         InvestMenu.Group openTenders = new InvestMenu.Group("Açık ihaleler");
         for (int k = 0; k < MAX_TENDER_ROWS; k++) {
             final int idx = k;
-            openTenders.add(new InvestMenu.Item("icon_city", () -> tenderAt(idx) == null ? "" : tenderAt(idx).city.name + " · " + Math.round(tenderAt(idx).mw) + " MW acil kapasite",
+            openTenders.add(new InvestMenu.Item("icon_inv_tender", () -> tenderAt(idx) == null ? "" : tenderAt(idx).city.name + " · " + Math.round(tenderAt(idx).mw) + " MW acil kapasite",
                 () -> tenderSub(tenderAt(idx)), () -> tenderAt(idx) != null, () -> true, () -> false,
                 () -> { Tender t = tenderAt(idx); if (t != null) { showTender(t.id); if (!invest.pinned()) hideInvest(); } }));
         }
-        InvestMenu.Group wonTenders = new InvestMenu.Group(null).add(new InvestMenu.Item("icon_coin",
+        InvestMenu.Group wonTenders = new InvestMenu.Group(null).add(new InvestMenu.Item("icon_inv_won",
             () -> "Kazanılan ihaleler (" + (st == null ? 0 : st.tenders.wonBy(st.player).size()) + ")", () -> "Yükümlülükler Varlıklarım → İhaleler'de",
             () -> st != null && !st.tenders.wonBy(st.player).isEmpty(), () -> true, () -> false, () -> cb.action("assets:tenders")));
         invest.add(plantsCat).add(new InvestMenu.Category("Bağlantı Yatırımları", false).add(lineGroup).add(tmGroup))
@@ -340,9 +342,10 @@ public final class Hud {
 
         menu = window("Menü");
         String[][] mi = { { "Devam Et", "menu" }, { "Kaydet (F5)", "save" }, { "Yükle (F9)", "load" }, { "Ayarlar", "settings" } };
-        for (String[] it : mi) menu.add(btn(it[0], it[1], "default")).width(240).height(34).pad(4).row();
-        menu.add(btn("Ana Menü", "main", "default")).width(240).height(34).pad(4).row();
-        menu.add(btn("Çıkış", "exit", "default")).width(240).height(34).pad(4).row();
+        String[] menuIcons = { "ui_resume", "ui_save", "ui_load", "ui_settings" };
+        for (int mk = 0; mk < mi.length; mk++) menu.add(iconBtn(mi[mk][0], mi[mk][1], menuIcons[mk])).width(240).height(34).pad(4).row();
+        menu.add(iconBtn("Ana Menü", "main", "ui_home")).width(240).height(34).pad(4).row();
+        menu.add(iconBtn("Çıkış", "exit", "ui_exit")).width(240).height(34).pad(4).row();
         menu.pack();
 
         gameOverLbl = l("", "default"); gameOverLbl.setWrap(true);
@@ -363,7 +366,7 @@ public final class Hud {
         lcOwnBtn = btn("Kendin kur", "lineOwn", "accent");
         own.add(lcOwnBtn).width(250).height(34);
         Table op = new Table(skin); op.setBackground("card"); op.pad(10);
-        op.add(l("UŞİ'YE BAŞVUR", "title")).left().row();
+        op.add(UiKit.iconLabel(skin, "org_usi", l("UŞİ'YE BAŞVUR", "title"), 26, 28)).left().row();
         op.add(lcOp).width(250).left().padTop(4).padBottom(8).row();
         lcOpBtn = btn("UŞİ'ye başvur", "lineOp", "default");
         op.add(lcOpBtn).width(250).height(34);
@@ -418,6 +421,12 @@ public final class Hud {
       + "Onaydan önce kontrol hakkı yoktur. Bir pazarda %50'yi aşan şirketin fiyatı ortalama üretim maliyeti + %15 ile sınırlıdır.\n\n"
       + "Kontroller: Sağ tık sürükle = kaydır, tekerlek = yakınlaştır, Q/E = döndür, WASD/oklar = kaydır, Boşluk = duraklat, "
       + "1/2/3 = hız (1x: bir gün 24 sn), B = yatırım, V = varlıklarım, Delete = yık, Tab = hat kademesi, L = katman, F5/F9 = kaydet/yükle, Esc = iptal/menü.";
+
+    private Button iconBtn(String text, String action, String icon) {
+        com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = UiKit.iconButton(skin, text, icon, "default", 24, 26);
+        b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor x) { cb.action(action); } });
+        return b;
+    }
 
     private TextButton btn(String text, String action, String style) {
         TextButton b = new TextButton(text, skin, style);
@@ -514,7 +523,7 @@ public final class Hud {
 
     private InvestMenu.Item tmItem(int level, String title, String sub) {
         double cost = level >= 2 ? GridBalance.TM380_COST : GridBalance.TM154_COST;
-        return new InvestMenu.Item("icon_pylon", title, () -> sub, () -> substationsEnabled, () -> st == null || st.player.cash >= cost,
+        return new InvestMenu.Item(level >= 2 ? "icon_inv_tm380" : "icon_inv_tm154", title, () -> sub, () -> substationsEnabled, () -> st == null || st.player.cash >= cost,
             () -> curTool == Tool.SUBSTATION && curTmLevel == level,
             () -> { cb.action("substation:" + level); if (!invest.pinned()) hideInvest(); });
     }
@@ -535,7 +544,7 @@ public final class Hud {
         InvestMenu.Group g = new InvestMenu.Group(null);
         for (int k = 0; k < MAX_TENDER_ROWS; k++) {
             final int idx = k;
-            g.add(new InvestMenu.Item("icon_coin", () -> listingAt(idx) == null ? "" : listingAt(idx).assetName(),
+            g.add(new InvestMenu.Item("icon_inv_sale", () -> listingAt(idx) == null ? "" : listingAt(idx).assetName(),
                 () -> { Listing l = listingAt(idx); return l == null ? "" : l.seller.name + " · " + Fmt.money(l.price) + " · kalan " + Math.max(0, (l.expiresHour - st.hour) / 24) + " gün"; },
                 () -> listingAt(idx) != null, () -> listingAt(idx) == null || st.player.cash >= listingAt(idx).price, () -> false,
                 () -> { Listing l = listingAt(idx); if (l != null) { showListing(l.id); if (!invest.pinned()) hideInvest(); } }));
@@ -992,7 +1001,7 @@ public final class Hud {
         demBtn.setChecked(tool == Tool.DEMOLISH);
         layerBtn.setChecked(layerPop.isVisible());
         assetsBtn.setChecked(assetsWin.isVisible());
-        for (Map.Entry<Layer, TextButton> e : layerBtns.entrySet()) e.getValue().setChecked(e.getKey() == layer);
+        for (Map.Entry<Layer, Button> e : layerBtns.entrySet()) e.getValue().setChecked(e.getKey() == layer);
         ((Label) layerTip.getActor()).setText("Harita katmanı (L) · Aktif: " + layer.label);
         if (investOpen()) invest.update();
         layoutOverlays();

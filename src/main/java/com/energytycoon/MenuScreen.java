@@ -24,7 +24,7 @@ public final class MenuScreen implements Screen {
     private final EnergyGame game;
     private final Skin skin;
     private final Stage stage = new Stage(new ScreenViewport());
-    private final Texture bgTex;
+    private final Texture bgTex, logoTex;
     private final Table root = new Table();
     private Label status;
 
@@ -46,6 +46,8 @@ public final class MenuScreen implements Screen {
         settings.seed = 1 + new Random().nextInt(99999);
         bgTex = new Texture(Gdx.files.classpath("ui/menu_background.jpg"), true);
         bgTex.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
+        logoTex = new Texture(Gdx.files.classpath("ui/logo_emblem.png"), true);
+        logoTex.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
         Image bg = new Image(bgTex);
         bg.setScaling(Scaling.fill);
         bg.setFillParent(true);
@@ -66,12 +68,21 @@ public final class MenuScreen implements Screen {
         return b;
     }
 
+    /** Logo rozeti + oyun adi ve alt basligi. */
+    private Table titleBlock() {
+        Table t = new Table();
+        t.add(new Image(logoTex)).size(88, 100).padRight(16);
+        Table names = new Table();
+        names.add(new Label("ENERJİ İMPARATORLUĞU", skin, "huge")).left().row();
+        names.add(new Label("Enerji şirketi yönetim ve ekonomi simülasyonu", skin, "title")).left().row();
+        t.add(names).left();
+        return t;
+    }
+
     private void showMain() {
         root.clear();
         Table col = new Table();
-        col.add(new Label("ENERJİ İMPARATORLUĞU", skin, "huge")).left().row();
-        Label sub = new Label("Enerji şirketi yönetim ve ekonomi simülasyonu", skin, "title");
-        col.add(sub).left().padBottom(26).row();
+        col.add(titleBlock()).left().padBottom(26).row();
 
         Table body = new Table();
         body.defaults().width(330).padTop(8);
@@ -94,8 +105,7 @@ public final class MenuScreen implements Screen {
     public void showSettings() {
         root.clear();
         Table col = new Table();
-        col.add(new Label("ENERJİ İMPARATORLUĞU", skin, "huge")).left().row();
-        col.add(new Label("Enerji şirketi yönetim ve ekonomi simülasyonu", skin, "title")).left().padBottom(26).row();
+        col.add(titleBlock()).left().padBottom(26).row();
         Table body = new Table();
         body.add(com.energytycoon.ui.SettingsPanel.build(skin, game)).left().row();
         body.add(button("Geri", "menu", this::showMain)).width(330).height(50).padTop(14);
@@ -308,5 +318,5 @@ public final class MenuScreen implements Screen {
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
-    @Override public void dispose() { stage.dispose(); bgTex.dispose(); if (previewTex != null) previewTex.dispose(); }
+    @Override public void dispose() { stage.dispose(); bgTex.dispose(); logoTex.dispose(); if (previewTex != null) previewTex.dispose(); }
 }

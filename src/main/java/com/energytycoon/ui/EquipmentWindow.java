@@ -65,7 +65,8 @@ public final class EquipmentWindow extends Window {
                 if (locked) l.setColor(0.55f, 0.58f, 0.62f, 1);
                 else if (i == 3 && !afford) l.setColor(1f, 0.55f, 0.5f, 1);
                 if (i == 7) l.setColor(locked ? Color.GRAY : new Color(1f, 0.85f, 0.3f, 1));
-                r.add(l).width(widths[i]).left().pad(4, 4, 4, 0);
+                if (i == 0) r.add(UiKit.iconLabel(skin, "sup_" + e.supplier.id, l, 26, 28)).width(widths[i]).left().pad(4, 4, 4, 0);
+                else r.add(l).width(widths[i]).left().pad(4, 4, 4, 0);
             }
             if (locked) {
                 r.row();

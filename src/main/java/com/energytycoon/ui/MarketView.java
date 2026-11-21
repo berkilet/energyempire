@@ -30,14 +30,14 @@ public final class MarketView {
         gasSub = new Label("", skin, "dim");
 
         Table r1 = new Table();
-        r1.add(UiKit.card(skin, "Elektrik fiyatı (ort.)", price, new Label("$/MWh, şu an", skin, "dim"))).width(150).padRight(6);
-        r1.add(UiKit.card(skin, "Kömür", coal, new Label("$/MWh ısıl", skin, "dim"))).width(112).padRight(6);
-        r1.add(UiKit.card(skin, "Doğalgaz", gas, gasSub)).width(112).padRight(6);
-        r1.add(UiKit.card(skin, "Uranyum", uranium, new Label("$/MWh ısıl", skin, "dim"))).width(112).padRight(6);
-        r1.add(UiKit.card(skin, "Karbon vergisi", carbon, new Label("$/ton CO₂", skin, "dim"))).width(130);
+        r1.add(UiKit.card(skin, "Elektrik fiyatı (ort.)", price, new Label("$/MWh, şu an", skin, "dim"), "fuel_price")).width(150).padRight(6);
+        r1.add(UiKit.card(skin, "Kömür", coal, new Label("$/MWh ısıl", skin, "dim"), "fuel_coal")).width(112).padRight(6);
+        r1.add(UiKit.card(skin, "Doğalgaz", gas, gasSub, "fuel_gas")).width(112).padRight(6);
+        r1.add(UiKit.card(skin, "Uranyum", uranium, new Label("$/MWh ısıl", skin, "dim"), "fuel_uranium")).width(112).padRight(6);
+        r1.add(UiKit.card(skin, "Karbon vergisi", carbon, new Label("$/ton CO₂", skin, "dim"), "fuel_carbon")).width(130);
         root.add(r1).padBottom(6).row();
         Table r2 = new Table();
-        r2.add(UiKit.card(skin, "Rüzgar", wind, null)).width(150).padRight(6);
+        r2.add(UiKit.card(skin, "Rüzgar", wind, null, "fuel_wind")).width(150).padRight(6);
         r2.add(UiKit.card(skin, "Bulut örtüsü", cloud, null)).width(112).padRight(6);
         r2.add(UiKit.card(skin, "Yenilenebilir pay", renew, null)).width(236).padRight(6);
         r2.add(UiKit.card(skin, "Karşılanan talep", served, new Label("geçen ay", skin, "dim"))).width(130);

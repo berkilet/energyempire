@@ -20,6 +20,7 @@ import java.util.function.Consumer;
  * Her sekmede ozet satiri, sutuna gore siralama, "yalnizca sorunlu" filtresi; satira tiklaninca kamera varliga gider.
  */
 public final class AssetsView {
+    private static final String[] TAB_ICONS = { "as_plants", "as_lines", "as_substations", "as_opapps", "as_tenders" };
     public enum Tab {
         PLANTS("Santraller"), LINES("Hatlar"), SUBSTATIONS("Trafo Merkezleri"), OPERATOR("UŞİ Başvurularım"), TENDERS("İhaleler");
         final String label;
@@ -53,9 +54,9 @@ public final class AssetsView {
         this.skin = skins.skin;
         this.action = action;
         root.defaults().left();
-        ButtonGroup<TextButton> g = new ButtonGroup<>();
+        ButtonGroup<com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton> g = new ButtonGroup<>();
         for (Tab t : Tab.values()) {
-            TextButton b = new TextButton(t.label, skin, "small");
+            com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = UiKit.iconButton(skin, t.label, TAB_ICONS[t.ordinal()], "small", 20, 21);
             b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { if (b.isChecked()) setTab(t); } });
             g.add(b);
             tabs.add(b).height(30).padRight(3);
@@ -85,7 +86,7 @@ public final class AssetsView {
         key = "";
         if (settingTab) return;
         settingTab = true; // setChecked dinleyiciyi tetikler; ic ice cagri olmasin
-        for (int i = 0; i < tabs.getChildren().size; i++) ((TextButton) tabs.getChildren().get(i)).setChecked(Tab.values()[i] == t);
+        for (int i = 0; i < tabs.getChildren().size; i++) ((com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton) tabs.getChildren().get(i)).setChecked(Tab.values()[i] == t);
         settingTab = false;
     }
 

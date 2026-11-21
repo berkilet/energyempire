@@ -16,6 +16,7 @@ import java.util.function.Consumer;
  * eylemler), Piyasa ve Faiz (politika faizi, beklenti, olaylar, endeks). Butun metinler sarilir; uzun tablolar kaydirilir.
  */
 public final class FinanceCenter {
+    private static final String[] TAB_ICONS = { "fin_summary", "fin_schedule", "fin_loans", "fin_market", "fin_capital", "fin_mna" };
     public enum Tab { SUMMARY("Özet"), SCHEDULE("Ödeme Takvimi"), LOANS("Krediler"), MARKET("Piyasa ve Faiz"), CAPITAL("Sermaye"), MNA("Birleşme ve Satın Alma");
         final String label; Tab(String l) { label = l; } }
 
@@ -54,10 +55,10 @@ public final class FinanceCenter {
         capitalTab = new CapitalTab(skins, action);
         mnaTab = new MnaTab(skins, action);
         root.defaults().left();
-        ButtonGroup<TextButton> g = new ButtonGroup<>();
+        ButtonGroup<com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton> g = new ButtonGroup<>();
         settingTab = true;
         for (Tab t : Tab.values()) {
-            TextButton b = new TextButton(t.label, skin, "small");
+            com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = UiKit.iconButton(skin, t.label, TAB_ICONS[t.ordinal()], "small", 20, 21);
             b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { if (b.isChecked() && !settingTab) setTab(t); } });
             g.add(b);
             tabs.add(b).height(30).padRight(3);
@@ -137,7 +138,7 @@ public final class FinanceCenter {
     public void setTab(Tab t) {
         tab = t;
         settingTab = true;
-        for (int i = 0; i < tabs.getChildren().size; i++) ((TextButton) tabs.getChildren().get(i)).setChecked(Tab.values()[i] == t);
+        for (int i = 0; i < tabs.getChildren().size; i++) ((com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton) tabs.getChildren().get(i)).setChecked(Tab.values()[i] == t);
         settingTab = false;
         bodyCell.setActor(switch (t) { case SUMMARY -> summary; case SCHEDULE -> schedule; case LOANS -> loans; case MARKET -> market;
             case CAPITAL -> capitalTab.root; case MNA -> mnaTab.root; });
@@ -361,7 +362,11 @@ public final class FinanceCenter {
             String[] c = { b.label + (p.bankBanUntil[b.ordinal()] > s.hour ? "\n(kredi yok: " + date(p.bankBanUntil[b.ordinal()]) + "'e kadar)" : ""),
                 String.valueOf(p.bankScore[b.ordinal()]), Bank.tierLabel(p.bankScore[b.ordinal()]), Fmt.money(exp),
                 "%" + Math.round(100 * exp / Math.max(1, cap)) + " (" + Fmt.money(cap) + ")", b.profile };
-            for (int i = 0; i < c.length; i++) { Label lb = new Label(c[i], skin, "small"); lb.setWrap(true); row.add(lb).width(bw[i]).padRight(6); }
+            for (int i = 0; i < c.length; i++) {
+                Label lb = new Label(c[i], skin, "small"); lb.setWrap(true);
+                if (i == 0) { lb.setWrap(false); row.add(UiKit.iconLabel(skin, "bank_" + b.name().toLowerCase(), lb, 26, 28)).width(bw[i]).left().padRight(6); }
+                else row.add(lb).width(bw[i]).padRight(6);
+            }
             loans.add(row).padBottom(2).row();
         }
         Label tiers = new Label("Kademeler: 30+ peşin masrafta %50 indirim · 60+ prim −0,15 puan, peşin masraf yok · 90+ prim −0,30 puan, erken kapama cezası yok. "
