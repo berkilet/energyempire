@@ -42,6 +42,8 @@ public final class GameState {
     public final GridOperator operator = new GridOperator(this);
     /** Acil kapasite ihaleleri. */
     public final TenderBook tenders = new TenderBook(this);
+    /** Varlik satis ilanlari. */
+    public final SaleBook sales = new SaleBook(this);
     /** Mesaj -> tiklaninca yapilacak eylem (ör. "tender:12"). */
     public final Map<String, String> messageActions = new HashMap<>();
     /** Test/dogrulama: kendi hatlari insaat beklemeden aktif olur (kayda yazilmaz). */
@@ -535,11 +537,11 @@ public final class GameState {
         return l;
     }
 
-    /** Kademe yukseltme bedeli: (yeni - eski indirimsiz maliyet) x (1 + prim). */
+    /** Kademe yukseltme bedeli: (yeni - eski indirimsiz maliyet) x UPGRADE_COST_FACTOR. */
     public double upgradeCost(PowerLine l) {
         LineTier to = l.tier.up();
         if (to == null) return 0;
-        return (routeCost(l.a, l.b, to) - routeCost(l.a, l.b, l.tier)) * (1 + GridBalance.UPGRADE_PREMIUM);
+        return (routeCost(l.a, l.b, to) - routeCost(l.a, l.b, l.tier)) * GridBalance.UPGRADE_COST_FACTOR;
     }
 
     public int upgradeHours(PowerLine l) {
@@ -584,7 +586,7 @@ public final class GameState {
     public boolean affectsPlayer(PowerLine l) {
         if (l.owner != null && l.owner.player || l.requester != null && l.requester.player) return true;
         for (GridNode n : new GridNode[] { l.a, l.b })
-            if (n instanceof Plant p && p.owner.player || n instanceof Substation t && t.owner.player) return true;
+            if (n instanceof Plant p && p.owner.player || n instanceof Substation t && t.playerOwned()) return true;
         return false;
     }
 
@@ -678,6 +680,7 @@ public final class GameState {
         if (t.pendingUpgrade != 0) return "Devam eden bir yükseltme var";
         if (kind == 2 && t.level >= 2) return "Zaten TM380";
         double cost = kind == 1 ? GridBalance.TM_PLUS_COST : GridBalance.TM380_UPGRADE_COST;
+        if (t.owner == null) return "UŞİ'nin trafo merkezi";
         if (t.owner.cash < cost) return "Yetersiz nakit (" + Math.round(cost / 1e6) + "M $ gerekli)";
         t.owner.cash -= cost; t.owner.capexSpent += cost; t.buildCost += cost;
         t.pendingUpgrade = kind;
@@ -688,7 +691,7 @@ public final class GameState {
     private void finishSubstationUpgrade(Substation t) {
         if (t.pendingUpgrade == 1) t.transformerMW += GridBalance.TM_PLUS_MW;
         else { t.level = 2; t.transformerMW = Math.max(t.transformerMW, GridBalance.TM380_MW); }
-        if (t.owner.player) notify(t.name() + ": yükseltme tamamlandı (" + Math.round(t.transformerMW) + " MW)");
+        if (t.playerOwned()) notify(t.name() + ": yükseltme tamamlandı (" + Math.round(t.transformerMW) + " MW)");
         t.pendingUpgrade = 0; t.upgradeHoursLeft = 0;
         topoDirty = true;
     }
@@ -697,7 +700,7 @@ public final class GameState {
         if (!substations.remove(t)) return;
         for (PowerLine l : new ArrayList<>(t.lines)) removeLine(l, refund);
         for (Plant p : plants) if (p.preferredTm == t.id) p.preferredTm = 0;
-        if (refund) t.owner.cash += t.bookValue(hour) * Balance.DEMOLISH_REFUND;
+        if (refund && t.owner != null) t.owner.cash += t.bookValue(hour) * Balance.DEMOLISH_REFUND;
         nodeById.remove(t.id); occ[map.idx(t.x, t.y)] = -1;
         topoDirty = true;
     }
@@ -1011,7 +1014,7 @@ public final class GameState {
             p.daysTracked = Math.min(30, p.daysTracked + 1);
         }
         markets.hourly(rng);
-        if (hod == 0) { markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); tenders.daily(); }
+        if (hod == 0) { markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); tenders.daily(); sales.daily(); }
 
         boolean changed = false;
         for (Plant p : plants) {
@@ -1042,7 +1045,7 @@ public final class GameState {
             if (t.buildHoursLeft > 0) {
                 if (--t.buildHoursLeft == 0) {
                     changed = true; t.builtAtHour = hour;
-                    if (t.owner.player) notify(t.name() + " devreye girdi (" + Math.round(t.transformerMW) + " MW trafo)");
+                    if (t.playerOwned()) notify(t.name() + " devreye girdi (" + Math.round(t.transformerMW) + " MW trafo)");
                 }
             } else if (t.pendingUpgrade != 0 && --t.upgradeHoursLeft <= 0) finishSubstationUpgrade(t);
         }
@@ -1170,7 +1173,8 @@ public final class GameState {
                 if (tm != null && tm.owner != o && tm.accessFeePerMWh > 0) {
                     double fee = out * (1 - p.cp.lossFraction) * tm.accessFeePerMWh;
                     o.cash -= fee; o.accessCost += fee; p.monthProfit -= fee;
-                    tm.owner.cash += fee; tm.owner.accessIncome += fee; tm.accessIncomeMonth += fee;
+                    if (tm.owner != null) { tm.owner.cash += fee; tm.owner.accessIncome += fee; } // UŞİ TM'si: bedel UŞİ'ye
+                    tm.accessIncomeMonth += fee;
                 }
                 p.lifetimeMWh += out;
                 co2 += out * pco2;
@@ -1266,9 +1270,8 @@ public final class GameState {
                 if (c.player) {
                     gameOver = true; gameOverReason = "Şirketiniz iflas etti. Nakit tükendi ve borç ödenemedi.";
                 } else {
-                    notify(c.name + " iflas etti!");
-                    for (Plant p : new ArrayList<>(plants)) if (p.owner == c) demolishPlant(p);
-                    for (Substation t : new ArrayList<>(substations)) if (t.owner == c) demolishSubstation(t, true);
+                    // Varliklar yikilmaz: santraller Kamu'ya (istemezse kapatilir), trafo merkezleri ve hatlar UŞİ'ye.
+                    sales.bankruptcy(c);
                 }
             } else if (c.player && c.cash < 0) {
                 notify("UYARI: Nakit negatif! Borçlanın veya giderleri azaltın.");

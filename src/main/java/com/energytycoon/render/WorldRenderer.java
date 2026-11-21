@@ -288,7 +288,7 @@ public final class WorldRenderer implements Disposable {
                 sv = new SubVis(); sv.level = t.level;
                 sv.body = new ModelInstance(models.substation(t.level));
                 sv.flag = new ModelInstance(models.flag);
-                sv.flag.materials.get(0).set(ColorAttribute.createDiffuse(new Color((t.owner.colorRgb << 8) | 0xFF)));
+                sv.flag.materials.get(0).set(ColorAttribute.createDiffuse(t.owner == null ? new Color(0.75f, 0.92f, 1f, 1) : new Color((t.owner.colorRgb << 8) | 0xFF)));
                 subVis.put(t.id, sv);
             }
         }
@@ -784,6 +784,7 @@ public final class WorldRenderer implements Disposable {
         for (ConnectionPoint cp : state.connectionPoints()) {
             if (cp.members.size() < 2 && cp.tm == null) continue;
             Company owner = cp.tm != null ? cp.tm.owner : cp.members.get(0).owner;
+            if (owner == null) continue;
             if (!owner.player) continue;
             Color col = cp.tm != null ? new Color(0.35f, 0.6f, 0.9f, 1) : new Color(1f, 0.85f, 0.3f, 1);
             for (Plant m : cp.members) ti = tile(ti, m.x, m.y, col, 0.22f, 1.06f);

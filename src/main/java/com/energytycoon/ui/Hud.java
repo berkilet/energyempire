@@ -204,7 +204,8 @@ public final class Hud {
             () -> "Kazanılan ihaleler (" + (st == null ? 0 : st.tenders.wonBy(st.player).size()) + ")", () -> "Yükümlülükler Varlıklarım → İhaleler'de",
             () -> st != null && !st.tenders.wonBy(st.player).isEmpty(), () -> true, () -> false, () -> cb.action("assets:tenders")));
         invest.add(plantsCat).add(new InvestMenu.Category("Bağlantı Yatırımları", false).add(lineGroup).add(tmGroup))
-            .add(new InvestMenu.Category("İhaleler", false).add(openTenders).add(wonTenders));
+            .add(new InvestMenu.Category("İhaleler", false).add(openTenders).add(wonTenders))
+            .add(new InvestMenu.Category("Satıştaki Varlıklar", false).add(saleGroup()));
         invest.update();
         invest.root.setVisible(false);
 
@@ -349,6 +350,8 @@ public final class Hud {
       + "Bitişik kendi santralleriniz tek bağlantı noktasıdır (küme): tek hattı paylaşırlar. Trafo merkezi (Yatırım → Bağlantı) "
       + "yarıçapındaki santrallerinizi toplar; ihracatı trafo gücü ve hatlarla sınırlıdır. Başkasının açık TM'sine bağlanınca MWh başına erişim bedeli ödersiniz.\n"
       + "Bir şehir 12 ay üst üste %60'ın altında kalırsa UŞİ acil kapasite ihalesi açar (Yatırım → İhaleler): en düşük 10 yıllık fiyat teklifi kazanır, kazanan 24 ayda kurmazsa teminatı yanar.\n"
+      + "Nakit sıkışırsa santralinizi/TM'nizi satışa çıkarabilirsiniz (seçim paneli): 30 gün şirketlere açık; alıcı çıkmazsa santrali Kamu (isterse), TM'yi UŞİ taban fiyattan alır. "
+      + "Rakiplerin ilanları Yatırım → Satıştaki Varlıklar'da. İflas eden şirketin varlıkları yıkılmaz, Kamu'ya ve UŞİ'ye geçer.\n"
       + "4) Her saat talep en ucuz santralden başlayarak karşılanır (merit order). Fiyat son devreye giren santralin maliyetidir.\n"
       + "5) Kendi santralinizi seçince yükseltme butonları çıkar: güneşte tracker ve robotik temizlik, rüzgarda repowering, "
       + "kömür/gazda karbon yakalama, nükleerde ömür uzatma vb.\n"
@@ -401,6 +404,62 @@ public final class Hud {
     public void setTmLevel(int level) { curTmLevel = level; }
 
     static final int MAX_TENDER_ROWS = 8;
+
+    // ----- satistaki varliklar (baska sirketlerin ilanlari)
+    private Listing listingAt(int i) {
+        if (st == null) return null;
+        int k = 0;
+        for (Listing l : st.sales.open()) if (l.seller != st.player && k++ == i) return l;
+        return null;
+    }
+
+    private InvestMenu.Group saleGroup() {
+        InvestMenu.Group g = new InvestMenu.Group(null);
+        for (int k = 0; k < MAX_TENDER_ROWS; k++) {
+            final int idx = k;
+            g.add(new InvestMenu.Item("icon_coin", () -> listingAt(idx) == null ? "" : listingAt(idx).assetName(),
+                () -> { Listing l = listingAt(idx); return l == null ? "" : l.seller.name + " · " + Fmt.money(l.price) + " · kalan " + Math.max(0, (l.expiresHour - st.hour) / 24) + " gün"; },
+                () -> listingAt(idx) != null, () -> listingAt(idx) == null || st.player.cash >= listingAt(idx).price, () -> false,
+                () -> { Listing l = listingAt(idx); if (l != null) { showListing(l.id); if (!invest.pinned()) hideInvest(); } }));
+        }
+        return g;
+    }
+
+    private Window listingWin;
+    private Label listingInfo;
+    private TextButton listingBuy;
+    private int listingId;
+
+    public void showListing(int id) {
+        if (st == null || st.sales.get(id) == null) return;
+        listingId = id;
+        if (listingWin == null) {
+            listingWin = window("Varlık Satışı");
+            listingInfo = l("", "small"); listingInfo.setWrap(true);
+            listingWin.add(listingInfo).width(480).left().row();
+            Table bt = new Table();
+            listingBuy = btnRun("Satın al", () -> cb.action("buy:" + listingId));
+            bt.add(listingBuy).width(220).height(34).padRight(8);
+            bt.add(btnRun("Haritada göster", () -> { Listing l = st.sales.get(listingId); if (l != null) cb.action("focus:node:" + l.asset.id); })).width(150).height(34).padRight(8);
+            bt.add(btnRun("Kapat", () -> listingWin.setVisible(false))).width(100).height(34);
+            listingWin.add(bt).padTop(10);
+            stage.addActor(listingWin);
+        }
+        Listing l = st.sales.get(id);
+        StringBuilder sb = new StringBuilder();
+        sb.append(l.assetName()).append('\n').append("Satıcı: ").append(l.seller.name).append(" · durum: ").append(l.status.label).append('\n')
+          .append("Fiyat: ").append(Fmt.money(l.price)).append(" (defter değerinin %").append(Math.round(Balance.SALE_ASK * 100)).append("'i; sahibinin bağlı hatları dahil)\n");
+        if (l.asset instanceof Plant p) sb.append("Geçen ay kâr: ").append(Fmt.money(p.lastMonthProfit)).append(" · yaş ").append(Fmt.f1(p.ageYears(st.hour))).append(" yıl\n");
+        if (l.status == Listing.Status.OPEN) sb.append("Kalan süre: ").append(Math.max(0, (l.expiresHour - st.hour) / 24)).append(" gün. Alıcı çıkmazsa ")
+            .append(l.asset instanceof Substation ? "UŞİ" : "Kamu (isterse)").append(" taban fiyattan alır.");
+        listingInfo.setText(sb.toString());
+        listingBuy.setText("Satın al — " + Fmt.money(l.price));
+        listingBuy.setDisabled(l.status != Listing.Status.OPEN || l.seller == st.player || st.player.cash < l.price);
+        listingWin.pack(); center(listingWin);
+        listingWin.setVisible(true); listingWin.toFront();
+    }
+
+    public void hideListing() { if (listingWin != null) listingWin.setVisible(false); }
 
     private Tender tenderAt(int i) {
         if (st == null) return null;

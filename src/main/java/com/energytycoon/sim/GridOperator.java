@@ -133,6 +133,50 @@ public final class GridOperator {
         return new int[] { min, min + GridBalance.OP_ETA_SPREAD_MONTHS };
     }
 
+    // ------------------------------------------------------------ kendin kur / UŞİ karsilastirmasi
+    /** Ayni hesap oyuncunun hat penceresinde gosterilir ve rakip YZ'nin kararinda kullanilir. */
+    public static final class Choice {
+        public double lineCost, ownCost, opCost, delayLoss, delayMonths, ownUpfront, opUpfront, monthlyMargin;
+        public int ownDays;
+        public int[] eta;
+        public boolean ownBetter() { return ownCost <= opCost; }
+    }
+
+    /**
+     * 15 yillik bugunku deger (iskonto %8): kendin kur = bedel + bakim - kalan defter degeri; UŞİ = basvuru + katki + yillik bedel
+     * + bekleme kaybi. Bekleme kaybi: santral hazir oldugunda hattin hazir olma farki (ay) x santralin aylik beklenen marji.
+     * plantReadyMonths: santralin devreye girmesine kalan ay (yeni santralde insaat suresi); monthlyMargin: beklenen aylik brut kar.
+     */
+    public Choice compare(GridNode a, GridNode b, LineTier tier, double plantReadyMonths, double monthlyMargin) {
+        Choice c = new Choice();
+        double len = s.lineLength(a, b);
+        c.lineCost = s.lineCost(a, b, tier);
+        c.ownDays = tier.buildDays(len);
+        c.eta = estimate(tier, len);
+        int n = GridBalance.LINE_COMPARE_YEARS;
+        double r = GridBalance.LINE_COMPARE_DISCOUNT;
+        double af = (1 - Math.pow(1 + r, -n)) / r, df = Math.pow(1 + r, -n);
+        double om = len * tier.omPerTileYear;
+        double residual = c.lineCost * Math.max(GridBalance.LINE_BOOK_FLOOR, 1 - n / (double) GridBalance.LINE_LIFE_YEARS) * df;
+        c.ownUpfront = c.lineCost;
+        c.ownCost = c.lineCost + om * af - residual;
+        c.opUpfront = applicationCost(c.lineCost);
+        double etaMid = (c.eta[0] + c.eta[1]) / 2.0;
+        double readyOwn = Math.max(plantReadyMonths, c.ownDays / 30.0), readyOp = Math.max(plantReadyMonths, etaMid);
+        c.delayMonths = Math.max(0, readyOp - readyOwn);
+        c.monthlyMargin = Math.max(0, monthlyMargin);
+        c.delayLoss = c.delayMonths * c.monthlyMargin;
+        c.opCost = c.opUpfront + annualCharge(c.lineCost) * af + c.delayLoss;
+        return c;
+    }
+
+    /** Santralin beklenen aylik brut kari (bugunku fiyat ve marjinal maliyetle; hat kapasitesiyle sinirli). */
+    public double expectedMonthlyMargin(Plant p, LineTier tier) {
+        double cf = switch (p.type) { case SOLAR -> 0.22; case WIND -> 0.33; case HYDRO -> 0.5; case NUCLEAR -> 0.9; default -> 0.6; };
+        double mw = Math.min(p.capacityMW(), tier.capacityMW);
+        return mw * cf * Balance.HOURS_PER_MONTH * Math.max(0, s.statPrice - s.marginalCost(p));
+    }
+
     public double accelerateCost(PowerLine l) { return GridBalance.OP_ACCELERATE * l.buildCost; }
 
     /** Hizlandirma (bir kez): planlama en fazla 2 aya iner, kuyruk basina gecer. Null: tamam. */

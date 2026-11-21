@@ -110,7 +110,7 @@ class RouteTest {
         PowerLine l = s.buildLine(s.player, p, c, LineTier.OG);
         s.markTopologyDirty(); s.tick();
         assertEquals(60, p.outputMW, 1e-6, "OG 60 MW");
-        double expect = (s.routeCost(p, c, LineTier.YG) - s.routeCost(p, c, LineTier.OG)) * (1 + GridBalance.UPGRADE_PREMIUM);
+        double expect = (s.routeCost(p, c, LineTier.YG) - s.routeCost(p, c, LineTier.OG)) * GridBalance.UPGRADE_COST_FACTOR;
         assertEquals(expect, s.upgradeCost(l), 1e-6);
         double cash = s.player.cash, book = l.buildCost;
         assertNull(s.upgradeLine(s.player, l));

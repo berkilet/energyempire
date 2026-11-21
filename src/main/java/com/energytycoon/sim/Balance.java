@@ -53,4 +53,13 @@ public final class Balance {
     public static final double TENDER_MIN_PRICE = 20, TENDER_MAX_PRICE = 300;
     /** Rakip teklifi: 10 yillik sermaye geri kazanim katsayisi ve kar marji (stile gore +/-). */
     public static final double TENDER_CRF = 0.149, TENDER_RIVAL_MARGIN = 0.15;
+
+    // ---- Varlik satisi ve iflas devri
+    /** Satis ilani: istenen fiyat ve son alici (Kamu/UŞİ) taban fiyati, defter degerinin orani; ilan suresi. */
+    public static final double SALE_ASK = 0.85, SALE_FLOOR = 0.60;
+    public static final int SALE_DAYS = 30;
+    /** Kamu, zarar eden santrali yalnizca sebeke parcasinin arzi tepe talebin bu katinin altindaysa alir. */
+    public static final double SALE_KAMU_SUPPLY = 1.10;
+    /** Rakip YZ: nakit bunun altina dusunce varlik satisina cikar; satin alirken beklenen yillik getiri esigi. */
+    public static final double DISTRESS_CASH = 0, RIVAL_BUY_YIELD = 0.10;
 }

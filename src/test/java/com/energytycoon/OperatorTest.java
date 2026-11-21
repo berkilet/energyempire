@@ -104,7 +104,7 @@ class OperatorTest {
         // bos slot varsa kuyruk ayni saatte insaata gecer (QUEUED gozlenmeyebilir)
         List<String> core = new ArrayList<>(phases); core.remove("QUEUED");
         assertEquals(List.of("PLANNED", "BUILDING", "ACTIVE"), core);
-        assertTrue(months >= GridBalance.OP_PLANNING_MONTHS + LineTier.YG.buildDays(l.lengthTiles) * 1.5 / 30 - 0.1);
+        assertTrue(months >= GridBalance.OP_PLANNING_MONTHS + LineTier.YG.buildDays(l.lengthTiles) * GridBalance.OP_BUILD_MULT / 30 - 0.1);
         assertTrue(p.outputMW > 0 || s.hour > 0);
         // yillik bedel: aylik tahakkuk (gelir tablosunda)
         hours(s, 3 * HPM);

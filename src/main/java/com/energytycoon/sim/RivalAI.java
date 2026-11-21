@@ -9,6 +9,8 @@ public final class RivalAI {
     private RivalAI() {}
 
     public static void monthly(GameState s, Company c) {
+        distress(s, c);
+        buyListings(s, c);
         tenders(s, c);
         substations(s, c);
         lineUpgrades(s, c);
@@ -41,6 +43,34 @@ public final class RivalAI {
         for (Equipment e : new Equipment[] { first, second, third }) {
             if (e == null || e.capex() + GridBalance.RIVAL_BUILD_RESERVE > c.cash) continue;
             if (buildNear(s, c, e, target, GridBalance.RIVAL_BUILD_RESERVE) != null) return;
+        }
+    }
+
+    // ------------------------------------------------------------ varlik satisi
+    /** Nakit eksiye dusunce en az kazandiran varliklarindan baslayarak, acigi + yedegi kapatacak kadarini satisa cikarir. */
+    static void distress(GameState s, Company c) {
+        if (c.cash >= Balance.DISTRESS_CASH) return;
+        double need = -c.cash + GridBalance.RIVAL_BUILD_RESERVE, listed = 0;
+        for (Listing l : s.sales.open()) if (l.seller == c) listed += l.price;
+        if (listed >= need) return;
+        List<GridNode> cand = new ArrayList<>();
+        for (Plant p : s.plants) if (p.owner == c && s.sales.openListingOf(p) == null) cand.add(p);
+        cand.sort(java.util.Comparator.comparingDouble(n -> ((Plant) n).lastMonthProfit));
+        for (Substation t : s.substations) if (t.owner == c && s.sales.openListingOf(t) == null) cand.add(t);
+        for (GridNode n : cand) {
+            if (listed >= need) break;
+            if (s.sales.list(c, n) == null) listed += s.sales.openListingOf(n).price;
+        }
+    }
+
+    /** Ilanlardan alim: santral yillik kari / fiyat >= esik; TM yaricapinda kendi santrali varsa. Ayda en fazla bir alim. */
+    static void buyListings(GameState s, Company c) {
+        for (Listing l : s.sales.open()) {
+            if (l.seller == c || c.cash < l.price + GridBalance.RIVAL_BUILD_RESERVE) continue;
+            boolean want = false;
+            if (l.asset instanceof Plant p) want = p.operational() && p.lastMonthProfit * 12 / Math.max(1, l.price) >= Balance.RIVAL_BUY_YIELD;
+            else if (l.asset instanceof Substation t) for (Plant p : s.plants) if (p.owner == c && t.inRange(p.x, p.y)) { want = true; break; }
+            if (want && s.sales.buy(c, l) == null) return;
         }
     }
 
@@ -250,11 +280,13 @@ public final class RivalAI {
 
         // Kendi hatti mi UŞİ mi: hat + santral + yedek karsilanabiliyor ve santral UŞİ tahmininden once bitiyorsa kendi hatti;
         // aksi halde (ucuz) UŞİ basvurusu. Oyuncuyla ayni kurallar ve ucretler.
-        double len = s.lineLength(probe, city);
-        int[] eta = s.operator.estimate(tier, len);
+        // Oyuncunun hat penceresindeki ayni 15 yillik karsilastirma (bekleme kaybi dahil); nakit yetmiyorsa UŞİ.
+        Plant est = new Plant();
+        est.type = e.type; est.equipment = e; est.owner = c; est.x = bx; est.y = by; est.builtAtHour = s.hour; est.ageStartHour = s.hour;
+        GridOperator.Choice ch = s.operator.compare(probe, city, tier, e.buildDays() / 30.0, s.operator.expectedMonthlyMargin(est, tier) * nLines);
         boolean ownAffordable = c.cash >= e.capex() + lineCost + reserve;
-        boolean plantFirst = e.buildDays() < eta[0] * 30;
-        if (ownAffordable && plantFirst) {
+        boolean opAffordable = c.cash >= e.capex() + GridOperator.applicationCost(lineCost / nLines) + reserve;
+        if (ownAffordable && (ch.ownBetter() || !opAffordable)) {
             Plant p = s.buildPlant(c, e, bx, by);
             if (p == null) return null;
             if (s.buildLine(c, p, city, tier) == null) s.buildLine(c, p, city);

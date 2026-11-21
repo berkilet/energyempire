@@ -237,6 +237,8 @@ public final class AssetsView {
 
     /** Durum metni ve siralama sirasi: 0 sorun yok ... 4 en ciddi. */
     static Object[] plantStatus(GameState s, Plant p) {
+        Listing li = s.sales.openListingOf(p);
+        if (li != null) return new Object[] { "Satışta (" + Math.max(0, (li.expiresHour - s.hour) / 24) + " gün)", 1, false };
         if (!p.operational()) {
             double total = Math.max(1, p.equipment.buildDays() * 24.0);
             return new Object[] { "İnşaatta %" + Math.round(100 * Math.max(0, Math.min(1, 1 - p.buildHoursLeft / total))), 1, false };

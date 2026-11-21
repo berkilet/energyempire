@@ -65,6 +65,8 @@ public class SaveData {
     public List<LineD> lines = new ArrayList<>();
     public List<SubstationD> substations = new ArrayList<>();
     public List<TenderD> tenders = new ArrayList<>();
+    public List<ListingD> listings = new ArrayList<>();
+    public static class ListingD { public int id, asset, seller = -1, buyer = -1; public double price; public long listed, expires; public String status; }
     public double[] monthlyPrice;
 
     public SaveData() {}
@@ -116,7 +118,7 @@ public class SaveData {
             d.plants.add(pd);
         }
         for (Substation t : s.substations) {
-            SubstationD td = new SubstationD(); td.id = t.id; td.x = t.x; td.y = t.y; td.owner = s.companies.indexOf(t.owner);
+            SubstationD td = new SubstationD(); td.id = t.id; td.x = t.x; td.y = t.y; td.owner = t.owner == null ? -1 : s.companies.indexOf(t.owner);
             td.level = t.level; td.buildHoursLeft = t.buildHoursLeft; td.pendingUpgrade = t.pendingUpgrade; td.upgradeHoursLeft = t.upgradeHoursLeft;
             td.builtAtHour = t.builtAtHour; td.transformerMW = t.transformerMW; td.buildCost = t.buildCost; td.accessFee = t.accessFeePerMWh;
             td.openAccess = t.openAccess;
@@ -129,6 +131,11 @@ public class SaveData {
             td.paidRevenue = t.paidRevenue; td.paidMWh = t.paidMWh;
             for (Tender.Bid b : t.bids) { BidD bd = new BidD(); bd.company = s.companies.indexOf(b.company); bd.price = b.price; bd.deposit = b.deposit; bd.hour = b.hour; td.bids.add(bd); }
             d.tenders.add(td);
+        }
+        for (Listing l : s.sales.all) {
+            ListingD ld = new ListingD(); ld.id = l.id; ld.asset = l.asset.id; ld.seller = s.companies.indexOf(l.seller);
+            ld.buyer = l.buyer == null ? -1 : s.companies.indexOf(l.buyer); ld.price = l.price; ld.listed = l.listedHour; ld.expires = l.expiresHour; ld.status = l.status.name();
+            d.listings.add(ld);
         }
         for (PowerLine l : s.lines) {
             LineD ld = new LineD(); ld.id = l.id; ld.a = l.a.id; ld.b = l.b.id; ld.owner = l.owner == null ? -1 : s.companies.indexOf(l.owner); ld.cost = l.buildCost;
@@ -209,7 +216,7 @@ public class SaveData {
             s.plants.add(p); s.nodeById.put(p.id, p); s.occ[s.map.idx(p.x, p.y)] = p.id;
         }
         if (substations != null) for (SubstationD td : substations) {
-            Substation t = new Substation(); t.id = td.id; t.x = td.x; t.y = td.y; t.owner = s.companies.get(td.owner);
+            Substation t = new Substation(); t.id = td.id; t.x = td.x; t.y = td.y; t.owner = td.owner < 0 ? null : s.companies.get(td.owner);
             t.level = td.level; t.buildHoursLeft = td.buildHoursLeft; t.pendingUpgrade = td.pendingUpgrade; t.upgradeHoursLeft = td.upgradeHoursLeft;
             t.builtAtHour = td.builtAtHour; t.transformerMW = td.transformerMW; t.buildCost = td.buildCost; t.accessFeePerMWh = td.accessFee;
             t.openAccess = td.openAccess;
@@ -239,6 +246,14 @@ public class SaveData {
             t.paidRevenue = td.paidRevenue; t.paidMWh = td.paidMWh;
             if (td.bids != null) for (BidD bd : td.bids) { Tender.Bid b = new Tender.Bid(); b.company = s.companies.get(bd.company); b.price = bd.price; b.deposit = bd.deposit; b.hour = bd.hour; t.bids.add(b); }
             s.tenders.add(t);
+        }
+        if (listings != null) for (ListingD ld : listings) {
+            GridNode n = s.nodeById.get(ld.asset);
+            if (n == null || ld.seller < 0) continue;
+            Listing l = new Listing(); l.id = ld.id; l.asset = n; l.seller = s.companies.get(ld.seller);
+            l.buyer = ld.buyer < 0 ? null : s.companies.get(ld.buyer); l.price = ld.price; l.listedHour = ld.listed; l.expiresHour = ld.expires;
+            l.status = Listing.Status.valueOf(ld.status);
+            s.sales.add(l);
         }
         if (monthlyPrice != null) for (double v : monthlyPrice) s.history.monthlyPrice.add(v);
         s.rng.setSeed(seed ^ hour * 31);

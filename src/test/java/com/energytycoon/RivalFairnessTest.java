@@ -208,8 +208,14 @@ class RivalFairnessTest {
         Plant p = RivalAI.buildNear(s, r, e, s.cities.get(0));
         assertNotNull(p);
         PowerLine l = p.lines.get(0);
-        assertSame(r, l.owner);
-        assertEquals(before - e.capex() - l.buildCost, r.cash, 1, "santral + hat ödenmeli");
+        // Rakip, oyuncunun hat penceresindeki ayni karsilastirmayla kendi hattini veya UŞİ'yi secer; ikisi de oyuncuyla ayni bedel.
+        if (l.owner == null) {
+            assertSame(r, l.requester, "UŞİ başvurusu rakibin adına");
+            assertEquals(before - e.capex() - GridOperator.applicationCost(l.buildCost), r.cash, 1, "santral + başvuru ödenmeli");
+        } else {
+            assertSame(r, l.owner);
+            assertEquals(before - e.capex() - l.buildCost, r.cash, 1, "santral + hat ödenmeli");
+        }
         assertTrue(p.buildHoursLeft > 0, "inşaat süresi işlemeli");
         // Santrale yetip hatta yetmeyen nakit: hiçbir şey kurulmaz, para harcanmaz.
         r.cash = e.capex() + 1;

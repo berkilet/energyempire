@@ -6,6 +6,7 @@ package com.energytycoon.sim;
  * level 1 = TM154, 2 = TM380.
  */
 public final class Substation extends GridNode {
+    /** Sahip sirket; null ise UŞİ'nin (her zaman erisime acik, bedel UŞİ'ye). */
     public Company owner;
     public int level = 1;
     public double transformerMW = GridBalance.TM154_MW;
@@ -26,6 +27,10 @@ public final class Substation extends GridNode {
     public transient ConnectionPoint cp;
 
     public boolean operational() { return buildHoursLeft <= 0; }
+
+    public boolean playerOwned() { return owner != null && owner.player; }
+
+    public String ownerName() { return owner == null ? GridBalance.OPERATOR_SHORT : owner.name; }
 
     public String levelLabel() { return level >= 2 ? "TM380" : "TM154"; }
 

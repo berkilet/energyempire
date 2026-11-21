@@ -86,14 +86,14 @@ public final class GridBalance {
     public static final double OP_CONTRIBUTION = 0.15;
     /** Yillik baglanti bedeli: hat maliyetinin orani (aylik tahakkuk). */
     public static final double OP_ANNUAL_CHARGE = 0.06;
-    public static final int OP_PLANNING_MONTHS = 6;
+    public static final int OP_PLANNING_MONTHS = 3; // ince ayar: 6 -> 3 (UŞİ ucuz ama yavas; uzun insaatli santrallerde bekleme kaybi yok)
     /** Ayni anda insaat slotu: OP_BASE_SLOTS + sehir sayisi / OP_CITIES_PER_SLOT. */
     // Denge olcumu (10 yil, oyuncu botu): baglantilarin %94-95i kendi hattindan, kuyrukta bekleme 0 ay -> formul 2 + sehir/4 iken 1 + sehir/6 yapildi.
     public static final int OP_BASE_SLOTS = 1, OP_CITIES_PER_SLOT = 6;
     /** UŞİ insaati, kendi insaat suresinin bu kati. */
-    public static final double OP_BUILD_MULT = 1.5;
+    public static final double OP_BUILD_MULT = 1.0; // ince ayar: 1.5 -> 1.0 (UŞİ kendi kurulumun hizinda insa eder)
     /** Planlama/kuyrukta aylik kayma olasiligi (+1 ay). */
-    public static final double OP_SLIP_CHANCE = 0.08;
+    public static final double OP_SLIP_CHANCE = 0.05; // ince ayar: 0.08 -> 0.05
     /** Tahmin araligi: en erken + bu kadar ay. */
     public static final int OP_ETA_SPREAD_MONTHS = 3;
     /** Hizlandirma: hat maliyetinin orani; planlama en fazla bu kadar aya iner ve kuyruk basina gecer. */
@@ -115,8 +115,12 @@ public final class GridBalance {
     public static final int ROUTE_HIGH_LEVEL = 11;
     /** Ayni iki uc arasinda ikinci/ucuncu hat bu oranda ucuz. */
     public static final double PARALLEL_DISCOUNT = 0.40;
-    /** Kademe yukseltme: (yeni - eski guzergah maliyeti) x (1 + prim); sure = yeni kademenin insaat suresi x carpan, hat kapali. */
-    public static final double UPGRADE_PREMIUM = 0.20, UPGRADE_TIME_MULT = 0.6;
+    /**
+     * Kademe yukseltme: (yeni - eski guzergah maliyeti) x carpan; sure = yeni kademenin insaat suresi x carpan, hat kapali.
+     * Carpan 1,2 iken yukseltme MW basina paralel hattan pahaliydi (kimse yukseltmiyordu). Mevcut guzergah ve direk yerleri
+     * kullanildigi icin 0,8: kucuk ek ihtiyacta paralel hat, buyuk genislemede yukseltme ucuz.
+     */
+    public static final double UPGRADE_COST_FACTOR = 0.8, UPGRADE_TIME_MULT = 0.6;
     /** Hat arizasi: saatlik olasilik = kademe.outagePerTileHour x uzunluk; sure (saat); onarim hat maliyetinin orani (UŞİ ucretsiz). */
     public static final int LINE_OUTAGE_MIN_H = 12, LINE_OUTAGE_MAX_H = 48;
     public static final double LINE_REPAIR_COST = 0.005;
@@ -137,4 +141,8 @@ public final class GridBalance {
     public static final int LOW_DEMAND_MONTH = 6;
     /** Ikinci yol yokken rakibin kabul ettigi en uzun yukseltme kesintisi (gun); uzunsa paralel hat. */
     public static final int RIVAL_MAX_OFFLINE_DAYS = 60;
+
+    /** Kendin kur / UŞİ karsilastirmasi (oyuncu penceresi ve rakip YZ ayni hesap): ufuk (yil) ve iskonto orani. */
+    public static final int LINE_COMPARE_YEARS = 15;
+    public static final double LINE_COMPARE_DISCOUNT = 0.08;
 }

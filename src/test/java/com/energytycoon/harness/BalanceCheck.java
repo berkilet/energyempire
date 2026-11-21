@@ -45,7 +45,11 @@ public final class BalanceCheck {
                     if (e.getKey().player) { plOwn += v[0]; plOp += v[1]; } else { rivOwn += v[0]; rivOp += v[1]; }
                 }
                 queue.addAll(s.operator.statQueue);
-                long rivTmNow = s.substations.stream().filter(t -> !t.owner.player).count();
+                long rivTmNow = s.substations.stream().filter(t -> t.owner != null && !t.owner.player).count();
+                long bankrupt = s.companies.stream().filter(x -> x.bankrupt).count();
+                Map<String, Integer> sold = new TreeMap<>();
+                for (Listing l : s.sales.all) sold.merge(l.status == Listing.Status.SOLD ? "satıldı→" + (l.buyer == null ? "UŞİ" : l.buyer.player ? "oyuncu" : l.buyer.neutral ? "Kamu" : "rakip") : l.status.label, 1, Integer::sum);
+                System.out.printf(Locale.ROOT, "   satış ilanları %s · iflas eden %d%n", sold, bankrupt);
                 for (Tender t : s.tenders.all)
                     tenderLines.add(String.format(Locale.ROOT, "  tohum %d · %s %d · %s %.0f MW · %s · teklifler %s · kazanan %s",
                         seed, Balance.START_YEAR + t.openedHour / Balance.HOURS_PER_YEAR, (t.openedHour / Balance.HOURS_PER_MONTH) % 12 + 1,
