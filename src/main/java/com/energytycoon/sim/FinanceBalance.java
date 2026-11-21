@@ -174,6 +174,8 @@ public final class FinanceBalance {
     /** Rakip YZ: aylik deneme olasiligi (stil carpani: fosil 1,5 saldirgan, dengeli 1, yesil 0,6), cagri primi araligi, ilk pay. */
     /** Elinde bagli ortaklik olan alici yeni devralmayi ancak konsolide Net borc / FAVOK bu degerin altindaysa dener (YZ ve olcum botu). */
     public static final double SERIAL_ACQ_LEVERAGE = 2.5;
+    /** Grup ici borc faizi: politika faizi + bu marj (piyasa kosullari; azinlik ortaklar korunur). */
+    public static final double INTRAGROUP_SPREAD = 0.01;
     /** Acik devralma kredisi olan sirket (YZ) konsolide Net borc / FAVOK bunun ustundeyken yeni santral siparisi vermez. */
     public static final double POST_ACQ_BUILD_LEVERAGE = 3.0;
     public static final double RIVAL_MNA_CHANCE = 0.08, RIVAL_TENDER_PREMIUM_MIN = 0.25, RIVAL_TENDER_PREMIUM_MAX = 0.40, RIVAL_TOEHOLD = 0.05;

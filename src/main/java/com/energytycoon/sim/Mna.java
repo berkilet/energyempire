@@ -600,6 +600,7 @@ public final class Mna {
         for (Listing l : s.sales.all) if (l.seller == target && l.status == Listing.Status.OPEN) l.status = Listing.Status.WITHDRAWN;
         parent.loans.addAll(target.loans); target.loans.clear();
         parent.cash += target.cash; target.cash = 0;
+        target.eq.icBalance = 0; // birlesmede grup ici borc kendi kendini kapatir
         for (int b = 0; b < 3; b++) parent.bankScore[b] = Math.max(parent.bankScore[b], target.bankScore[b]);
         int ti = idx(target), pi = idx(parent);
         for (Company x : s.companies) {
@@ -621,6 +622,54 @@ public final class Mna {
     }
 
     public static final String[] STRATEGY = { "Büyüme", "Temkinli", "Nakit üret" };
+
+    // ------------------------------------------------------------ grup ici nakit (yonetim kurulu kontrolu, %50 ustu)
+    /** Bagli ortakliktan cekilebilecek en fazla tutar: kasasi eksi kendi rezervi (6 aylik borc servisi). */
+    public double subWithdrawable(Company sub) { return Math.max(0, sub.cash - RivalAI.reserve(s, sub)); }
+
+    /**
+     * Grup ici borc: amount > 0 bagli ortakliktan ana sirkete, < 0 ana sirketten bagli ortakliga. Borclu taraf her ay
+     * politika faizi + 1 puan oder (piyasa kosullari: azinlik ortaklar zarar gormez). Null: tamam.
+     */
+    public String intraGroupTransfer(Company parent, Company sub, double amount) {
+        if (!controls(parent, sub) || s.competition.top(sub) != parent) return "Yalnızca kontrol ettiğiniz bağlı ortaklıkla";
+        if (amount > 0 && amount > subWithdrawable(sub) + 1) return "Bağlı ortaklıktan en fazla " + money(subWithdrawable(sub)) + " çekilebilir (kendi borç servisi rezervi korunur)";
+        if (amount < 0 && -amount > parent.cash) return "Nakit yetersiz (" + money(parent.cash) + ")";
+        sub.cash -= amount; parent.cash += amount;
+        sub.eq.icBalance += amount;
+        return null;
+    }
+
+    /** Ozel temettu: butun ortaklara paylariyla orantili (kurucu payina dusen kisim sirkette kalir; olagan kural). */
+    public String specialDividend(Company parent, Company sub, double total) {
+        if (!controls(parent, sub) || s.competition.top(sub) != parent) return "Yalnızca kontrol ettiğiniz bağlı ortaklıkta";
+        String why = s.capital.dividendBlocker(sub);
+        if (why != null) return why;
+        double out = total * (1 - sub.eq.founderPct());
+        if (out > subWithdrawable(sub) + 1) return "Bağlı ortaklığın kasası yetmez (rezerv korunur; en fazla " + money(subWithdrawable(sub) / Math.max(0.01, 1 - sub.eq.founderPct())) + ")";
+        sub.cash -= out;
+        for (int j = 0; j < s.companies.size(); j++) {
+            double h = sub.eq.held(j);
+            if (h <= 0) continue;
+            double amt = total * h / sub.eq.shares;
+            co(j).cash += amt; co(j).dividendIncome += amt;
+        }
+        return null;
+    }
+
+    /** Aylik grup ici faiz. */
+    void intraGroupInterest() {
+        double r = (s.macro.policyRate + FinanceBalance.INTRAGROUP_SPREAD) / 12;
+        for (Company sub : s.companies) {
+            double b = sub.eq.icBalance;
+            if (Math.abs(b) < 1 || sub.eq.parent < 0) continue;
+            Company parent = co(sub.eq.parent);
+            double i = Math.abs(b) * r;
+            Company debtor = b > 0 ? parent : sub, creditor = b > 0 ? sub : parent;
+            debtor.cash -= i; debtor.interest += i;
+            creditor.cash += i; creditor.interest -= i; // net faiz gideri olarak gelir tablosunda
+        }
+    }
 
     // ------------------------------------------------------------ zamanlama
     void daily() {
@@ -646,6 +695,7 @@ public final class Mna {
                 if (p >= FinanceBalance.ASSOCIATE) h.affiliateIncome += p * t.lastNet;
             }
         }
+        intraGroupInterest();
         long cut = s.hour - (long) (FinanceBalance.MANDATORY_LOOKBACK_MONTHS + 1) * Balance.HOURS_PER_MONTH;
         d().purchases.removeIf(p -> p.hour < cut);
         for (Company c : s.companies) c.eq.askSeed = s.rng.nextDouble();

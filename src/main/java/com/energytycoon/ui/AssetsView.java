@@ -254,14 +254,14 @@ public final class AssetsView {
     private List<Row> plantRows(GameState s) {
         List<Row> out = new ArrayList<>();
         for (Plant p : s.plants) {
-            if (p.owner != s.player) continue;
+            if (!s.playerGroup(p.owner)) continue; // bagli ortakliklar dahil
             Row r = new Row(PLANT_COLS.length);
             City c = nearestCity(s, p.x, p.y);
             Object[] st = plantStatus(s, p);
             long warrantyEnd = p.builtAtHour + (long) p.equipment.supplier.warrantyYears * Balance.HOURS_PER_YEAR;
             boolean warrantySoon = p.operational() && warrantyEnd > s.hour && warrantyEnd - s.hour <= 6L * Balance.HOURS_PER_MONTH;
             double age = p.ageYears(s.hour), left = Math.max(0, p.type.lifeYears - p.wearYears(s.hour));
-            r.set(0, p.name() + (p.customName == null ? " #" + p.id : ""), p.name() + p.id);
+            r.set(0, p.name() + (p.customName == null ? " #" + p.id : "") + (p.owner != s.player ? "\nBağlı ortaklık: " + p.owner.name : ""), p.name() + p.id);
             r.set(1, p.type.label.replace(" Santrali", ""), p.type.label);
             r.set(2, String.valueOf(Math.round(p.capacityMW())), p.capacityMW());
             r.set(3, c == null ? "—" : c.name, c == null ? "" : c.name);
@@ -285,7 +285,7 @@ public final class AssetsView {
     private List<Row> lineRows(GameState s) {
         List<Row> out = new ArrayList<>();
         for (PowerLine l : s.lines) {
-            boolean mine = l.owner == s.player, requested = l.requester == s.player;
+            boolean mine = s.playerGroup(l.owner), requested = l.requester == s.player;
             if (!mine && !requested) continue;
             Row r = new Row(LINE_COLS.length);
             r.set(0, l.a.name() + " – " + l.b.name(), l.a.name() + l.b.name());
@@ -311,7 +311,7 @@ public final class AssetsView {
     private List<Row> tmRows(GameState s) {
         List<Row> out = new ArrayList<>();
         for (Substation t : s.substations) {
-            if (t.owner != s.player) continue;
+            if (!s.playerGroup(t.owner)) continue;
             Row r = new Row(TM_COLS.length);
             City c = nearestCity(s, t.x, t.y);
             r.set(0, t.name() + " · " + (c == null ? "" : c.name + " yakını") + " (" + t.x + "," + t.y + ")", t.id);
@@ -395,23 +395,23 @@ public final class AssetsView {
         switch (tab) {
             case PLANTS -> {
                 double mw = 0, cfw = 0, prof = 0; int n = 0, op = 0;
-                for (Plant p : s.plants) if (p.owner == s.player) {
+                for (Plant p : s.plants) if (s.playerGroup(p.owner)) {
                     n++; mw += p.capacityMW(); prof += p.yearProfit + p.monthProfit;
                     if (p.operational()) { op++; cfw += p.cf30() * p.capacityMW(); }
                 }
                 double opMw = 0;
-                for (Plant p : s.plants) if (p.owner == s.player && p.operational()) opMw += p.capacityMW();
+                for (Plant p : s.plants) if (s.playerGroup(p.owner) && p.operational()) opMw += p.capacityMW();
                 return n + " santral · " + Fmt.mw(mw) + " · ort. kapasite faktörü (30 g) %" + Math.round(opMw > 0 ? 100 * cfw / opMw : 0)
                     + " · yılbaşından bu yana kâr " + Fmt.money(prof);
             }
             case LINES -> {
                 double len = 0, cap = 0; int n = 0, own = 0;
-                for (PowerLine l : s.lines) if (l.owner == s.player || l.requester == s.player) { n++; len += l.lengthTiles; cap += l.capacityMW(); if (l.owner == s.player) own++; }
+                for (PowerLine l : s.lines) if (s.playerGroup(l.owner) || l.requester == s.player) { n++; len += l.lengthTiles; cap += l.capacityMW(); if (s.playerGroup(l.owner)) own++; }
                 return n + " hat (" + own + " kendi, " + (n - own) + " UŞİ başvurusu) · toplam " + Math.round(len) + " kare · " + Fmt.mw(cap) + " kapasite";
             }
             case SUBSTATIONS -> {
                 double mw = 0, inc = 0; int n = 0;
-                for (Substation t : s.substations) if (t.owner == s.player) { n++; mw += t.transformerMW; inc += t.lastAccessIncome; }
+                for (Substation t : s.substations) if (s.playerGroup(t.owner)) { n++; mw += t.transformerMW; inc += t.lastAccessIncome; }
                 return n + " trafo merkezi · " + Fmt.mw(mw) + " trafo · geçen ay erişim geliri " + Fmt.money(inc);
             }
             case OPERATOR -> {

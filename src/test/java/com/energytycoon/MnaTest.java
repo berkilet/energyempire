@@ -417,4 +417,33 @@ class MnaTest {
         assertEquals(s.finance.ebitda4(a) + s.finance.ebitda4(b), s.finance.groupEbitda4(a), 1);
         assertTrue(s.finance.leverage(a) < (a.debt() - a.cash + 1) / s.finance.ebitda4(a) + 1e9);
     }
+
+    @Test
+    void parentManagesSubsidiaryCashAndAssets() {
+        Object[] m = market(0.20, 0.20);
+        GameState s = (GameState) m[0]; Company b = (Company) m[2];
+        Company p = s.player;
+        int pi = s.companies.indexOf(p);
+        b.eq.add(pi, b.eq.shares * 0.6); b.eq.founder = b.eq.shares * 0.4; b.eq.parent = pi;
+        assertTrue(s.playerGroup(b), "bagli ortaklik oyuncunun grubunda");
+        assertNotEquals(b.colorRgb, s.displayColor(b), "haritada ana sirket rengine yakin");
+        b.cash = 500e6; p.cash = 100e6;
+        double max = s.mna.subWithdrawable(b);
+        assertNotNull(s.mna.intraGroupTransfer(p, b, max + 10e6), "rezerv korunur");
+        assertNull(s.mna.intraGroupTransfer(p, b, 200e6));
+        assertEquals(300e6, p.cash, 1);
+        assertEquals(200e6, b.eq.icBalance, 1, "ana sirket bagli ortakliga borclu");
+        assertNull(s.mna.intraGroupTransfer(p, b, -50e6));
+        assertEquals(150e6, b.eq.icBalance, 1);
+        double pc = p.cash, bc = b.cash;
+        days(s, 31);
+        assertTrue(p.cash < pc + 1e9 && b.eq.icBalance > 0);
+        // ozel temettu: ana sirkete payi kadar
+        b.cash = 800e6; double before = p.cash;
+        assertNull(s.mna.specialDividend(p, b, 100e6));
+        assertEquals(60e6, p.cash - before, 1, "payi %60");
+        // kontrol yoksa islem yok
+        Company a = (Company) m[1];
+        assertNotNull(s.mna.intraGroupTransfer(p, a, 1e6));
+    }
 }

@@ -107,6 +107,17 @@ public final class GameScreen implements Screen, Hud.Listener {
         for (int h = 0; h < 24 * 95; h++) state.tick();
         state.messages.clear();
         if (tab.equals("CAPITAL") || tab.equals("MNA") || tab.equals("deal") || tab.equals("defense")) devCapitalSetup();
+        if (tab.startsWith("GROUP")) {
+            // dogrulama: ilk rakip oyuncunun bagli ortakligi (%60), grup ici borc
+            Company a = devRival(0), p = state.player;
+            int pi = state.companies.indexOf(p);
+            a.eq.add(pi, a.eq.shares * 0.6); a.eq.founder = a.eq.shares * 0.4; a.eq.parent = pi; a.eq.icBalance = 40e6;
+            a.cash += 300e6;
+            hud.selectMnaCompany(state.companies.indexOf(a));
+            state.messages.clear();
+            if (tab.equals("GROUPASSETS")) action("assets:plants"); else hud.openFinance(com.energytycoon.ui.FinanceCenter.Tab.MNA);
+            return;
+        }
         if (tab.equals("wizard")) hud.devWizard();
         else if (tab.equals("deal")) devDeal();
         else if (tab.equals("defense")) devDefense();
@@ -298,13 +309,13 @@ public final class GameScreen implements Screen, Hud.Listener {
         }
         if (a.startsWith("list:")) {
             GridNode asset = state.nodeById(Integer.parseInt(a.substring(5)));
-            String err = asset == null ? "Varlık yok" : state.sales.list(state.player, asset);
+            String err = asset == null ? "Varlık yok" : state.sales.list(asset instanceof Plant pp ? pp.owner : asset instanceof Substation ts ? ts.owner : state.player, asset);
             if (err != null) hud.toast(err);
             return;
         }
         if (a.startsWith("unlist:")) {
             Listing li = state.sales.get(Integer.parseInt(a.substring(7)));
-            if (li != null) { String err = state.sales.withdraw(state.player, li); hud.toast(err != null ? err : "Satıştan çekildi."); }
+            if (li != null) { String err = state.playerGroup(li.seller) ? state.sales.withdraw(li.seller, li) : "Bu ilan sizin değil"; hud.toast(err != null ? err : "Satıştan çekildi."); }
             return;
         }
         if (a.startsWith("sale:")) { hud.showListing(Integer.parseInt(a.substring(5))); return; }
@@ -345,7 +356,7 @@ public final class GameScreen implements Screen, Hud.Listener {
         if (a.startsWith("tm:")) {
             tmMenuFor = -1;
             String[] f = a.split(":");
-            if (state.nodeById(Integer.parseInt(f[1])) instanceof Plant p && p.owner.player) {
+            if (state.nodeById(Integer.parseInt(f[1])) instanceof Plant p && state.playerGroup(p.owner)) {
                 int id = Integer.parseInt(f[2]);
                 state.setPreferredSubstation(p, id);
                 hud.toast(id == 0 ? p.name() + ": otomatik bağlantı" : p.name() + " → " + state.nodeById(id).name() + " bağlandı");
@@ -382,7 +393,7 @@ public final class GameScreen implements Screen, Hud.Listener {
             case "cancelTool" -> cancelTool();
             case "lineup" -> {
                 for (PowerLine l : state.lines) if (l.id == selLine) {
-                    String err = state.upgradeLine(state.player, l);
+                    String err = state.upgradeLine(state.playerGroup(l.owner) ? l.owner : state.player, l);
                     hud.toast(err != null ? err : "Yükseltme başladı: " + GridOperator.label(l) + " → " + l.upgradeTo.shortLabel + " (" + l.buildHoursLeft / 24 + " gün, hat kapalı)");
                     break;
                 }
@@ -390,7 +401,7 @@ public final class GameScreen implements Screen, Hud.Listener {
             case "lineCancel" -> { hud.hideLineChoice(); pendingA = pendingB = null; }
             case "lineOwn", "lineOp" -> confirmLine(a.equals("lineOp"));
             case "optransfer" -> {
-                for (PowerLine l : state.lines) if (l.id == selLine && l.owner == state.player) {
+                for (PowerLine l : state.lines) if (l.id == selLine && state.playerGroup(l.owner)) {
                     double v = state.operator.transfer(l);
                     if (v >= 0) hud.toast("Hat UŞİ'ye devredildi: +" + Fmt.money(v) + " (artık bakım gideri yok)");
                     break;
@@ -401,7 +412,7 @@ public final class GameScreen implements Screen, Hud.Listener {
     }
 
     private void upgradeSelected(Upgrade u) {
-        if (!(state.nodeById(selNode) instanceof Plant p) || !p.owner.player) return;
+        if (!(state.nodeById(selNode) instanceof Plant p) || !state.playerGroup(p.owner)) return;
         String err = state.startUpgrade(p, u);
         hud.toast(err != null ? err : u.label + " başladı (" + u.days + " gün" + (u.offline ? ", santral bu sürede kapalı" : "") + ")");
     }
@@ -428,16 +439,18 @@ public final class GameScreen implements Screen, Hud.Listener {
         }
     }
 
+    private Company assetOwner(GridNode n) { return n instanceof Plant p ? p.owner : n instanceof Substation t && t.owner != null ? t.owner : state.player; }
+
     /** Kendi santrali/TM'si icin satisa cikar / satistan cek. */
     private void saleActions(List<String[]> a, GridNode asset) {
         Listing li = state.sales.openListingOf(asset);
-        if (li == null) a.add(new String[] { "Satışa çıkar (≈" + Fmt.money(state.sales.askPrice(asset, state.player)) + ", " + Balance.SALE_DAYS
-            + " gün; alıcı çıkmazsa " + (asset instanceof Substation ? "UŞİ" : "Kamu, isterse") + " " + Fmt.money(state.sales.floorPrice(asset, state.player)) + "'a alır)", "list:" + asset.id, "1" });
+        if (li == null) a.add(new String[] { "Satışa çıkar (≈" + Fmt.money(state.sales.askPrice(asset, assetOwner(asset))) + ", " + Balance.SALE_DAYS
+            + " gün; alıcı çıkmazsa " + (asset instanceof Substation ? "UŞİ" : "Kamu, isterse") + " " + Fmt.money(state.sales.floorPrice(asset, assetOwner(asset))) + "'a alır)", "list:" + asset.id, "1" });
         else a.add(new String[] { "Satıştan çek (" + Math.max(0, (li.expiresHour - state.hour) / 24) + " gün kaldı)", "unlist:" + li.id, "1" });
     }
 
     private void substationAction(String a) {
-        if (!(state.nodeById(selNode) instanceof Substation t) || !t.playerOwned()) return;
+        if (!(state.nodeById(selNode) instanceof Substation t) || !state.playerGroup(t.owner)) return;
         if (a.startsWith("tmup:")) {
             int kind = Integer.parseInt(a.substring(5));
             String err = state.upgradeSubstation(t, kind);
@@ -454,18 +467,18 @@ public final class GameScreen implements Screen, Hud.Listener {
 
     private void deleteSelected() {
         GridNode n = state.nodeById(selNode);
-        if (n instanceof Substation t && t.playerOwned()) {
+        if (n instanceof Substation t && state.playerGroup(t.owner)) {
             double refund = t.bookValue(state.hour) * Balance.DEMOLISH_REFUND;
             state.demolishSubstation(t, true); selNode = -1;
             hud.toast("Trafo merkezi yıkıldı (bağlı hatlar kaldırıldı). İade: " + Fmt.money(refund));
             return;
         }
-        if (n instanceof Plant p && p.owner.player) {
+        if (n instanceof Plant p && state.playerGroup(p.owner)) {
             double refund = p.bookValue(state.hour) * Balance.DEMOLISH_REFUND;
             state.demolishPlant(p); selNode = -1;
             hud.toast("Santral yıkıldı. İade: " + Fmt.money(refund));
         } else if (selLine >= 0) {
-            for (PowerLine l : state.lines) if (l.id == selLine && l.owner != null && l.owner.player) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); break; }
+            for (PowerLine l : state.lines) if (l.id == selLine && state.playerGroup(l.owner)) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); break; }
             selLine = -1;
         }
     }
@@ -582,7 +595,7 @@ public final class GameScreen implements Screen, Hud.Listener {
     private GridNode connectionTarget(GridNode n) {
         if (n instanceof Plant p) {
             state.components();
-            if (p.cp != null && p.cp.tm != null && (p.cp.tm.owner == state.player || p.cp.tm.openAccess)) return p.cp.tm;
+            if (p.cp != null && p.cp.tm != null && (state.playerGroup(p.cp.tm.owner) || p.cp.tm.openAccess)) return p.cp.tm;
         }
         return n;
     }
@@ -643,17 +656,17 @@ public final class GameScreen implements Screen, Hud.Listener {
             {
                 GridNode n = state.nodeAt(x, y);
                 if (n instanceof Substation sub) {
-                    if (!sub.playerOwned()) { hud.toast("Başkasının trafo merkezini yıkamazsınız."); return; }
+                    if (!state.playerGroup(sub.owner)) { hud.toast("Başkasının trafo merkezini yıkamazsınız."); return; }
                     selNode = sub.id; deleteSelected(); return;
                 }
                 if (n instanceof Plant p) {
-                    if (!p.owner.player) { hud.toast("Rakip tesisini yıkamazsınız."); return; }
+                    if (!state.playerGroup(p.owner)) { hud.toast("Rakip tesisini yıkamazsınız."); return; }
                     double refund = p.bookValue(state.hour) * Balance.DEMOLISH_REFUND;
                     state.demolishPlant(p);
                     hud.toast("Santral yıkıldı. İade: " + Fmt.money(refund));
                 } else {
                     PowerLine l = wr.pickLineScreen(lastSx, lastSy, LINE_PICK_PX);
-                    if (l != null && l.owner != null && l.owner.player) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); }
+                    if (l != null && state.playerGroup(l.owner)) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); }
                     else if (l != null) hud.toast("Bu hat size ait değil.");
                 }
             }
@@ -707,11 +720,11 @@ public final class GameScreen implements Screen, Hud.Listener {
                 boolean afford = state.player.cash >= state.substationCost(tmLevel);
                 wr.radiusX = t[0]; wr.radiusY = t[1]; wr.radius = (float) GridBalance.TM_RADIUS; wr.radiusValid = why == null && afford;
                 int n2 = 0; double mw = 0;
-                for (Plant p : state.plants) if (p.owner.player && Math.hypot(p.x - t[0], p.y - t[1]) <= GridBalance.TM_RADIUS + 1e-6) { n2++; mw += p.capacityMW(); }
+                for (Plant p : state.plants) if (state.playerGroup(p.owner) && Math.hypot(p.x - t[0], p.y - t[1]) <= GridBalance.TM_RADIUS + 1e-6) { n2++; mw += p.capacityMW(); }
                 hud.setPlaceInfo("Yarıçaptaki santralleriniz: " + n2 + (n2 > 0 ? " (" + Fmt.mw(mw) + ")" : "")
                     + (why != null ? "   ✗ " + why : !afford ? "   ✗ Yetersiz nakit" : ""));
             }
-            case DEMOLISH -> hud.setPlaceInfo(n instanceof Plant p && p.owner.player ? "Yık: " + p.name() + " (iade " + Fmt.money(p.bookValue(state.hour) * Balance.DEMOLISH_REFUND) + ")" : "Yıkmak için kendi santralinize veya hatlarınıza tıklayın");
+            case DEMOLISH -> hud.setPlaceInfo(n instanceof Plant p && state.playerGroup(p.owner) ? "Yık: " + p.name() + " (iade " + Fmt.money(p.bookValue(state.hour) * Balance.DEMOLISH_REFUND) + ")" : "Yıkmak için kendi santralinize veya hatlarınıza tıklayın");
             default -> {
                 if (n != null) hud.setPlaceInfo(n instanceof Plant p ? p.name() + " · " + p.equipment.fullName() + " · " + p.owner.name : n.name());
                 else hud.setPlaceInfo(String.format("Rüzgar %s  ·  Güneş %s  ·  Su %s  ·  Düşü %s  ·  Kömür %s  ·  Gaz %s",
@@ -742,7 +755,8 @@ public final class GameScreen implements Screen, Hud.Listener {
                           : p.upgrading() ? p.pendingUpgrade.label + ": " + p.upgradeHoursLeft / 24 + " gün" : "Çalışıyor";
             Equipment e = p.equipment;
             StringBuilder sb = new StringBuilder();
-            sb.append(p.customName != null ? p.customName + " (" + p.type.label + ")" : p.type.label).append("  —  ").append(p.owner.name).append('\n');
+            sb.append(p.customName != null ? p.customName + " (" + p.type.label + ")" : p.type.label).append("  —  ").append(p.owner.name)
+                .append(p.owner.eq.parent >= 0 && !p.owner.player ? " (bağlı ortaklık: " + state.competition.top(p.owner).name + ", kasası " + Fmt.money(p.owner.cash) + ")" : "").append('\n');
             if (p.legacy && p.owner.neutral && p.retireYear > 0)
                 sb.append("Kamu Üretim (eski filo) · Kapanış: ").append(GameState.MONTH_NAMES[p.retireMonth]).append(' ').append(p.retireYear).append('\n');
             sb
@@ -885,11 +899,11 @@ public final class GameScreen implements Screen, Hud.Listener {
     private List<String[]> selectionActions() {
         List<String[]> a = new ArrayList<>();
         GridNode n = state.nodeById(selNode);
-        if (n instanceof Plant p && p.owner.player) {
+        if (n instanceof Plant p && state.playerGroup(p.owner)) {
             for (Upgrade u : Upgrade.values()) {
                 if (u.type != p.type) continue;
                 if (p.upgrades.contains(u)) { a.add(new String[] { "✓ " + u.label, "none", "0" }); continue; }
-                boolean ok = p.canUpgrade(u) && state.player.cash >= u.cost(p);
+                boolean ok = p.canUpgrade(u) && p.owner.cash >= u.cost(p);
                 a.add(new String[] { "▲ " + u.label + " — " + Fmt.money(u.cost(p)) + ", " + u.days + " gün\n" + u.desc, "upgrade:" + u.name(), ok ? "1" : "0" });
             }
             // Tek "TM değiştir" dugmesi; acilinca mesafeye gore sirali liste
@@ -911,10 +925,10 @@ public final class GameScreen implements Screen, Hud.Listener {
             }
             saleActions(a, p);
             a.add(new String[] { "Yık (iade %" + (int) (Balance.DEMOLISH_REFUND * 100) + ")", "demolish", "1" });
-        } else if (n instanceof Plant p2 || n instanceof Substation t2 && !t2.playerOwned()) {
+        } else if (n instanceof Plant p2 || n instanceof Substation t2 && !state.playerGroup(t2.owner)) {
             Listing li = state.sales.openListingOf(n);
             if (li != null) a.add(new String[] { "Satın al — " + Fmt.money(li.price) + " (" + li.seller.name + " satıyor)", "buy:" + li.id, state.player.cash >= li.price ? "1" : "0" });
-        } else if (n instanceof Substation t && t.playerOwned()) {
+        } else if (n instanceof Substation t && state.playerGroup(t.owner)) {
             saleActions(a, t);
             boolean busy = !t.operational() || t.pendingUpgrade != 0;
             a.add(new String[] { "▲ +" + (int) GridBalance.TM_PLUS_MW + " MW trafo — " + Fmt.money(GridBalance.TM_PLUS_COST) + ", " + GridBalance.TM_PLUS_DAYS + " gün",
@@ -927,7 +941,7 @@ public final class GameScreen implements Screen, Hud.Listener {
             a.add(new String[] { "Yık (iade %" + (int) (Balance.DEMOLISH_REFUND * 100) + ", bağlı hatlar kalkar)", "demolish", "1" });
         } else if (selLine >= 0) {
             for (PowerLine l : state.lines) if (l.id == selLine) {
-                if (l.owner != null && l.owner.player) {
+                if (state.playerGroup(l.owner)) {
                     if (l.tier.up() != null && l.status == LineStatus.ACTIVE) {
                         String why = state.checkUpgrade(state.player, l);
                         a.add(new String[] { "▲ Kademe yükselt: " + l.tier.shortLabel + " → " + l.tier.up().shortLabel + " — " + Fmt.money(state.upgradeCost(l)) + ", "
@@ -1100,6 +1114,17 @@ public final class GameScreen implements Screen, Hud.Listener {
             }
             case "comment" -> {
                 for (DealBook.Review r : state.deals.reviews) if (r.id == Integer.parseInt(f[1])) { err = state.competition.comment(r); if (err != null) hud.toast(err); }
+            }
+            case "ic" -> {
+                Company t = companyAt(f[1]);
+                double amt = Double.parseDouble(f[2]);
+                err = t == null ? "Şirket yok" : state.mna.intraGroupTransfer(p, t, amt);
+                hud.toast(err != null ? err : amt > 0 ? t.name + " kasasından " + Fmt.money(amt) + " çekildi (grup içi borç)" : t.name + " kasasına " + Fmt.money(-amt) + " gönderildi (grup içi borç)");
+            }
+            case "sdiv" -> {
+                Company t = companyAt(f[1]);
+                err = t == null ? "Şirket yok" : state.mna.specialDividend(p, t, Double.parseDouble(f[2]));
+                hud.toast(err != null ? err : t.name + " özel temettü dağıttı: toplam " + Fmt.money(Double.parseDouble(f[2])));
             }
             case "tenderme" -> { for (DealBook.TenderOffer t : state.deals.offers) if (t.id == Integer.parseInt(f[1])) t.playerTenders = !t.playerTenders; }
             case "def" -> {

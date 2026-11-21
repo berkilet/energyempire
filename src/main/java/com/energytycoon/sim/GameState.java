@@ -1307,6 +1307,18 @@ public final class GameState {
     /** Sirket degerleri ve hisse fiyatlari (Capital: temel deger, halka acikta piyasa fiyati). */
     public void updateValuations() { capital.monthly(); }
 
+    /** Sirket oyuncunun grubunda mi (oyuncu veya onayli bagli ortakligi): varliklari oyuncu yonetir. */
+    public boolean playerGroup(Company c) { return c != null && !c.neutral && !c.eq.merged && !c.bankrupt && competition.top(c) == player; }
+
+    /** Haritadaki renk: bagli ortaklik ana sirketin rengini, hafif acik tonla tasir. */
+    public int displayColor(Company c) {
+        Company t = competition.top(c);
+        if (t == c) return c.colorRgb;
+        int r = (t.colorRgb >> 16) & 0xFF, g = (t.colorRgb >> 8) & 0xFF, b = t.colorRgb & 0xFF;
+        r += (255 - r) * 35 / 100; g += (255 - g) * 35 / 100; b += (255 - b) * 35 / 100;
+        return (r << 16) | (g << 8) | b;
+    }
+
     /** Oyuncunun bu sirkette payi var mi. */
     public boolean playerHolds(Company c) { return c != player && c.eq.held(companies.indexOf(player)) > 0; }
 

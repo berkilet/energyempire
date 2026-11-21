@@ -40,6 +40,8 @@ public final class Equity {
     public int parent = -1, strategy;
     /** Birlesip ana sirkete katildi (ortakliktan cikarma). */
     public boolean merged;
+    /** Grup ici borc bakiyesi (bagli ortaklikta): + ana sirket bu sirkete borclu, - bu sirket ana sirkete borclu. */
+    public double icBalance;
     /** Rekabet: son 12 ayin aylik geliri (halka), hakim durum, kamu hizmeti modunda tuketiciye iade. */
     public double[] rev12 = new double[12];
     public int revIdx;

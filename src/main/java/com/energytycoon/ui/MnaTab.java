@@ -19,6 +19,7 @@ public final class MnaTab {
     private final Consumer<String> action;
     private GameState st;
     private int selected = -1;
+    private double icAmount = 50e6;
     private String key = "";
 
     private static final String[] HEAD = { "Şirket", "Değer", "Hisse", "Durum", "Serbest", "Payınız", "Kurucu", "Not", "Ulusal pay", "" };
@@ -54,14 +55,21 @@ public final class MnaTab {
         Table h = new Table();
         for (int i = 0; i < HEAD.length; i++) h.add(head(HEAD[i], i == 0 ? Align.left : Align.right)).width(W[i]).padRight(4);
         root.add(h).row();
+        // grup sirasi: ana sirket, hemen altinda bagli ortakliklari
+        java.util.List<Integer> order = new java.util.ArrayList<>();
         for (int i = 0; i < s.companies.size(); i++) {
             Company c = s.companies.get(i);
-            if (c.neutral) continue;
+            if (c.neutral || c.eq.merged || c.eq.parent >= 0) continue;
+            order.add(i);
+            for (int j = 0; j < s.companies.size(); j++) if (s.companies.get(j).eq.parent == i && !s.companies.get(j).eq.merged) order.add(j);
+        }
+        for (int i : order) {
+            Company c = s.companies.get(i);
             Table row = new Table(skin);
             row.setBackground(i == selected ? "rowSel" : c.player ? "card" : "row");
             row.pad(3, 6, 3, 6);
             String status = c.eq.merged ? "Birleşti" : c.bankrupt ? "İflas" : c.eq.parent >= 0 ? "Bağlı ort. (" + s.companies.get(c.eq.parent).name + ")" : c.eq.listed ? "Halka açık" : "Halka kapalı";
-            String[] cells = { c.player ? c.name + " (siz)" : c.name, Fmt.money(s.capital.value(c)), c.eq.listed ? CapitalTab.px(c.eq.price) : "—", status,
+            String[] cells = { c.player ? c.name + " (siz)" : c.eq.parent >= 0 ? "↳ " + c.name : c.name, Fmt.money(s.capital.value(c)), c.eq.listed ? CapitalTab.px(c.eq.price) : "—", status,
                 c.eq.listed ? "%" + Math.round(c.eq.freePct() * 100) : "—", c.player ? "—" : pct0(s.mna.stake(p, c)), "%" + Math.round(c.eq.founderPct() * 100),
                 c.bankrupt ? "—" : s.finance.rating(c).name(), pct0(s.competition.nationalShare(java.util.Set.of(c))) };
             for (int j = 0; j < cells.length; j++) {
@@ -133,6 +141,24 @@ public final class MnaTab {
                 + "Kredi notunuz ve banka taahhütleriniz bağlı ortaklıklarla birlikte (konsolide) hesaplanır; üretimi pazar payınıza eklenir.", skin, "dim");
             sl.setWrap(true);
             root.add(sl).width(780).padBottom(4).row();
+            // grup ici nakit
+            double wmax = s.mna.subWithdrawable(t), bal = t.eq.icBalance;
+            Label cl = new Label("GRUP İÇİ NAKİT · " + t.name + " kasası " + Fmt.money(t.cash) + " (rezerv korunarak çekilebilir " + Fmt.money(wmax) + ")"
+                + (Math.abs(bal) >= 1 ? " · grup içi borç: " + (bal > 0 ? "siz " + t.name + "'e " : t.name + " size ") + Fmt.money(Math.abs(bal)) + " borçlu" : "")
+                + "\nYönetim kurulunu siz atadığınız için kasalar arasında para aktarabilirsiniz. Aktarım grup içi borç olarak kaydedilir; borçlu taraf her ay politika faizi + 1 puan öder "
+                + "(azınlık ortakların hakkı korunur). Özel temettü bütün ortaklara paylarıyla orantılı dağıtılır.", skin, "small");
+            cl.setWrap(true);
+            root.add(cl).width(780).padTop(4).row();
+            Table ct = new Table();
+            ct.add(step("−", () -> icAmount = Math.max(10e6, icAmount - 50e6))).size(30, 28);
+            ct.add(new Label(Fmt.money(icAmount), skin, "value")).width(90).center();
+            ct.add(step("+", () -> icAmount += 50e6)).size(30, 28).padRight(8);
+            ct.add(button("Bağlı ortaklıktan çek", "ic:" + ti + ":" + icAmount, icAmount <= wmax + 1)).height(28).padRight(4);
+            ct.add(button("Bağlı ortaklığa gönder", "ic:" + ti + ":" + (-icAmount), s.player.cash >= icAmount)).height(28).padRight(4);
+            if (bal > 1) ct.add(button("Borcu öde", "ic:" + ti + ":" + (-Math.min(bal, s.player.cash)), s.player.cash > 1)).height(28).padRight(4);
+            if (bal < -1) ct.add(button("Alacağı tahsil et", "ic:" + ti + ":" + Math.min(-bal, wmax), wmax > 1)).height(28).padRight(4);
+            ct.add(button("Özel temettü", "sdiv:" + ti + ":" + icAmount, true)).height(28);
+            root.add(ct).padBottom(4).row();
         }
     }
 

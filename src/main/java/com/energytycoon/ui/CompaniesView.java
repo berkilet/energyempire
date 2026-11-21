@@ -48,7 +48,13 @@ public final class CompaniesView {
         ct.row();
         // Ozel sirketler once; tarafsiz kamu sirketi siralamanin disinda, ayri baslik altinda.
         rowOrder.clear();
-        for (Company c : s.companies) if (!c.neutral) rowOrder.add(c);
+        // grup gorunumu: ana sirket, hemen altinda bagli ortakliklari (birlesenler listede yok)
+        for (Company c : s.companies) {
+            if (c.neutral || c.eq.merged || c.eq.parent >= 0) continue;
+            rowOrder.add(c);
+            int ci = s.companies.indexOf(c);
+            for (Company x : s.companies) if (!x.neutral && !x.eq.merged && x.eq.parent == ci) rowOrder.add(x);
+        }
         for (Company c : s.companies) if (c.neutral) rowOrder.add(c);
         for (Company c : rowOrder) {
             if (c.neutral) {
@@ -103,8 +109,13 @@ public final class CompaniesView {
         built = true;
     }
 
+    private String structKey = "";
+
     public void update(GameState s) {
-        if (!built) build(s);
+        // grup yapisi degisince (devralma, birlesme) tablo yeniden kurulur
+        StringBuilder sk = new StringBuilder();
+        for (Company c : s.companies) sk.append(c.eq.parent).append(c.eq.merged).append(',');
+        if (!built || !sk.toString().equals(structKey)) { structKey = sk.toString(); build(s); }
         double totalGen = 0;
         for (Company c : s.companies) totalGen += c.lastMwhGenerated;
         for (int k = 0; k < rowOrder.size() && k < compRows.size(); k++) {
@@ -112,7 +123,8 @@ public final class CompaniesView {
             Label[] r = compRows.get(k);
             double cap = 0; int n = 0;
             for (Plant p : s.plants) if (p.owner == c && p.operational()) { cap += p.capacityMW(); n++; }
-            r[0].setText(c.name + (c.eq.merged ? "  (birleşti)" : c.bankrupt ? "  (iflas)" : c.eq.parent >= 0 ? "  (bağlı ortaklık)" : ""));
+            r[0].setText(c.eq.parent >= 0 ? "↳ " + c.name + " (" + s.companies.get(c.eq.parent).name + " %" + Math.round(c.eq.pct(c.eq.parent) * 100) + ")"
+                : c.name + (c.bankrupt ? "  (iflas)" : ""));
             r[1].setText(Fmt.money(c.valuation));
             UiKit.setMoney(skin, r[2], c.cash, true);
             r[3].setText(c.debt() > 0 ? Fmt.money(c.debt()) : "—");

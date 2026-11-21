@@ -616,6 +616,7 @@ public final class WorldRenderer implements Disposable {
                 drawList.add(mi);
             }
             pv.flag.transform.setToTranslation(cx - 0.42f, top, cz + 0.42f);
+            ((ColorAttribute) pv.flag.materials.get(0).get(ColorAttribute.Diffuse)).color.set((state.displayColor(p.owner) << 8) | 0xFF);
             drawList.add(pv.flag);
             boolean built = p.operational();
             if (pv.rotor != null) {
@@ -758,6 +759,7 @@ public final class WorldRenderer implements Disposable {
             sv.body.transform.setToTranslation(t.x + 0.5f, top, t.y + 0.5f).scale(1, prog, 1);
             drawList.add(sv.body);
             sv.flag.transform.setToTranslation(t.x + 0.08f, top, t.y + 0.92f);
+            if (t.owner != null) ((ColorAttribute) sv.flag.materials.get(0).get(ColorAttribute.Diffuse)).color.set((state.displayColor(t.owner) << 8) | 0xFF);
             drawList.add(sv.flag);
         }
         // toplayici hatlar: topoloji degistikce yeniden
@@ -785,7 +787,7 @@ public final class WorldRenderer implements Disposable {
             if (cp.members.size() < 2 && cp.tm == null) continue;
             Company owner = cp.tm != null ? cp.tm.owner : cp.members.get(0).owner;
             if (owner == null) continue;
-            if (!owner.player) continue;
+            if (!state.playerGroup(owner)) continue;
             Color col = cp.tm != null ? new Color(0.35f, 0.6f, 0.9f, 1) : new Color(1f, 0.85f, 0.3f, 1);
             for (Plant m : cp.members) ti = tile(ti, m.x, m.y, col, 0.22f, 1.06f);
         }
