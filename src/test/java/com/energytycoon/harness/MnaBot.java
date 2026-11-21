@@ -133,6 +133,11 @@ public final class MnaBot {
             f.loan = Math.min(loanMax, cost - f.cash); f.bank = b;
         }
         if (f.loan <= 0) { f.loan = 0; f.bank = null; }
+        // pay takasi (yalnizca halka acik alici, kredili devralma modunda kullanilmaz): kurucu payi %55'in altina inmeyecek kadar yeni hisse
+        if (!leverageMode && f.total() < cost - 1 && p.eq.listed && p.eq.price > 0) {
+            double maxNew = Math.max(0, p.eq.founder / 0.55 - p.eq.shares);
+            f.swapValue = Math.min(cost - f.total(), maxNew * p.eq.price);
+        }
         if (f.total() < cost - 1) return null;
         return f;
     }
