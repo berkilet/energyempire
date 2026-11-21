@@ -1,81 +1,96 @@
-##### final64
--- 64x64 tohum 1: bot %20+ pay true, bot devralma 0, koşullu 0 · oyuncu kurucu payı %78 · koşullu onay fırsatı (ay) 13 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.74
+##### r6_64
+-- 64x64 tohum 1: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %56 · koşullu onay fırsatı (ay) 25 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.49
    2027 halka arz: Oyuncu (kurucu %77)
    2027 halka arz: Yeşil Vadi Güç (kurucu %72)
-   2029 devralma: Yeşil Vadi Güç → Anadolu Enerji
-   2038 halka arz: Anadolu Enerji (kurucu %0)
--- 64x64 tohum 2: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.72
-   2027 halka arz: Oyuncu (kurucu %77)
-   2033 devralma: Yeşil Vadi Güç → Anadolu Enerji
--- 64x64 tohum 3 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.73
-   2028 halka arz: Oyuncu (kurucu %77)
+   2027 devralma: Oyuncu → Anadolu Enerji
+-- 64x64 tohum 2: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %75 · koşullu onay fırsatı (ay) 25 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.39
+   2027 halka arz: Oyuncu (kurucu %75)
+   2027 devralma: Oyuncu → Anadolu Enerji
+   2030 halka arz: Yeşil Vadi Güç (kurucu %75)
+-- 64x64 tohum 3: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %69 · koşullu onay fırsatı (ay) 10 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.57
+   2028 halka arz: Oyuncu (kurucu %69)
    2028 devralma: Oyuncu → Anadolu Enerji
--- 64x64 tohum 4: bot %20+ pay true, bot devralma 0, koşullu 0 · oyuncu kurucu payı %80 · koşullu onay fırsatı (ay) 44 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.86
-   2027 halka arz: Oyuncu (kurucu %77)
+   2031 halka arz: Yeşil Vadi Güç (kurucu %79)
+-- 64x64 tohum 4 (Şirketiniz iflas etti: Devralma kredisi · Lemon Brothers 90 gün ödenmedi (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %58 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.94
+   2027 halka arz: Oyuncu (kurucu %58)
    2027 devralma: Yeşil Vadi Güç → Anadolu Enerji
-   2028 halka arz: Yeşil Vadi Güç (kurucu %79)
-   2028 halka arz: Anadolu Enerji (kurucu %0)
--- 64x64 tohum 5 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.71
+   2027 devralma: Oyuncu → Yeşil Vadi Güç
+   2028 halka arz: Anadolu Enerji (kurucu %36)
+-- 64x64 tohum 5 (Şirketiniz iflas etti: Ticari · Deutsche Bunk 90 gün ödenmedi (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 13 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.66
    2028 halka arz: Oyuncu (kurucu %77)
    2028 devralma: Oyuncu → Anadolu Enerji
--- 64x64 tohum 6 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.98
+-- 64x64 tohum 6 (Şirketiniz iflas etti: Devralma kredisi · Deutsche Bunk 90 gün ödenmedi (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 2, koşullu 0 · oyuncu kurucu payı %58 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.98
    2027 halka arz: Oyuncu (kurucu %77)
    2027 devralma: Oyuncu → Anadolu Enerji
--- 64x64 tohum 7: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 29 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.59
+   2030 devralma: Oyuncu → Yeşil Vadi Güç
+-- 64x64 tohum 7: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 19 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.58
    2029 halka arz: Oyuncu (kurucu %77)
    2029 devralma: Oyuncu → Anadolu Enerji
    2030 halka arz: Yeşil Vadi Güç (kurucu %77)
--- 64x64 tohum 8 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 5 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.95
+-- 64x64 tohum 8 (Şirketiniz iflas etti: Devralma kredisi · Lemon Brothers 90 gün ödenmedi (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 2, koşullu 0 · oyuncu kurucu payı %59 · koşullu onay fırsatı (ay) 14 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.96
    2027 halka arz: Oyuncu (kurucu %77)
    2027 devralma: Oyuncu → Anadolu Enerji
--- 64x64 tohum 9: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 29 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.47
+   2029 devralma: Oyuncu → Yeşil Vadi Güç
+   2031 halka arz: Anadolu Enerji (kurucu %29)
+-- 64x64 tohum 9: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 41 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.47
    2025 devralma: Anadolu Enerji → Yeşil Vadi Güç
    2027 halka arz: Oyuncu (kurucu %77)
-   2028 halka arz: Yeşil Vadi Güç (kurucu %39)
--- 64x64 tohum 10 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.67
+   2034 halka arz: Yeşil Vadi Güç (kurucu %36)
+-- 64x64 tohum 10: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 39 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.27
    2027 halka arz: Oyuncu (kurucu %77)
    2027 devralma: Oyuncu → Anadolu Enerji
-== 64x64, 10 tohum: bot (a) %20+ pay 8, (b) devralma 6, (c) koşullu onayla devralma 0 · halka arz 16 · otorite: başvuru 10, onay 10, koşullu 0, ret 0 · kontrol devri 10 · sonuçsuz teklif 3
+   2036 halka arz: Yeşil Vadi Güç (kurucu %75)
+== 64x64, 10 tohum: bot (a) %20+ pay 9, (b) devralma 9, (c) koşullu onayla devralma 0 · halka arz 18 · otorite: başvuru 13, onay 13, koşullu 0, ret 0 · kontrol devri 13 · sonuçsuz teklif 3
    ret sebepleri: {}
-##### final96
--- 96x96 tohum 1 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 64 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.69
-   2027 halka arz: Oyuncu (kurucu %77)
-   2028 halka arz: Yeşil Vadi Güç (kurucu %76)
--- 96x96 tohum 2 (Şirketiniz iflas etti: 60 gündür eksi nakit (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.97
+   bot ay sebepleri: {ISLEM: kurucudan kontrol payi=11, acik teklif bekleniyor=11, azinlik payi: nakit yetmedi=198, bot: 8 ceyrek dolmadi=230, bot: ND/FAVOK > 3=39, bot: not BB alti=128, devralma sonrasi 24 ay=227, kurucu kontrol payi: finansman yetmedi=253, rekabet: ret=579}
+   koşullu onay fırsatı varken: {azinlik payi: nakit yetmedi=67, bot: ND/FAVOK > 3=2, bot: not BB alti=33, devralma sonrasi 24 ay=38, kurucu kontrol payi: finansman yetmedi=112}
+##### r6_96
+-- 96x96 tohum 1: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %70 · koşullu onay fırsatı (ay) 15 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.63
+   2027 halka arz: Oyuncu (kurucu %70)
+   2027 devralma: Oyuncu → Anadolu Enerji
+   2028 halka arz: Yeşil Vadi Güç (kurucu %79)
+-- 96x96 tohum 2 (Şirketiniz iflas etti: Devralma kredisi · Lemon Brothers 90 gün ödenmedi (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 2, koşullu 0 · oyuncu kurucu payı %56 · koşullu onay fırsatı (ay) 7 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.72
    2027 halka arz: Oyuncu (kurucu %77)
    2027 devralma: Oyuncu → Anadolu Enerji
--- 96x96 tohum 3 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 7 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 1.00
-   2027 halka arz: Oyuncu (kurucu %77)
-   2028 halka arz: Anadolu Enerji (kurucu %80)
+   2033 devralma: Oyuncu → Yeşil Vadi Güç
+-- 96x96 tohum 3: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %73 · koşullu onay fırsatı (ay) 53 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.47
+   2027 halka arz: Oyuncu (kurucu %73)
+   2027 devralma: Oyuncu → Anadolu Enerji
+   2028 halka arz: Anadolu Enerji (kurucu %24)
+   2029 halka arz: Yeşil Vadi Güç (kurucu %76)
+-- 96x96 tohum 4: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %74 · koşullu onay fırsatı (ay) 16 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.33
+   2027 halka arz: Oyuncu (kurucu %74)
+   2027 devralma: Oyuncu → Anadolu Enerji
+-- 96x96 tohum 5: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %74 · koşullu onay fırsatı (ay) 25 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.52
+   2027 halka arz: Oyuncu (kurucu %74)
+   2027 devralma: Oyuncu → Anadolu Enerji
    2029 halka arz: Yeşil Vadi Güç (kurucu %77)
--- 96x96 tohum 4 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 3 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.71
-   2027 halka arz: Oyuncu (kurucu %77)
+-- 96x96 tohum 6: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %69 · koşullu onay fırsatı (ay) 6 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.79
+   2027 halka arz: Oyuncu (kurucu %69)
    2027 devralma: Oyuncu → Anadolu Enerji
--- 96x96 tohum 5: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.98
-   2027 halka arz: Oyuncu (kurucu %77)
-   2030 halka arz: Anadolu Enerji (kurucu %78)
-   2039 devralma: Oyuncu → Anadolu Enerji
-   2039 halka arz: Yeşil Vadi Güç (kurucu %77)
--- 96x96 tohum 6: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 6 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.96
-   2027 halka arz: Oyuncu (kurucu %77)
-   2030 halka arz: Yeşil Vadi Güç (kurucu %74)
--- 96x96 tohum 7: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.78
-   2027 halka arz: Oyuncu (kurucu %77)
+   2030 halka arz: Yeşil Vadi Güç (kurucu %72)
+-- 96x96 tohum 7: bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %61 · koşullu onay fırsatı (ay) 39 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.59
+   2027 halka arz: Oyuncu (kurucu %61)
+   2027 devralma: Oyuncu → Anadolu Enerji
    2027 halka arz: Yeşil Vadi Güç (kurucu %75)
-   2027 halka arz: Anadolu Enerji (kurucu %78)
--- 96x96 tohum 8 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 12 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.99
-   2027 halka arz: Oyuncu (kurucu %77)
-   2028 devralma: Oyuncu → Anadolu Enerji
--- 96x96 tohum 9 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.95
-   2027 halka arz: Oyuncu (kurucu %77)
+   2027 halka arz: Anadolu Enerji (kurucu %38)
+-- 96x96 tohum 8 (Şirketiniz iflas etti: Devralma kredisi · Deutsche Bunk 90 gün ödenmedi (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 2, koşullu 0 · oyuncu kurucu payı %60 · koşullu onay fırsatı (ay) 28 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.98
+   2027 halka arz: Oyuncu (kurucu %76)
+   2027 devralma: Oyuncu → Anadolu Enerji
+   2030 devralma: Oyuncu → Yeşil Vadi Güç
+-- 96x96 tohum 9 (Şirketiniz iflas etti: Devralma kredisi · Lemon Brothers 90 gün ödenmedi (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %76 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.90
+   2027 halka arz: Oyuncu (kurucu %76)
    2027 devralma: Oyuncu → Yeşil Vadi Güç
--- 96x96 tohum 10: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 19 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.70
-   2027 halka arz: Oyuncu (kurucu %77)
-   2039 halka arz: Yeşil Vadi Güç (kurucu %75)
-== 96x96, 10 tohum: bot (a) %20+ pay 5, (b) devralma 5, (c) koşullu onayla devralma 0 · halka arz 19 · otorite: başvuru 5, onay 5, koşullu 0, ret 0 · kontrol devri 5 · sonuçsuz teklif 0
+-- 96x96 tohum 10 (Şirketiniz iflas etti: Ticari · Deutsche Bunk 90 gün ödenmedi (yapılandırma hakkı kullanılmış).): bot %20+ pay true, bot devralma 1, koşullu 0 · oyuncu kurucu payı %75 · koşullu onay fırsatı (ay) 22 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.41
+   2027 halka arz: Oyuncu (kurucu %75)
+   2027 devralma: Oyuncu → Anadolu Enerji
+   2033 halka arz: Yeşil Vadi Güç (kurucu %79)
+== 96x96, 10 tohum: bot (a) %20+ pay 10, (b) devralma 10, (c) koşullu onayla devralma 0 · halka arz 18 · otorite: başvuru 12, onay 12, koşullu 0, ret 0 · kontrol devri 12 · sonuçsuz teklif 3
    ret sebepleri: {}
-##### finallev
--- 64x64 tohum 1: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %78 · koşullu onay fırsatı (ay) 13 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.74
+   bot ay sebepleri: {ISLEM: kurucudan kontrol payi=12, acik teklif bekleniyor=12, azinlik payi: nakit yetmedi=176, bot: 8 ceyrek dolmadi=230, bot: ND/FAVOK > 3=514, bot: not BB alti=76, devralma sonrasi 24 ay=233, kurucu kontrol payi: finansman yetmedi=313, rekabet: ret=149}
+   koşullu onay fırsatı varken: {acik teklif bekleniyor=1, azinlik payi: nakit yetmedi=38, bot: ND/FAVOK > 3=31, bot: not BB alti=25, devralma sonrasi 24 ay=56, kurucu kontrol payi: finansman yetmedi=97}
+##### r6_lev
+-- 64x64 tohum 1: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %78 · koşullu onay fırsatı (ay) 12 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.74
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 139M borç 0M ND/FAVÖK -26.0 not A gecikme 0 payı olan şirket 0 değer 702M
    2026 iz: hisse 10.00M temettü %0 geri alım 0M hakim true tavanlı santral 2 nakit 96M borç 50M ND/FAVÖK -2.2 not A gecikme 0 payı olan şirket 0 değer 965M
    2027 halka arz: Oyuncu (kurucu %77)
@@ -84,17 +99,17 @@
    2028 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 115M borç 34M ND/FAVÖK -1.0 not A gecikme 0 payı olan şirket 0 değer 1928M
    2029 devralma: Yeşil Vadi Güç → Anadolu Enerji
    2029 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 155M borç 24M ND/FAVÖK -1.6 not A gecikme 0 payı olan şirket 0 değer 1964M
-   2030 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 137M borç 14M ND/FAVÖK -1.1 not A gecikme 0 payı olan şirket 0 değer 2522M
-   2031 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 170M borç 95M ND/FAVÖK -0.5 not A gecikme 0 payı olan şirket 0 değer 2433M
-   2032 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 82M borç 118M ND/FAVÖK 0.2 not A gecikme 0 payı olan şirket 0 değer 2840M
-   2033 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 12 nakit 132M borç 187M ND/FAVÖK 0.3 not A gecikme 0 payı olan şirket 0 değer 3471M
-   2034 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 13 nakit 88M borç 388M ND/FAVÖK 1.5 not A gecikme 0 payı olan şirket 0 değer 4053M
-   2035 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 14 nakit 195M borç 303M ND/FAVÖK 0.5 not A gecikme 0 payı olan şirket 0 değer 4604M
-   2036 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 16 nakit 144M borç 309M ND/FAVÖK 0.6 not A gecikme 0 payı olan şirket 0 değer 5185M
-   2037 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 17 nakit 158M borç 314M ND/FAVÖK 0.6 not A gecikme 0 payı olan şirket 0 değer 5186M
-   2038 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 18 nakit 171M borç 294M ND/FAVÖK 0.5 not A gecikme 0 payı olan şirket 0 değer 5671M
-   2039 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 20 nakit 140M borç 445M ND/FAVÖK 1.2 not A gecikme 0 payı olan şirket 0 değer 6405M
-   2040 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 22 nakit 172M borç 984M ND/FAVÖK 2.4 not BBB gecikme 0 payı olan şirket 0 değer 6484M
+   2030 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 55M borç 14M ND/FAVÖK -0.4 not A gecikme 0 payı olan şirket 0 değer 2718M
+   2031 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 84M borç 3M ND/FAVÖK -0.5 not A gecikme 0 payı olan şirket 0 değer 2260M
+   2032 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 153M borç 0M ND/FAVÖK -0.8 not A gecikme 0 payı olan şirket 0 değer 3720M
+   2033 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 173M borç 96M ND/FAVÖK -0.3 not A gecikme 0 payı olan şirket 0 değer 4523M
+   2034 iz: hisse 12.87M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 86M borç 174M ND/FAVÖK 0.4 not A gecikme 0 payı olan şirket 0 değer 4432M
+   2035 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 16 nakit 130M borç 232M ND/FAVÖK 0.5 not A gecikme 0 payı olan şirket 0 değer 4215M
+   2036 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 17 nakit 134M borç 175M ND/FAVÖK 0.2 not A gecikme 0 payı olan şirket 0 değer 4665M
+   2037 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 18 nakit 83M borç 205M ND/FAVÖK 0.5 not A gecikme 0 payı olan şirket 0 değer 5549M
+   2038 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 19 nakit 161M borç 128M ND/FAVÖK -0.2 not A gecikme 0 payı olan şirket 0 değer 4614M
+   2039 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 20 nakit 68M borç 70M ND/FAVÖK 0.0 not A gecikme 0 payı olan şirket 0 değer 5478M
+   2040 iz: hisse 12.87M temettü %30 geri alım 0M hakim true tavanlı santral 21 nakit 213M borç 32M ND/FAVÖK -0.9 not A gecikme 0 payı olan şirket 0 değer 4703M
    devralma sonrası: devralma yok
 -- 64x64 tohum 2: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.72
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 381M borç 256M ND/FAVÖK -37.0 not CCC gecikme 0 payı olan şirket 0 değer 593M
@@ -107,14 +122,14 @@
    2031 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 157M borç 1272M ND/FAVÖK 2.9 not BBB gecikme 0 payı olan şirket 0 değer 6747M
    2032 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 22 nakit 298M borç 1935M ND/FAVÖK 3.2 not BBB gecikme 0 payı olan şirket 0 değer 7919M
    2033 devralma: Yeşil Vadi Güç → Anadolu Enerji
-   2033 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 26 nakit 235M borç 1834M ND/FAVÖK 3.3 not BB gecikme 0 payı olan şirket 0 değer 6425M
-   2034 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 30 nakit 323M borç 1952M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 7294M
-   2035 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 32 nakit 383M borç 2101M ND/FAVÖK 3.1 not BBB gecikme 0 payı olan şirket 0 değer 8377M
-   2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 36 nakit 432M borç 2393M ND/FAVÖK 3.2 not BBB gecikme 0 payı olan şirket 0 değer 8665M
-   2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 41 nakit 474M borç 2662M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 10619M
-   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 44 nakit 231M borç 2321M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 9958M
-   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 48 nakit 487M borç 2654M ND/FAVÖK 2.9 not BB gecikme 0 payı olan şirket 0 değer 11421M
-   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 50 nakit 116M borç 2280M ND/FAVÖK 3.1 not BB gecikme 0 payı olan şirket 0 değer 9642M
+   2033 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 26 nakit 213M borç 1833M ND/FAVÖK 3.5 not BB gecikme 0 payı olan şirket 0 değer 5786M
+   2034 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 30 nakit 362M borç 2119M ND/FAVÖK 3.4 not BBB gecikme 0 payı olan şirket 0 değer 7896M
+   2035 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 35 nakit 431M borç 2277M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 8405M
+   2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 43 nakit 494M borç 2556M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 8827M
+   2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 49 nakit 510M borç 2982M ND/FAVÖK 3.5 not BB gecikme 0 payı olan şirket 0 değer 9743M
+   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 55 nakit 597M borç 3173M ND/FAVÖK 3.4 not BB gecikme 0 payı olan şirket 0 değer 10860M
+   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 59 nakit 628M borç 3175M ND/FAVÖK 3.1 not BB gecikme 0 payı olan şirket 0 değer 9588M
+   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 65 nakit 681M borç 3437M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 11669M
    devralma sonrası: devralma yok
 -- 64x64 tohum 3: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.73
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 482M borç 253M ND/FAVÖK Infinity not B gecikme 0 payı olan şirket 0 değer 616M
@@ -124,20 +139,19 @@
    2028 devralma: Yeşil Vadi Güç → Anadolu Enerji
    2028 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 189M borç 271M ND/FAVÖK 0.6 not BBB gecikme 0 payı olan şirket 0 değer 2207M
    2029 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 92M borç 350M ND/FAVÖK 1.5 not A gecikme 0 payı olan şirket 0 değer 2927M
-   2030 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 151M borç 412M ND/FAVÖK 1.1 not A gecikme 0 payı olan şirket 0 değer 3039M
-   2031 halka arz: Anadolu Enerji (kurucu %37)
-   2031 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 136M borç 445M ND/FAVÖK 1.1 not BBB gecikme 0 payı olan şirket 0 değer 3409M
-   2032 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 13 nakit 135M borç 460M ND/FAVÖK 1.0 not A gecikme 0 payı olan şirket 0 değer 4657M
-   2033 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 14 nakit 111M borç 556M ND/FAVÖK 1.4 not A gecikme 0 payı olan şirket 0 değer 6183M
-   2034 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 15 nakit 289M borç 1194M ND/FAVÖK 2.7 not BBB gecikme 0 payı olan şirket 0 değer 6206M
-   2035 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 21 nakit 218M borç 1608M ND/FAVÖK 3.3 not BBB gecikme 0 payı olan şirket 0 değer 6764M
-   2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 23 nakit 220M borç 1585M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 6580M
-   2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 25 nakit 293M borç 1757M ND/FAVÖK 3.3 not BB gecikme 0 payı olan şirket 0 değer 6410M
-   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 28 nakit 250M borç 1733M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 6194M
-   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 30 nakit 340M borç 1894M ND/FAVÖK 2.8 not BBB gecikme 0 payı olan şirket 0 değer 8628M
-   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 32 nakit 400M borç 2262M ND/FAVÖK 3.4 not BB gecikme 0 payı olan şirket 0 değer 5585M
+   2030 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 130M borç 412M ND/FAVÖK 1.4 not BBB gecikme 0 payı olan şirket 0 değer 2923M
+   2031 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 1 nakit 164M borç 733M ND/FAVÖK 1.9 not BBB gecikme 0 payı olan şirket 0 değer 3422M
+   2032 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 12 nakit 124M borç 697M ND/FAVÖK 1.6 not BBB gecikme 0 payı olan şirket 0 değer 4442M
+   2033 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 14 nakit 143M borç 747M ND/FAVÖK 1.7 not BBB gecikme 0 payı olan şirket 0 değer 4194M
+   2034 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 17 nakit 170M borç 991M ND/FAVÖK 2.2 not BBB gecikme 0 payı olan şirket 0 değer 4733M
+   2035 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 22 nakit 245M borç 1477M ND/FAVÖK 2.9 not BB gecikme 0 payı olan şirket 0 değer 5664M
+   2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 25 nakit 207M borç 1652M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 7016M
+   2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 25 nakit 39M borç 1234M ND/FAVÖK 2.9 not BB gecikme 0 payı olan şirket 0 değer 5752M
+   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 22 nakit 65M borç 917M ND/FAVÖK 1.8 not BB gecikme 12 payı olan şirket 0 değer 7310M
+   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 21 nakit 209M borç 1049M ND/FAVÖK 1.8 not B gecikme 12 payı olan şirket 0 değer 7099M
+   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 26 nakit 442M borç 1644M ND/FAVÖK 2.4 not B gecikme 12 payı olan şirket 0 değer 7066M
    devralma sonrası: devralma yok
--- 64x64 tohum 4: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %79 · koşullu onay fırsatı (ay) 9 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.94
+-- 64x64 tohum 4: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %79 · koşullu onay fırsatı (ay) 10 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.86
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 68M borç 184M ND/FAVÖK 7.0 not CCC gecikme 0 payı olan şirket 0 değer 717M
    2026 iz: hisse 10.00M temettü %0 geri alım 0M hakim true tavanlı santral 3 nakit 95M borç 149M ND/FAVÖK 0.7 not BBB gecikme 0 payı olan şirket 0 değer 1680M
    2027 halka arz: Oyuncu (kurucu %77)
@@ -146,18 +160,18 @@
    2028 halka arz: Yeşil Vadi Güç (kurucu %79)
    2028 halka arz: Anadolu Enerji (kurucu %36)
    2028 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 140M borç 68M ND/FAVÖK -0.7 not A gecikme 0 payı olan şirket 0 değer 3049M
-   2029 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 271M borç 23M ND/FAVÖK -1.3 not A gecikme 0 payı olan şirket 0 değer 5143M
-   2030 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 134M borç 0M ND/FAVÖK -0.6 not A gecikme 0 payı olan şirket 0 değer 5644M
-   2031 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 118M borç 95M ND/FAVÖK -0.1 not A gecikme 0 payı olan şirket 0 değer 6643M
-   2032 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 139M borç 505M ND/FAVÖK 1.0 not A gecikme 0 payı olan şirket 0 değer 8213M
-   2033 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 132M borç 1359M ND/FAVÖK 2.5 not BBB gecikme 0 payı olan şirket 0 değer 10068M
-   2034 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 25 nakit 202M borç 1974M ND/FAVÖK 3.5 not BBB gecikme 0 payı olan şirket 0 değer 10553M
-   2035 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 29 nakit 296M borç 2189M ND/FAVÖK 3.3 not BBB gecikme 0 payı olan şirket 0 değer 10938M
-   2036 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 34 nakit 292M borç 2226M ND/FAVÖK 3.3 not BBB gecikme 0 payı olan şirket 0 değer 11658M
-   2037 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 39 nakit 363M borç 2511M ND/FAVÖK 3.2 not BBB gecikme 0 payı olan şirket 0 değer 14073M
-   2038 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 44 nakit 371M borç 2605M ND/FAVÖK 3.1 not BBB gecikme 0 payı olan şirket 0 değer 12007M
-   2039 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 50 nakit 458M borç 2484M ND/FAVÖK 2.5 not BBB gecikme 0 payı olan şirket 0 değer 12911M
-   2040 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 55 nakit 380M borç 2403M ND/FAVÖK 2.5 not BBB gecikme 0 payı olan şirket 0 değer 13743M
+   2029 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 267M borç 23M ND/FAVÖK -1.3 not A gecikme 0 payı olan şirket 0 değer 4808M
+   2030 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 50M borç 93M ND/FAVÖK 0.2 not A gecikme 0 payı olan şirket 0 değer 5758M
+   2031 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 109M borç 77M ND/FAVÖK -0.1 not A gecikme 0 payı olan şirket 0 değer 7578M
+   2032 iz: hisse 12.71M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 173M borç 522M ND/FAVÖK 0.9 not A gecikme 0 payı olan şirket 0 değer 10324M
+   2033 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 19 nakit 146M borç 947M ND/FAVÖK 2.0 not A gecikme 0 payı olan şirket 0 değer 8714M
+   2034 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 22 nakit 142M borç 1251M ND/FAVÖK 2.8 not BBB gecikme 0 payı olan şirket 0 değer 6509M
+   2035 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 24 nakit 210M borç 1525M ND/FAVÖK 3.2 not BBB gecikme 0 payı olan şirket 0 değer 4826M
+   2036 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 26 nakit 157M borç 1369M ND/FAVÖK 3.4 not BB gecikme 0 payı olan şirket 0 değer 5214M
+   2037 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 30 nakit 262M borç 1649M ND/FAVÖK 3.3 not BBB gecikme 0 payı olan şirket 0 değer 8599M
+   2038 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 33 nakit 194M borç 1797M ND/FAVÖK 3.8 not BB gecikme 0 payı olan şirket 0 değer 8743M
+   2039 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 34 nakit 77M borç 1356M ND/FAVÖK 3.1 not BBB gecikme 0 payı olan şirket 0 değer 8475M
+   2040 iz: hisse 12.71M temettü %30 geri alım 0M hakim true tavanlı santral 34 nakit 78M borç 1006M ND/FAVÖK 2.2 not BBB gecikme 0 payı olan şirket 0 değer 11300M
    devralma sonrası: devralma yok
 -- 64x64 tohum 5: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 15 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.80
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 142M borç 0M ND/FAVÖK -26.5 not A gecikme 0 payı olan şirket 0 değer 705M
@@ -176,13 +190,15 @@
    2035 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 26 nakit 324M borç 1662M ND/FAVÖK 3.0 not BBB gecikme 0 payı olan şirket 0 değer 9179M
    2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 30 nakit 382M borç 1844M ND/FAVÖK 3.0 not BBB gecikme 0 payı olan şirket 0 değer 8900M
    2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 33 nakit 288M borç 1800M ND/FAVÖK 3.1 not BB gecikme 0 payı olan şirket 0 değer 8124M
-   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 37 nakit 401M borç 2087M ND/FAVÖK 3.2 not BBB gecikme 0 payı olan şirket 0 değer 8640M
-   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 39 nakit 155M borç 1669M ND/FAVÖK 2.9 not BB gecikme 0 payı olan şirket 0 değer 8050M
-   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 39 nakit 41M borç 1181M ND/FAVÖK 2.2 not BBB gecikme 0 payı olan şirket 0 değer 7334M
+   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 36 nakit 409M borç 2037M ND/FAVÖK 3.3 not BB gecikme 0 payı olan şirket 0 değer 8028M
+   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 40 nakit 295M borç 1883M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 7572M
+   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 40 nakit 34M borç 1295M ND/FAVÖK 2.6 not BBB gecikme 0 payı olan şirket 0 değer 8538M
    devralma sonrası: devralma yok
-== 64x64, 5 tohum: bot (a) %20+ pay 0, (b) devralma 0, (c) koşullu onayla devralma 0 · halka arz 10 · otorite: başvuru 5, onay 5, koşullu 0, ret 0 · kontrol devri 5 · sonuçsuz teklif 3
+== 64x64, 5 tohum: bot (a) %20+ pay 0, (b) devralma 0, (c) koşullu onayla devralma 0 · halka arz 9 · otorite: başvuru 5, onay 5, koşullu 0, ret 0 · kontrol devri 5 · sonuçsuz teklif 3
    ret sebepleri: {}
--- 96x96 tohum 1 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 64 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.69
+   bot ay sebepleri: {azinlik payi: nakit yetmedi=44, bot: 8 ceyrek dolmadi=115, bot: ND/FAVOK > 3=270, bot: gecikme=3, bot: not BB alti=31, deger orani 1,0-1,5 bandinda hedef yok=291, kurucu kontrol payi: finansman yetmedi=85, rekabet: ret=165}
+   koşullu onay fırsatı varken: {deger orani 1,0-1,5 bandinda hedef yok=4, kurucu kontrol payi: finansman yetmedi=33}
+-- 96x96 tohum 1: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 64 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.69
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 62M borç 138M ND/FAVÖK 37.3 not CCC gecikme 0 payı olan şirket 0 değer 616M
    2026 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 71M borç 83M ND/FAVÖK 0.2 not A gecikme 0 payı olan şirket 0 değer 1682M
    2027 halka arz: Oyuncu (kurucu %77)
@@ -197,6 +213,10 @@
    2034 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 408M borç 3209M ND/FAVÖK 2.9 not BBB gecikme 0 payı olan şirket 0 değer 17695M
    2035 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 285M borç 3165M ND/FAVÖK 4.1 not BB gecikme 0 payı olan şirket 0 değer 8247M
    2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 61M borç 2505M ND/FAVÖK 3.6 not CCC gecikme 32 payı olan şirket 0 değer 6233M
+   2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 453M borç 2967M ND/FAVÖK 3.2 not B gecikme 32 payı olan şirket 0 değer 9767M
+   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 510M borç 3271M ND/FAVÖK 3.3 not BB gecikme 32 payı olan şirket 0 değer 12104M
+   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 449M borç 3334M ND/FAVÖK 3.5 not BB gecikme 32 payı olan şirket 0 değer 10837M
+   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 648M borç 3371M ND/FAVÖK 3.1 not B gecikme 32 payı olan şirket 0 değer 8851M
    devralma sonrası: devralma yok
 -- 96x96 tohum 2: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.97
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 147M borç 0M ND/FAVÖK -14.2 not A gecikme 0 payı olan şirket 0 değer 771M
@@ -213,12 +233,12 @@
    2035 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 46 nakit 235M borç 1568M ND/FAVÖK 1.5 not A gecikme 0 payı olan şirket 0 değer 17719M
    2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 52 nakit 220M borç 1825M ND/FAVÖK 1.6 not A gecikme 0 payı olan şirket 0 değer 18302M
    2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 54 nakit 268M borç 1552M ND/FAVÖK 1.3 not A gecikme 0 payı olan şirket 0 değer 16210M
-   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 55 nakit 395M borç 1240M ND/FAVÖK 0.7 not A gecikme 0 payı olan şirket 0 değer 16949M
-   2039 halka arz: Yeşil Vadi Güç (kurucu %77)
-   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 60 nakit 261M borç 1532M ND/FAVÖK 1.2 not A gecikme 0 payı olan şirket 0 değer 18307M
-   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 66 nakit 312M borç 2376M ND/FAVÖK 1.9 not A gecikme 0 payı olan şirket 0 değer 22186M
+   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 57 nakit 149M borç 1800M ND/FAVÖK 1.5 not A gecikme 0 payı olan şirket 0 değer 17050M
+   2039 halka arz: Yeşil Vadi Güç (kurucu %72)
+   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 62 nakit 625M borç 1705M ND/FAVÖK 0.9 not A gecikme 0 payı olan şirket 0 değer 16333M
+   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 66 nakit 607M borç 1472M ND/FAVÖK 0.8 not A gecikme 0 payı olan şirket 0 değer 17247M
    devralma sonrası: devralma yok
--- 96x96 tohum 3 (Şirketiniz iflas etti: Yapılandırma şartı (6 ayda santral satışı) yerine getirilmedi.): bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 7 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 1.00
+-- 96x96 tohum 3: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 7 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.87
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 92M borç 0M ND/FAVÖK -17.5 not A gecikme 0 payı olan şirket 0 değer 737M
    2026 iz: hisse 10.00M temettü %0 geri alım 0M hakim true tavanlı santral 1 nakit 153M borç 0M ND/FAVÖK -2.5 not A gecikme 0 payı olan şirket 0 değer 1518M
    2027 halka arz: Oyuncu (kurucu %77)
@@ -233,7 +253,11 @@
    2033 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 31 nakit 468M borç 2585M ND/FAVÖK 2.6 not BBB gecikme 0 payı olan şirket 0 değer 7904M
    2034 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 33 nakit 359M borç 2495M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 8101M
    2035 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 33 nakit 78M borç 1806M ND/FAVÖK 2.8 not BB gecikme 0 payı olan şirket 0 değer 7356M
-   2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 33 nakit 105M borç 1381M ND/FAVÖK 2.0 not CCC gecikme 20 payı olan şirket 0 değer 8614M
+   2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 188M borç 1381M ND/FAVÖK 1.9 not CCC gecikme 20 payı olan şirket 0 değer 8614M
+   2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 301M borç 1222M ND/FAVÖK 1.0 not B gecikme 20 payı olan şirket 0 değer 11236M
+   2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 392M borç 1947M ND/FAVÖK 1.7 not BBB gecikme 20 payı olan şirket 0 değer 10610M
+   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim false tavanlı santral 0 nakit 513M borç 2749M ND/FAVÖK 3.0 not BB gecikme 20 payı olan şirket 0 değer 8835M
+   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 1 nakit 559M borç 2974M ND/FAVÖK 3.5 not B gecikme 20 payı olan şirket 0 değer 8315M
    devralma sonrası: devralma yok
 -- 96x96 tohum 4: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.76
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 116M borç 0M ND/FAVÖK -49.5 not A gecikme 0 payı olan şirket 0 değer 638M
@@ -252,8 +276,8 @@
    2036 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 42 nakit 368M borç 2190M ND/FAVÖK 2.4 not BBB gecikme 0 payı olan şirket 0 değer 9622M
    2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 45 nakit 409M borç 2175M ND/FAVÖK 2.2 not BB gecikme 0 payı olan şirket 0 değer 8974M
    2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 54 nakit 647M borç 3446M ND/FAVÖK 3.2 not BB gecikme 0 payı olan şirket 0 değer 10232M
-   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 55 nakit 300M borç 2985M ND/FAVÖK 3.2 not B gecikme 0 payı olan şirket 0 değer 10155M
-   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 55 nakit 38M borç 2167M ND/FAVÖK 2.4 not BB gecikme 5 payı olan şirket 0 değer 12332M
+   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 56 nakit 305M borç 2987M ND/FAVÖK 3.2 not B gecikme 0 payı olan şirket 0 değer 8570M
+   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 58 nakit 740M borç 3732M ND/FAVÖK 3.3 not BB gecikme 0 payı olan şirket 0 değer 15274M
    devralma sonrası: devralma yok
 -- 96x96 tohum 5: bot %20+ pay false, bot devralma 0, koşullu 0 · oyuncu kurucu payı %77 · koşullu onay fırsatı (ay) 0 · oran<1,5 iken en yüksek bölgesel birleşik pay %100 · en düşük değer oranı 0.99
    2025 iz: hisse 10.00M temettü %0 geri alım 0M hakim false tavanlı santral 0 nakit 61M borç 92M ND/FAVÖK 1.7 not BB gecikme 0 payı olan şirket 0 değer 737M
@@ -273,8 +297,11 @@
    2037 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 58 nakit 375M borç 2628M ND/FAVÖK 2.1 not BBB gecikme 0 payı olan şirket 0 değer 20477M
    2038 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 64 nakit 485M borç 2903M ND/FAVÖK 2.1 not BBB gecikme 0 payı olan şirket 0 değer 24282M
    2039 halka arz: Yeşil Vadi Güç (kurucu %77)
-   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 67 nakit 519M borç 2812M ND/FAVÖK 2.2 not BBB gecikme 0 payı olan şirket 0 değer 17993M
-   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 75 nakit 522M borç 3345M ND/FAVÖK 2.8 not BBB gecikme 0 payı olan şirket 0 değer 20022M
+   2039 devralma: Yeşil Vadi Güç → Anadolu Enerji
+   2039 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 65 nakit 441M borç 2225M ND/FAVÖK 1.8 not BBB gecikme 0 payı olan şirket 0 değer 18019M
+   2040 iz: hisse 13.00M temettü %30 geri alım 0M hakim true tavanlı santral 73 nakit 428M borç 2735M ND/FAVÖK 2.1 not BBB gecikme 0 payı olan şirket 0 değer 17974M
    devralma sonrası: devralma yok
-== 96x96, 5 tohum: bot (a) %20+ pay 0, (b) devralma 0, (c) koşullu onayla devralma 0 · halka arz 12 · otorite: başvuru 0, onay 0, koşullu 0, ret 0 · kontrol devri 0 · sonuçsuz teklif 0
+== 96x96, 5 tohum: bot (a) %20+ pay 0, (b) devralma 0, (c) koşullu onayla devralma 0 · halka arz 12 · otorite: başvuru 1, onay 1, koşullu 0, ret 0 · kontrol devri 1 · sonuçsuz teklif 0
    ret sebepleri: {}
+   bot ay sebepleri: {azinlik payi: nakit yetmedi=53, bot: 8 ceyrek dolmadi=115, bot: ND/FAVOK > 3=87, bot: gecikme=1, bot: not BB alti=84, deger orani 1,0-1,5 bandinda hedef yok=502, kurucu kontrol payi: finansman yetmedi=113, rekabet: ret=58}
+   koşullu onay fırsatı varken: {bot: ND/FAVOK > 3=15, deger orani 1,0-1,5 bandinda hedef yok=13, kurucu kontrol payi: finansman yetmedi=43}
