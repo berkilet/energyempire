@@ -27,7 +27,7 @@ public final class Macro {
         public EventType type;
         public int monthsLeft;
         public Event() {}
-        Event(EventType t, int m) { type = t; monthsLeft = m; }
+        public Event(EventType t, int m) { type = t; monthsLeft = m; }
     }
 
     private final GameState s;

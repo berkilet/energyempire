@@ -95,4 +95,22 @@ public final class FinanceBalance {
     public static final double NEWS_OUTAGE_MW = 300;
     /** Temettu politikasinin (0/30/50) duyarliliga destegi. */
     public static final double[] DIVIDEND_SUPPORT = { 0, 0.01, 0.02 };
+
+    // ---- 2. Halka arz
+    public static final int IPO_MIN_QUARTERS = 8, IPO_PREP_MONTHS = 6, IPO_POSTPONE_MONTHS = 3;
+    /** Arz edilen yeni hisse / mevcut hisse; fiyat temel degerin %80-95'i (talebe gore); maliyet hasilatin %3'u. */
+    public static final double IPO_MIN = 0.15, IPO_MAX = 0.49, IPO_PRICE_LOW = 0.80, IPO_PRICE_HIGH = 0.95, ISSUE_COST = 0.03;
+    /** Rakip: nakit + kullanilabilir kredi planlanan yatirimin altindaysa arz yapar (oran %25-40). */
+    public static final double RIVAL_IPO_MIN = 0.25, RIVAL_IPO_MAX = 0.40, RIVAL_IPO_NEED = 600e6, RIVAL_IPO_NEED_ASSETS = 0.25;
+    public static final int RIVAL_DIVIDEND_AFTER_IPO = 30;
+
+    // ---- 3. Sermaye islemleri
+    /** Bedelli sermaye artirimi: yeni hisse orani, iskonto, duyuru dususu; yilda en fazla bir. */
+    public static final double RIGHTS_MIN = 0.05, RIGHTS_MAX = 0.30, RIGHTS_DISCOUNT_MIN = 0.10, RIGHTS_DISCOUNT_MAX = 0.20;
+    public static final double RIGHTS_DROP_MIN = 0.03, RIGHTS_DROP_MAX = 0.08;
+    public static final int RIGHTS_PER_YEARS = 1;
+    /** Geri alim ve piyasadan alim: gunluk en fazla serbest dolasimin %2'si; her %1'lik alim fiyati ~%1,5 yukseltir. */
+    public static final double DAILY_TRADE_MAX = 0.02, PRICE_IMPACT = 1.5;
+    public static final int[] DIVIDEND_OPTIONS = { 0, 30, 50 };
+    public static final double CONTROL = 0.50;
 }

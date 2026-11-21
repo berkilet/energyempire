@@ -61,6 +61,8 @@ public final class Company {
     public double mwhGenerated, lastMwhGenerated;
     public double co2Tons, lastCo2;
     public double renewMwh, lastRenewMwh;
+    /** Diger sirketlerden alinan temettu (nakit) ve istirak/bagli ortaklik kar payi (nakitsiz), bu ay / gecen ay. */
+    public double dividendIncome, lastDividendIncome, affiliateIncome, lastAffiliateIncome;
 
     public double lastRenewShare() { return lastMwhGenerated > 0 ? lastRenewMwh / lastMwhGenerated : 0; }
     /** Son 12 ayin net kari. */

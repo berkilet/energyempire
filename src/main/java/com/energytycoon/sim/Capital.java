@@ -111,14 +111,16 @@ public final class Capital {
         for (Company c : s.companies) {
             Equity e = c.eq;
             e.newsMult = 1 + (e.newsMult - 1) * (1 - FinanceBalance.NEWS_DECAY);
-            if (!e.listed || c.bankrupt) continue;
+            if (c.bankrupt || c.neutral) continue;
+            dailyOps(c);
+            if (!e.listed) continue;
             e.price = Math.max(0.01, targetPrice(c) * (1 + FinanceBalance.PRICE_NOISE * s.rng.nextGaussian()));
             c.stockPrice = e.price; c.valuation = value(c);
         }
     }
 
     /** Ceyrek sonu: net kar halkasi; halka acik sirkette beklentiyle (son 4 ceyrek egilimi) kiyas, sapma fiyati sicratir. */
-    void quarterly(Company c) {
+    public void quarterly(Company c) {
         Equity e = c.eq;
         double actual = e.qNetAcc;
         e.qNetAcc = 0;
@@ -133,6 +135,7 @@ public final class Capital {
         }
         e.qNet[e.qNetCount % 8] = actual;
         e.qNetCount++;
+        dividend(c, actual);
     }
 
     /** Fiyati etkileyen haber (yalnizca halka acik sirketlerde fiyata yansir). */
@@ -144,4 +147,202 @@ public final class Capital {
     }
 
     static String money(double v) { return Finance.money(v); }
+
+    // ------------------------------------------------------------ 2. halka arz
+    /** Halka arz engeli; null: arz yapilabilir. */
+    public String ipoBlocker(Company c) {
+        Equity e = c.eq;
+        if (c.neutral) return "Kamu Üretim halka açılmaz";
+        if (c.bankrupt || e.parent >= 0) return "Bağlı ortaklık veya faal olmayan şirket halka arz yapamaz";
+        if (e.listed) return "Şirket zaten halka açık";
+        if (e.ipoReadyHour >= 0) return "Halka arz hazırlığı sürüyor";
+        if (c.quarters < FinanceBalance.IPO_MIN_QUARTERS) return "En az " + FinanceBalance.IPO_MIN_QUARTERS + " çeyrek faaliyet gerekir (şu an " + c.quarters + ")";
+        if (e.qNetCount < 4 || last4Net(e) <= 0) return "Son 4 çeyrekte toplam net kâr pozitif olmalı (" + money(last4Net(e)) + ")";
+        if (s.finance.rating(c).ordinal() > Rating.BB.ordinal()) return "Kredi notu en az BB olmalı (şu an " + s.finance.rating(c) + ")";
+        if (s.macro.active(Macro.EventType.CRISIS)) return "Halka arz penceresi kapalı (küresel finans krizi)";
+        return null;
+    }
+
+    public static double clampIpo(double f) { return Math.max(FinanceBalance.IPO_MIN, Math.min(FinanceBalance.IPO_MAX, f)); }
+
+    /** Arz onizlemesi: { kurucu payi (sonra), en dusuk hasilat, en yuksek hasilat, yeni hisse }. */
+    public double[] ipoEstimate(Company c, double fraction) {
+        double f = clampIpo(fraction), n = c.eq.shares * f, ps = c.eq.fundamental / c.eq.shares;
+        return new double[] { c.eq.founder / (c.eq.shares + n), n * ps * FinanceBalance.IPO_PRICE_LOW * (1 - FinanceBalance.ISSUE_COST),
+            n * ps * FinanceBalance.IPO_PRICE_HIGH * (1 - FinanceBalance.ISSUE_COST), n };
+    }
+
+    /** Halka arz hazirligini baslatir (6 ay). Null: tamam. */
+    public String startIpo(Company c, double fraction) {
+        String why = ipoBlocker(c);
+        if (why != null) return why;
+        c.eq.ipoFraction = clampIpo(fraction);
+        c.eq.ipoReadyHour = s.hour + (long) FinanceBalance.IPO_PREP_MONTHS * Balance.HOURS_PER_MONTH;
+        c.eq.ipoCrisisPending = false;
+        if (c.player) s.notify("FİNANS: Halka arz hazırlığı başladı (aracı kurum, izahname, düzenleyici onayı): 6 ay. Arz oranı %" + Math.round(c.eq.ipoFraction * 100) + ".", "openfin");
+        else s.notify("FİNANS: " + c.name + " halka arz hazırlığına başladı.");
+        return null;
+    }
+
+    public boolean ipoPreparing(Company c) { return c.eq.ipoReadyHour >= 0; }
+
+    /** Kriz sirasinda: arzi ertele (3 ay) veya iptal et. */
+    public void postponeIpo(Company c) {
+        c.eq.ipoReadyHour = Math.max(c.eq.ipoReadyHour, s.hour) + (long) FinanceBalance.IPO_POSTPONE_MONTHS * Balance.HOURS_PER_MONTH;
+        c.eq.ipoCrisisPending = false;
+        if (c.player) s.notify("FİNANS: Halka arz " + FinanceBalance.IPO_POSTPONE_MONTHS + " ay ertelendi.", "openfin");
+    }
+
+    public void cancelIpo(Company c) {
+        c.eq.ipoReadyHour = -1; c.eq.ipoCrisisPending = false;
+        if (c.player) s.notify("FİNANS: Halka arz iptal edildi.", "openfin");
+    }
+
+    /** Arz gunu talebi (0..1): piyasa duyarliligi ve rastgele talep. */
+    double ipoDemand(Company c) {
+        double d = 0.5 + (sentiment(c) - 1) * 2 + 0.15 * s.rng.nextGaussian();
+        return Math.max(0, Math.min(1, d));
+    }
+
+    private void completeIpo(Company c) {
+        Equity e = c.eq;
+        double ps = e.fundamental / e.shares;
+        double d = ipoDemand(c);
+        double price = ps * (FinanceBalance.IPO_PRICE_LOW + (FinanceBalance.IPO_PRICE_HIGH - FinanceBalance.IPO_PRICE_LOW) * d);
+        double n = e.shares * e.ipoFraction, gross = n * price, cost = gross * FinanceBalance.ISSUE_COST;
+        e.shares += n; e.listed = true; e.price = price; e.newsMult = 1;
+        e.ipoReadyHour = -1; e.ipoHour = s.hour; e.ipoPrice = price; e.ipoProceeds = gross - cost; e.lastIssueHour = s.hour;
+        c.cash += gross - cost;
+        c.valuation = value(c); c.stockPrice = price;
+        s.notify("FİNANS: " + (c.player ? "Şirketiniz" : c.name) + " halka açıldı: " + Math.round(n / 1e5) / 10.0 + "M hisse, hisse başı " + String.format(java.util.Locale.ROOT, "%.2f $", price)
+            + ", hasılat " + money(gross - cost) + " (maliyet " + money(cost) + "). Kurucu payı %" + Math.round(e.founderPct() * 1000) / 10.0 + ".", c.player ? "openfin" : null);
+    }
+
+    // ------------------------------------------------------------ 3. sermaye islemleri
+    /** Bedelli sermaye artirimi engeli. */
+    public String issueBlocker(Company c) {
+        if (c.neutral) return "Kamu Üretim sermaye artırımı yapmaz";
+        if (!c.eq.listed) return "Yalnızca halka açık şirket yeni hisse basabilir";
+        long next = c.eq.lastIssueHour + (long) FinanceBalance.RIGHTS_PER_YEARS * Balance.HOURS_PER_YEAR;
+        if (s.hour < next) return "Yılda en fazla bir ihraç: " + ((next - s.hour) / Balance.HOURS_PER_MONTH + 1) + " ay sonra";
+        return null;
+    }
+
+    public static double clampIssue(double f) { return Math.max(FinanceBalance.RIGHTS_MIN, Math.min(FinanceBalance.RIGHTS_MAX, f)); }
+
+    /** Iskonto: talep zayifsa yuksek (%10-20). */
+    double issueDiscount(Company c) {
+        double d = Math.max(0, Math.min(1, 0.5 + (sentiment(c) - 1) * 2));
+        return FinanceBalance.RIGHTS_DISCOUNT_MAX - (FinanceBalance.RIGHTS_DISCOUNT_MAX - FinanceBalance.RIGHTS_DISCOUNT_MIN) * d;
+    }
+
+    /** Onizleme: { kurucu payi sonra, net hasilat, iskonto, duyuru dususu, ihrac fiyati, yeni hisse }. */
+    public double[] issueEstimate(Company c, double fraction) {
+        double f = clampIssue(fraction), n = c.eq.shares * f, disc = issueDiscount(c), px = c.eq.price * (1 - disc);
+        double drop = FinanceBalance.RIGHTS_DROP_MIN + (FinanceBalance.RIGHTS_DROP_MAX - FinanceBalance.RIGHTS_DROP_MIN) * (f - FinanceBalance.RIGHTS_MIN) / (FinanceBalance.RIGHTS_MAX - FinanceBalance.RIGHTS_MIN);
+        return new double[] { c.eq.founder / (c.eq.shares + n), n * px * (1 - FinanceBalance.ISSUE_COST), disc, drop, px, n };
+    }
+
+    /** Bedelli sermaye artirimi (yeni hisse). Null: tamam. */
+    public String issue(Company c, double fraction) {
+        String why = issueBlocker(c);
+        if (why != null) return why;
+        double[] q = issueEstimate(c, fraction);
+        c.eq.shares += q[5];
+        c.cash += q[1];
+        c.eq.lastIssueHour = s.hour;
+        c.eq.newsMult *= 1 - q[3];
+        c.eq.price *= 1 - q[3];
+        s.notify("FİNANS: " + (c.player ? "Sermaye artırımı" : c.name + " sermaye artırımı") + ": " + Math.round(q[5] / 1e5) / 10.0 + "M yeni hisse, "
+            + Math.round(q[2] * 100) + "% iskontolu, net " + money(q[1]) + ". Hisse duyuruyla %" + Math.round(q[3] * 100) + " düştü; kurucu payı %" + Math.round(c.eq.founderPct() * 1000) / 10.0 + ".", c.player ? "openfin" : null);
+        return null;
+    }
+
+    /** Geri alim butcesi (gunluk en fazla serbest dolasimin %2'si; alinan hisseler iptal edilir). */
+    public String setBuyback(Company c, double budget) {
+        if (!c.eq.listed) return "Yalnızca halka açık şirket geri alım yapar";
+        c.eq.buybackBudget = Math.max(0, budget);
+        return null;
+    }
+
+    /** Hisse alimi fiyat etkisi: alinan hisse / toplam hisse basina PRICE_IMPACT. */
+    void impact(Company t, double sharesBought) {
+        double up = FinanceBalance.PRICE_IMPACT * sharesBought / t.eq.shares;
+        t.eq.newsMult *= 1 + up; t.eq.price *= 1 + up;
+    }
+
+    private void buybacks(Company c) {
+        Equity e = c.eq;
+        if (e.buybackBudget <= 1 || !e.listed) return;
+        double n = Math.min(e.free() * FinanceBalance.DAILY_TRADE_MAX, Math.min(e.buybackBudget, Math.max(0, c.cash)) / e.price);
+        if (n <= 0) { e.buybackBudget = 0; return; }
+        double cost = n * e.price;
+        c.cash -= cost; e.buybackBudget -= cost; e.shares -= n;
+        impact(c, n);
+        if (e.buybackBudget <= 1 && c.player) s.notify("FİNANS: Geri alım tamamlandı. Kurucu payı %" + Math.round(e.founderPct() * 1000) / 10.0 + ".", "openfin");
+    }
+
+    /** Temettu engeli (taahhut ihlali bayragi, gecikme). */
+    public String dividendBlocker(Company c) {
+        if (c.dividendBan) return "Kredi taahhüdü ihlali: temettü dağıtılamaz";
+        if (s.finance.anyLate(c)) return "Geciken kredi taksiti varken temettü dağıtılamaz";
+        return null;
+    }
+
+    public void setDividend(Company c, int pct) { c.eq.dividendPct = pct >= 50 ? 50 : pct >= 30 ? 30 : 0; }
+
+    /** Ceyrek sonu temettu: karin politika orani; kurucu payina dusen kisim sirkette kalir, diger ortaklara odenir. */
+    private void dividend(Company c, double qNet) {
+        Equity e = c.eq;
+        e.lastDividend = 0;
+        if (e.dividendPct <= 0 || qNet <= 0 || c.neutral || dividendBlocker(c) != null) return;
+        double total = qNet * e.dividendPct / 100.0;
+        double out = total * (1 - e.founderPct());
+        if (out <= 0 || c.cash < out) return;
+        c.cash -= out;
+        for (int j = 0; j < s.companies.size(); j++) {
+            double h = e.held(j);
+            if (h <= 0) continue;
+            Company o = s.companies.get(j);
+            double amt = total * h / e.shares;
+            o.cash += amt; o.dividendIncome += amt;
+        }
+        e.lastDividend = total;
+    }
+
+    /** Rakip YZ: kosullar saglanir ve buyume icin sermaye gerekirse halka arz (oran %25-40); krizde erteler. */
+    void rivalMonthly(Company c) {
+        Equity e = c.eq;
+        if (ipoPreparing(c) || e.listed || ipoBlocker(c) != null) return;
+        double room = Math.max(0, s.finance.creditLimit(c) - s.finance.limitUsage(c));
+        double need = Math.max(FinanceBalance.RIVAL_IPO_NEED, FinanceBalance.RIVAL_IPO_NEED_ASSETS * s.assetValue(c));
+        if (c.cash + room >= need) return;
+        startIpo(c, FinanceBalance.RIVAL_IPO_MIN + (FinanceBalance.RIVAL_IPO_MAX - FinanceBalance.RIVAL_IPO_MIN) * s.rng.nextDouble());
+    }
+
+    /** Gunluk sermaye islemleri: halka arz takvimi, geri alim. */
+    private void dailyOps(Company c) {
+        Equity e = c.eq;
+        if (e.ipoReadyHour >= 0) {
+            boolean crisis = s.macro.active(Macro.EventType.CRISIS);
+            if (crisis && !e.ipoCrisisPending) {
+                if (c.player && !s.aiPlayer) {
+                    e.ipoCrisisPending = true;
+                    s.notify("FİNANS: Halka arz hazırlığı sırasında küresel finans krizi çıktı. Arzı erteleyin veya iptal edin (Finans → Sermaye).", "ipocrisis");
+                } else postponeIpo(c);
+            } else if (!crisis && !e.ipoCrisisPending && s.hour >= e.ipoReadyHour) {
+                if (ipoBlockerAtListing(c) == null) completeIpo(c);
+                else postponeIpo(c);
+            }
+        }
+        buybacks(c);
+    }
+
+    /** Arz gununde: kar ve not kosullari hala gecerli mi. */
+    String ipoBlockerAtListing(Company c) {
+        if (c.bankrupt) return "faal değil";
+        if (last4Net(c.eq) <= 0) return "son 4 çeyrek zarar";
+        if (s.finance.rating(c).ordinal() > Rating.BB.ordinal()) return "not BB altı";
+        return null;
+    }
 }

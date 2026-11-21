@@ -9,6 +9,9 @@ public final class RivalAI {
     private RivalAI() {}
 
     public static void monthly(GameState s, Company c) {
+        s.capital.rivalMonthly(c);
+        if (c.eq.listed && c.eq.dividendPct == 0 && c.eq.ipoHour >= 0 && s.hour - c.eq.ipoHour < Balance.HOURS_PER_MONTH * 2)
+            s.capital.setDividend(c, FinanceBalance.RIVAL_DIVIDEND_AFTER_IPO);
         financing = true;
         try { monthlyInner(s, c); } finally { financing = false; }
     }

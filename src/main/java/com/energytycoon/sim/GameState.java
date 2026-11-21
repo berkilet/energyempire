@@ -1242,6 +1242,7 @@ public final class GameState {
             c.lastDebtService = c.debtServicePaid; c.debtServicePaid = 0; c.lastCapex = c.capexSpent;
             c.lastAccessIncome = c.accessIncome; c.lastAccessCost = c.accessCost; c.accessIncome = c.accessCost = 0;
             c.lastConnectionCharge = c.connectionCharge; c.connectionCharge = 0;
+            c.lastDividendIncome = c.dividendIncome; c.dividendIncome = 0; c.lastAffiliateIncome = c.affiliateIncome; c.affiliateIncome = 0;
             c.lastMwhGenerated = c.mwhGenerated; c.lastCo2 = c.co2Tons; c.lastRenewMwh = c.renewMwh;
             c.revenue = c.fuelCost = c.omCost = c.carbonCost = c.interest = c.fines = c.capexSpent = 0;
             c.mwhGenerated = 0; c.co2Tons = 0; c.renewMwh = 0;
