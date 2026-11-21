@@ -27,6 +27,11 @@ public final class PowerLine {
     /** Devam eden kademe yukseltmesinin hedefi (UPGRADING) ve bedeli. */
     public LineTier upgradeTo;
     public double upgradeCost;
+    /** Rakip YZ'nin bu hatti en son degerlendirdigi yil (tekrar etmemek icin). */
+    public transient long rivalReviewYear;
+    /** Olcum: kuyruga giris saati ve o anki kuyruk uzunlugu. */
+    public transient long queuedAtHour;
+    public transient int queueLenAtEnqueue;
 
     public GridNode other(GridNode n) { return n == a ? b : a; }
     public boolean operator() { return owner == null; }

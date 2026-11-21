@@ -17,6 +17,9 @@ public final class GridOperator {
 
     GridOperator(GameState s) { this.s = s; }
 
+    /** Olcum: insaata gecen her basvuru icin {kuyrukta bekleme (ay), kuyruga girerken siradaki basvuru sayisi, basvurudan insaata (ay)}. */
+    public final transient List<double[]> statQueue = new ArrayList<>();
+
     public int slots() { return GridBalance.OP_BASE_SLOTS + s.cities.size() / GridBalance.OP_CITIES_PER_SLOT; }
 
     public static double contribution(double lineCost) { return GridBalance.OP_CONTRIBUTION * lineCost; }
@@ -35,6 +38,7 @@ public final class GridOperator {
         l.contribution = contribution(cost); l.annualCharge = annualCharge(cost);
         l.buildHoursLeft = GridBalance.OP_PLANNING_MONTHS * HPM;
         l.builtAtHour = s.hour;
+        s.statConnections.computeIfAbsent(c, k -> new int[2])[1]++;
         return l;
     }
 
@@ -61,7 +65,7 @@ public final class GridOperator {
                 any = true;
                 if (--l.buildHoursLeft <= 0) {
                     if (l.operatorPlan) s.activateLine(l);
-                    else { l.status = LineStatus.QUEUED; l.buildHoursLeft = 0; }
+                    else { l.status = LineStatus.QUEUED; l.buildHoursLeft = 0; l.queuedAtHour = s.hour; l.queueLenAtEnqueue = queue().size(); }
                 }
             } else if (l.status == LineStatus.QUEUED) { any = true; if (l.holdHours > 0) l.holdHours--; }
         }
@@ -74,6 +78,7 @@ public final class GridOperator {
             l.status = LineStatus.BUILDING;
             l.buildHoursLeft = buildHours(l.tier, l.lengthTiles);
             free--;
+            statQueue.add(new double[] { (s.hour - l.queuedAtHour) / (double) HPM, l.queueLenAtEnqueue, (s.hour - l.appliedAtHour) / (double) HPM });
             if (l.requester != null && l.requester.player)
                 s.notify(shortName + ": " + label(l) + " hattının inşaatı başladı (" + l.buildHoursLeft / 24 + " gün)");
         }

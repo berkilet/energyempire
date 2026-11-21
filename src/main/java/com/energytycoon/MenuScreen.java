@@ -2,6 +2,7 @@ package com.energytycoon;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -32,6 +33,8 @@ public final class MenuScreen implements Screen {
     private Image preview;
     private Texture previewTex;
     private Label scenDesc, presetDesc, cityLbl, rivalLbl, previewInfo;
+    /** Onizleme lejanti: oyuncu, rakipler, Kamu Uretim, UŞİ hatti, sehir. */
+    private final Table legend = new Table();
     private final ButtonGroup<TextButton> presetGroup = new ButtonGroup<>();
     private TextField seedField;
     private boolean dirty = true;
@@ -221,7 +224,8 @@ public final class MenuScreen implements Screen {
         right.add(new Label("Harita önizleme", skin, "dim")).left().row();
         right.add(preview).size(300, 300).row();
         previewInfo = new Label("", skin, "small"); previewInfo.setWrap(true);
-        right.add(previewInfo).width(300).padTop(4);
+        right.add(previewInfo).width(300).padTop(4).row();
+        right.add(legend).width(300).left().padTop(4);
 
         card.add(left).top().padRight(14);
         card.add(right).top().row();
@@ -262,7 +266,29 @@ public final class MenuScreen implements Screen {
         int land = 0;
         for (boolean w : s.map.water) if (!w) land++;
         previewInfo.setText(s.map.preset.label + " · " + s.map.size + "×" + s.map.size + " · %" + Math.round(100.0 * land / s.map.water.length)
-            + " kara · " + s.cities.size() + " şehir · " + s.companies.stream().filter(c -> !c.player && !c.neutral).count() + " rakip\nBeyaz: şehirler · gri: kamu santralleri (eski filo) · renkli: rakip santralleri.");
+            + " kara · " + s.cities.size() + " şehir · " + s.companies.stream().filter(c -> !c.player && !c.neutral).count() + " rakip");
+        legend.clear();
+        legend.defaults().left().padBottom(1);
+        legendRow(new Color[] { rgb(s.player.colorRgb) }, false, "Siz (oyuncu)");
+        java.util.List<Color> rc = new java.util.ArrayList<>();
+        for (com.energytycoon.sim.Company c : s.companies) if (!c.player && !c.neutral) rc.add(rgb(c.colorRgb));
+        if (!rc.isEmpty()) legendRow(rc.toArray(new Color[0]), false, "Rakipler");
+        if (s.neutral != null) legendRow(new Color[] { rgb(com.energytycoon.sim.GridBalance.NEUTRAL_COLOR) }, false, "Kamu Üretim (eski filo, \"K\")");
+        legendRow(new Color[] { com.energytycoon.ui.MapPreview.OPERATOR_LINE }, true, "UŞİ hattı");
+        legendRow(new Color[] { Color.WHITE }, false, "Şehir");
+    }
+
+    private static Color rgb(int v) { return new Color((v << 8) | 0xFF); }
+
+    private void legendRow(Color[] colors, boolean line, String text) {
+        Table sw = new Table();
+        for (Color c : colors) {
+            Image im = new Image(skin.newDrawable("white", c));
+            if (line) sw.add(im).size(18, 3).padRight(2);
+            else sw.add(im).size(10, 10).padRight(2);
+        }
+        legend.add(sw).width(48).left();
+        legend.add(new Label(text, skin, "small")).left().row();
     }
 
     @Override public void show() { Gdx.input.setInputProcessor(stage); }

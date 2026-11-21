@@ -27,6 +27,29 @@ public final class Plant extends GridNode {
     public String customName;
     /** Kullanicinin sectigi trafo merkezi (0 = otomatik: en yakin kendi TM'si, yoksa bara). */
     public int preferredTm;
+    /** Acil kapasite ihalesi sozlesmesi (0 yok). */
+    public int tenderId;
+    /** Baglanti noktasinin dolu oldugu saatler (bu ay) ve art arda dolu ay sayisi. */
+    public int cpFullHoursMonth, cpFullMonths;
+    /** Son 30 gunun gunluk uretimi ve kisintisi (MWh), halka tampon; yilbasindan beri kar. */
+    public double[] dailyMWh = new double[30], dailyCurtailMWh = new double[30];
+    public int dayIdx, daysTracked;
+    public double yearProfit;
+
+    /** Son 30 gunun kapasite faktoru (izlenen gun kadar). */
+    public double cf30() {
+        if (daysTracked <= 0 || capacityMW() <= 0) return 0;
+        double sum = 0;
+        for (double v : dailyMWh) sum += v;
+        return sum / (capacityMW() * 24.0 * daysTracked);
+    }
+
+    /** Son 30 gunde kisintiya ugrayan enerjinin potansiyel uretime orani. */
+    public double curtailShare30() {
+        double out = 0, cut = 0;
+        for (int i = 0; i < 30; i++) { out += dailyMWh[i]; cut += dailyCurtailMWh[i]; }
+        return out + cut <= 0 ? 0 : cut / (out + cut);
+    }
     /** Son saatte baglanti dolulugu yuzunden uretemedigi MW ve uretmeme nedeni (gosterim). */
     public transient double curtailedMW;
     public transient String idleReason;

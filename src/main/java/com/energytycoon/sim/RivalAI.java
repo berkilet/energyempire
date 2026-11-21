@@ -9,6 +9,9 @@ public final class RivalAI {
     private RivalAI() {}
 
     public static void monthly(GameState s, Company c) {
+        tenders(s, c);
+        substations(s, c);
+        lineUpgrades(s, c);
         double rivalMult = s.settings.difficulty.rivalMult;
         if (c.cash < GridBalance.RIVAL_DECISION_CASH / rivalMult) return;
         Random r = s.rng;
@@ -41,6 +44,148 @@ public final class RivalAI {
         }
     }
 
+    // ------------------------------------------------------------ trafo merkezi
+    /**
+     * TM kurma: (A) 3 kare yaricapta en az 3 kendi santrali (insaattakiler dahil) veya (B) 2 aydan uzun dolu baglanti noktasi.
+     * TM bedeli alternatif hat bedeliyle kiyaslanir; nakit + rezerv kurali gecerli. Kume 600 MW'i asarsa TM380'e yukseltir.
+     */
+    static void substations(GameState s, Company c) {
+        for (Substation t : s.substations)
+            if (t.owner == c && t.operational() && t.level < 2 && t.pendingUpgrade == 0 && t.cp != null
+                && t.cp.installedMW() > GridBalance.RIVAL_TM380_MW && c.cash >= GridBalance.TM380_UPGRADE_COST + GridBalance.RIVAL_BUILD_RESERVE)
+                s.upgradeSubstation(t, 2);
+        if (c.cash < GridBalance.TM154_COST + GridBalance.RIVAL_BUILD_RESERVE) return;
+        s.components();
+        List<Plant> free = new ArrayList<>();
+        boolean anyFull = false;
+        for (Plant p : s.plants) if (p.owner == c && (p.cp == null || p.cp.tm == null)) { free.add(p); anyFull |= p.cpFullMonths >= GridBalance.RIVAL_TM_FULL_MONTHS; }
+        if (free.size() < 2 && !anyFull) return;
+        int bx = -1, by = -1, bn = 0; boolean bFull = false;
+        int r = (int) Math.ceil(GridBalance.TM_RADIUS);
+        for (Plant p : free) for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++) {
+            int x = p.x + dx, y = p.y + dy;
+            if (s.checkSubstation(x, y) != null) continue;
+            int n = 0; boolean full = false;
+            for (Plant q : free) if (Math.hypot(q.x - x, q.y - y) <= GridBalance.TM_RADIUS + 1e-6) { n++; full |= q.cpFullMonths >= GridBalance.RIVAL_TM_FULL_MONTHS; }
+            if (n > bn || (n == bn && full && !bFull)) { bn = n; bx = x; by = y; bFull = full; }
+        }
+        boolean condA = bn >= GridBalance.RIVAL_TM_MIN_PLANTS, condB = bFull && bn >= 1;
+        if (bx < 0 || !(condA || condB)) return;
+        City city = nearestCity(s, bx, by);
+        if (city == null) return;
+        Probe at = new Probe(bx, by);
+        // Alternatif: (A) yeni santral icin ayri hat, (B) dolu noktaya paralel hat (indirimli). TM: bedel + (B'de) TM'den yeni hat.
+        double line = s.lineCost(at, city, LineTier.YG);
+        double alt = condA ? line : line * (1 - GridBalance.PARALLEL_DISCOUNT);
+        double tmCost = GridBalance.TM154_COST + (condA ? 0 : line);
+        if (tmCost > alt || c.cash < tmCost + GridBalance.RIVAL_BUILD_RESERVE) return;
+        Substation t = s.buildSubstation(c, 1, bx, by);
+        if (t == null) return;
+        // Erisim: bolgede kendisinden buyuk bir rakip varsa kapali, yoksa varsayilan bedelle acik.
+        double mine = 0;
+        java.util.Map<Company, Double> others = new java.util.HashMap<>();
+        for (Plant p : s.plants) {
+            if (Math.hypot(p.x - bx, p.y - by) > GridBalance.RIVAL_TM_REGION || p.owner.neutral) continue;
+            if (p.owner == c) mine += p.capacityMW(); else others.merge(p.owner, p.capacityMW(), Double::sum);
+        }
+        boolean bigger = false;
+        for (double v : others.values()) bigger |= v > mine;
+        t.openAccess = !bigger;
+        t.accessFeePerMWh = GridBalance.ACCESS_FEE_DEFAULT;
+        if (!condA) s.buildLine(c, t, city, LineTier.YG);
+        if (!c.player) s.statRivalTms++;
+    }
+
+    static City nearestCity(GameState s, int x, int y) {
+        City best = null; double bd = Double.MAX_VALUE;
+        for (City ct : s.cities) { double d = Math.hypot(ct.x - x, ct.y - y); if (d < bd) { bd = d; best = ct; } }
+        return best;
+    }
+
+    // ------------------------------------------------------------ hat yukseltme
+    /**
+     * Gecen yil saatlerinin %25'inden fazlasinda dolu kendi hatlari: yukseltme paralel hattan ucuzsa yukseltir. Yukseltmede hat
+     * kapali kalacagi icin: ayni baglanti noktasinin ikinci aktif yolu varsa hemen; yoksa talebin en dusuk oldugu ayda ve kesinti
+     * RIVAL_MAX_OFFLINE_DAYS'i asmiyorsa. Aksi halde paralel hat. Her hat yilda bir kez degerlendirilir.
+     */
+    static void lineUpgrades(GameState s, Company c) {
+        long year = s.year();
+        for (PowerLine l : new ArrayList<>(s.lines)) {
+            if (l.owner != c || l.status != LineStatus.ACTIVE || l.rivalReviewYear == year) continue;
+            if (l.saturatedHoursLastYear <= GridBalance.OP_REINFORCE_SATURATION * Balance.HOURS_PER_YEAR) continue;
+            boolean second = secondPath(s, l);
+            boolean lowSeason = s.month() == GridBalance.LOW_DEMAND_MONTH;
+            if (!second && !lowSeason) continue; // dusuk mevsimi bekle
+            l.rivalReviewYear = year;
+            // Karsilastirma ayni ek kapasite icin: eksik = noktanin kurulu gucu - hat kapasitesi (en az hattin yarisi).
+            ConnectionPoint cp = GameState.cpOf(l.a) != null ? GameState.cpOf(l.a) : GameState.cpOf(l.b);
+            double need = Math.max(l.capacityMW() * 0.5, cp == null ? 0 : cp.installedMW() - cp.lineCapacityMW());
+            double up = s.checkUpgrade(c, l) == null ? s.upgradeCost(l) : Double.MAX_VALUE;
+            if (!second && s.upgradeHours(l) > GridBalance.RIVAL_MAX_OFFLINE_DAYS * 24) up = Double.MAX_VALUE;
+            int dup = 0;
+            for (PowerLine o : l.a.lines) if (o.other(l.a) == l.b) dup++;
+            int nPar = (int) Math.ceil(need / l.capacityMW());
+            double par = dup + nPar <= 3 && s.checkLine(c, l.a, l.b, l.tier) == null ? nPar * s.lineCost(l.a, l.b, l.tier) : Double.MAX_VALUE;
+            if (up <= par && up < Double.MAX_VALUE) {
+                if (c.cash < up + GridBalance.RIVAL_BUILD_RESERVE) continue;
+                if (s.upgradeLine(c, l) == null) {
+                    if (!c.player) s.statRivalUpgrades++;
+                    s.statUpgradeLog.add(new long[] { s.hour, l.id, second ? 1 : 0, l.buildHoursLeft });
+                }
+            } else if (par < Double.MAX_VALUE && c.cash >= par + GridBalance.RIVAL_BUILD_RESERVE) {
+                if (s.buildLine(c, l.a, l.b, l.tier) != null && !c.player) s.statRivalParallel++;
+            }
+        }
+    }
+
+    /** Hattin santral/TM tarafindaki baglanti noktasinin bu hat disinda kullanilabilir bir ihracat hatti var mi. */
+    static boolean secondPath(GameState s, PowerLine l) {
+        s.components();
+        ConnectionPoint cp = GameState.cpOf(l.a);
+        if (cp == null) cp = GameState.cpOf(l.b);
+        if (cp == null) return false;
+        for (PowerLine o : cp.exportLines) if (o != l && o.usable()) return true;
+        return false;
+    }
+
+    // ------------------------------------------------------------ acil kapasite ihaleleri
+    /** Kazanilan ihale yukumlulugunu kurar; acik ihalelere tahmini maliyet + marjla teklif verir. */
+    static void tenders(GameState s, Company c) {
+        for (Tender t : s.tenders.all) {
+            if (t.status != Tender.Status.AWARDED || t.winner != c) continue;
+            double have = 0;
+            for (Plant p : s.plants)
+                if (p.owner == c && p.id >= t.plantIdMark && Math.hypot(p.x - t.city.x, p.y - t.city.y) <= Balance.TENDER_MAX_DIST) have += p.capacityMW();
+            if (have < t.mw) buildNear(s, c, tenderEquipment(s, c), t.city, 0, 3, Balance.TENDER_MAX_DIST - 1);
+        }
+        for (Tender t : s.tenders.open()) {
+            if (t.bidOf(c) != null) continue;
+            Equipment e = tenderEquipment(s, c);
+            int units = (int) Math.ceil(t.mw / e.capacityMW);
+            double capex = units * e.capex(), dep = s.tenders.depositFor(t);
+            if (c.cash < dep + capex + GridBalance.RIVAL_BUILD_RESERVE) continue; // teminat + yatirim karsilanamiyor
+            double price = tenderPrice(s, c, e, t, units);
+            s.tenders.bid(c, t, price);
+        }
+    }
+
+    static Equipment tenderEquipment(GameState s, Company c) {
+        return pick(s, c, c.aiStyle.equals("green") ? PlantType.WIND : PlantType.GAS);
+    }
+
+    /** Teklif: (yillik sermaye geri kazanimi + sabit O&M) / garantili uretim + marjinal maliyet, ustune kar marji. */
+    static double tenderPrice(GameState s, Company c, Equipment e, Tender t, int units) {
+        Plant probe = new Plant();
+        probe.type = e.type; probe.equipment = e; probe.owner = c; probe.x = t.city.x; probe.y = t.city.y;
+        probe.builtAtHour = s.hour; probe.ageStartHour = s.hour;
+        double cf = e.type.renewable ? (e.type == PlantType.WIND ? 0.33 : e.type == PlantType.SOLAR ? 0.22 : 0.5) : 0.85;
+        double mwh = Math.min(t.mw, units * e.capacityMW) * cf * Balance.HOURS_PER_YEAR;
+        double annual = units * (e.capex() * Balance.TENDER_CRF + e.fixedOmPerHour() * Balance.HOURS_PER_YEAR);
+        double margin = Balance.TENDER_RIVAL_MARGIN + switch (c.aiStyle) { case "fossil" -> 0.05; case "green" -> -0.03; default -> 0; } + s.rng.nextDouble() * 0.05;
+        double price = (annual / Math.max(1, mwh) + s.marginalCost(probe)) * (1 + margin);
+        return Math.max(Balance.TENDER_MIN_PRICE, Math.min(Balance.TENDER_MAX_PRICE, Math.round(price * 10) / 10.0));
+    }
+
     static Equipment pick(GameState s, Company c, PlantType t) {
         return switch (c.aiStyle) {
             case "green" -> s.catalog.newest(t, s.year());
@@ -62,13 +207,17 @@ public final class RivalAI {
      * (Bedava kurulum icin GameState.placeLegacy.)
      */
     public static Plant buildNear(GameState s, Company c, Equipment e, City city, double reserve) {
+        return buildNear(s, c, e, city, reserve, 4, 16);
+    }
+
+    public static Plant buildNear(GameState s, Company c, Equipment e, City city, double reserve, double minDist, double maxDist) {
         if (s.checkEquipment(e) != null) return null;
         // %50: kendi kumesinin/TM'sinin yanina (bos ihracat kapasitesi varsa hat gerekmez)
         if (s.rng.nextDouble() < GridBalance.RIVAL_CLUSTER_CHANCE) {
-            Plant p = buildInCluster(s, c, e, city, reserve);
+            Plant p = buildInCluster(s, c, e, city, reserve, maxDist);
             if (p != null) return p;
         }
-        int[] site = findSite(s, e, city, 4, 16);
+        int[] site = findSite(s, e, city, minDist, maxDist);
         if (site == null) return null;
         int bx = site[0], by = site[1];
         Probe probe = new Probe(bx, by);
@@ -121,7 +270,7 @@ public final class RivalAI {
     }
 
     /** Kendi kumesinin yanina veya kendi TM yaricapina, ihracat kapasitesinde yer varsa hatsiz kurar. */
-    private static Plant buildInCluster(GameState s, Company c, Equipment e, City city, double reserve) {
+    private static Plant buildInCluster(GameState s, Company c, Equipment e, City city, double reserve, double maxDist) {
         if (c.cash < e.capex() + reserve) return null;
         int[] normal = findSite(s, e, city, 4, 16);
         double minScore = e.type.renewable && normal != null ? s.siteScore(e, normal[0], normal[1]) * 0.85 : 0;
@@ -139,6 +288,7 @@ public final class RivalAI {
             }
             for (int[] t : cand) {
                 if (s.checkPlacement(e.type, t[0], t[1]) != null) continue;
+                if (Math.hypot(t[0] - city.x, t[1] - city.y) > maxDist) continue;
                 double sc = e.type.renewable ? s.siteScore(e, t[0], t[1]) : 1;
                 if (sc >= minScore && sc > bs) { bs = sc; best = t; }
             }

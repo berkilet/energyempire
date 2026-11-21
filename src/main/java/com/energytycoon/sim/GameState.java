@@ -40,8 +40,19 @@ public final class GameState {
     public final List<Substation> substations = new ArrayList<>();
     /** Ulusal Sebeke Isletmesi (sirket degil). */
     public final GridOperator operator = new GridOperator(this);
+    /** Acil kapasite ihaleleri. */
+    public final TenderBook tenders = new TenderBook(this);
+    /** Mesaj -> tiklaninca yapilacak eylem (ör. "tender:12"). */
+    public final Map<String, String> messageActions = new HashMap<>();
     /** Test/dogrulama: kendi hatlari insaat beklemeden aktif olur (kayda yazilmaz). */
     public boolean instantLines;
+    /** Gozlem sayaclari (rapor/test): rakiplerin kurdugu TM, yaptigi hat yukseltmesi, yukseltme kayitlari. */
+    public transient int statRivalTms, statRivalUpgrades, statRivalParallel;
+    /** Olcum: oyuncuyu da rakip YZ ile oynat (yalnizca harness). */
+    public transient boolean aiPlayer;
+    /** Olcum: sirket basina kurulan baglanti sayisi {kendi hatti, UŞİ basvurusu}. */
+    public final transient Map<Company, int[]> statConnections = new HashMap<>();
+    public final transient List<long[]> statUpgradeLog = new ArrayList<>(); // {saat, hatId, ikinciYol(0/1), sureSaat}
     public final Map<Integer, GridNode> nodeById = new HashMap<>();
     /** tile -> node id (-1 yok). Sehir 3x3 kaplar. */
     public final int[] occ;
@@ -180,7 +191,7 @@ public final class GameState {
         return m * (1.07 + 0.05);
     }
 
-    static final String[] MONTH_NAMES = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
+    public static final String[] MONTH_NAMES = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
     /** "Mart'ta" gibi bulunma hali. */
     static final String[] MONTH_LOC = { "Ocak'ta", "Şubat'ta", "Mart'ta", "Nisan'da", "Mayıs'ta", "Haziran'da", "Temmuz'da", "Ağustos'ta", "Eylül'de", "Ekim'de", "Kasım'da", "Aralık'ta" };
 
@@ -244,15 +255,25 @@ public final class GameState {
         }
         // Kapanis tarihleri: karisik sirayla, aralik boyunca esit aralikli.
         java.util.Collections.shuffle(fleet, rng);
-        int from = (GridBalance.LEGACY_RETIRE_FROM - Balance.START_YEAR) * 12;
-        int span = (GridBalance.LEGACY_RETIRE_TO - GridBalance.LEGACY_RETIRE_FROM + 1) * 12 - 1;
+        if (scenario.legacyCoalRetireTo > 0) {
+            // Komurden Cikis: komur LEGACY_RETIRE_FROM..legacyCoalRetireTo, gaz normal takvim.
+            List<Plant> coalP = new ArrayList<>(), gasP = new ArrayList<>();
+            for (Plant p : fleet) (p.type == PlantType.COAL ? coalP : gasP).add(p);
+            spreadRetirements(coalP, GridBalance.LEGACY_RETIRE_FROM, scenario.legacyCoalRetireTo);
+            spreadRetirements(gasP, GridBalance.LEGACY_RETIRE_FROM, GridBalance.LEGACY_RETIRE_TO);
+        } else spreadRetirements(fleet, GridBalance.LEGACY_RETIRE_FROM, GridBalance.LEGACY_RETIRE_TO);
+        topoDirty = true;
+    }
+
+    private static void spreadRetirements(List<Plant> fleet, int fromYear, int toYear) {
+        int from = (fromYear - Balance.START_YEAR) * 12;
+        int span = (toYear - fromYear + 1) * 12 - 1;
         for (int i = 0; i < fleet.size(); i++) {
             int off = fleet.size() == 1 ? span / 2 : (int) Math.round(i * span / (double) (fleet.size() - 1));
             int abs = from + off;
             fleet.get(i).retireYear = Balance.START_YEAR + abs / 12;
             fleet.get(i).retireMonth = abs % 12;
         }
-        topoDirty = true;
     }
 
     /** Ay basinda: kapanisa LEGACY_NOTICE_MONTHS kalan santraller icin haber, suresi dolanlari iadesiz kapat. */
@@ -298,6 +319,13 @@ public final class GameState {
     public void notify(String msg) {
         messages.add(msg);
         while (messages.size() > 200) messages.poll();
+    }
+
+    /** Tiklanabilir bildirim: arayuz mesaja tiklaninca action'i calistirir. */
+    public void notify(String msg, String action) {
+        notify(msg);
+        messageActions.put(msg, action);
+        if (messageActions.size() > 100) messageActions.clear();
     }
 
     public int countPlants(Company c, PlantType t) {
@@ -493,6 +521,7 @@ public final class GameState {
         if (owner.cash < cost) return null;
         owner.cash -= cost; owner.capexSpent += cost;
         PowerLine l = createLine(owner, a, b, cost, tier);
+        statConnections.computeIfAbsent(owner, k -> new int[2])[0]++;
         if (instantLines) return l;
         // Kendi hatti: pesin odenir, insaat suresi (taban + kare basina); %10 olasilikla %10-30 gecikme.
         l.status = LineStatus.BUILDING;
@@ -762,7 +791,7 @@ public final class GameState {
         return true;
     }
 
-    private static ConnectionPoint cpOf(GridNode n) {
+    public static ConnectionPoint cpOf(GridNode n) {
         return n instanceof Plant p ? p.cp : n instanceof Substation t ? t.cp : null;
     }
 
@@ -976,8 +1005,13 @@ public final class GameState {
     public void tick() {
         if (gameOver) return;
         int hod = hourOfDay();
+        if (hod == 0) for (Plant p : plants) if (p.operational()) {
+            // yeni gun: halka tamponda bir sonraki gunu sifirla
+            if (p.daysTracked > 0 || p.dailyMWh[p.dayIdx] > 0) { p.dayIdx = (p.dayIdx + 1) % 30; p.dailyMWh[p.dayIdx] = 0; p.dailyCurtailMWh[p.dayIdx] = 0; }
+            p.daysTracked = Math.min(30, p.daysTracked + 1);
+        }
         markets.hourly(rng);
-        if (hod == 0) { markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); }
+        if (hod == 0) { markets.daily(rng, (int) (hour / Balance.HOURS_PER_YEAR)); tenders.daily(); }
 
         boolean changed = false;
         for (Plant p : plants) {
@@ -1050,6 +1084,7 @@ public final class GameState {
         double totDemand = 0, totServed = 0, priceWeighted = 0, priceDemand = 0, playerMW = 0, rivalMW = 0, renew = 0, co2 = 0;
         double fineMult = settings.difficulty.fineMult;
 
+        tenders.resetHour();
         for (Component comp : components()) {
             double demand = 0, rawDemand = 0;
             for (City ct : comp.cities) {
@@ -1119,7 +1154,7 @@ public final class GameState {
                 double out = p.outputMW;
                 if (out <= 0) continue;
                 p.flowMW = out;
-                double rev = out * comp.price;
+                double rev = tenders.revenue(p, out, comp.price);
                 double fuelC = out * fuelCostPerMWh(p);
                 double var = out * p.type.varOm;
                 double pco2 = p.co2PerMWh(hour);
@@ -1143,11 +1178,14 @@ public final class GameState {
             }
             if (unserved > 1e-3) fineOwners(comp, unserved * fineMult);
         }
+        for (City c : cities) { c.monthDemandMWh += c.demandMW; c.monthServedMWh += c.servedMW; }
         // Doluluk: hattin dolulugu iki ucunun buyugu; esigi asan her saat sayilir.
         for (PowerLine l : lines) if (l.usable() && l.utilization() > GridBalance.SATURATION_THRESHOLD) l.saturatedHoursThisYear++;
+        for (ConnectionPoint cp : points) if (cp.utilization() > GridBalance.SATURATION_THRESHOLD) for (Plant m : cp.members) m.cpFullHoursMonth++;
         // sabit O&M
         for (Plant p : plants) {
             if (!p.operational()) continue;
+            p.dailyMWh[p.dayIdx] += p.outputMW; p.dailyCurtailMWh[p.dayIdx] += p.curtailedMW;
             double fx = p.fixedOmPerHour();
             p.owner.cash -= fx; p.owner.omCost += fx; p.monthProfit -= fx;
         }
@@ -1176,6 +1214,8 @@ public final class GameState {
     private void monthly() {
         refreshComponentStats();
         operator.monthly();
+        for (City c : cities) { c.lastServedRatio = c.monthDemandMWh > 0 ? c.monthServedMWh / c.monthDemandMWh : 1; c.monthDemandMWh = c.monthServedMWh = 0; }
+        tenders.monthly();
         if (month() == 0) for (PowerLine l : lines) { l.saturatedHoursLastYear = l.saturatedHoursThisYear; l.saturatedHoursThisYear = 0; }
         for (Supplier s : catalog.allSuppliers()) s.monthly(rng);
         lastServedRatio = monthDemandMWh > 0 ? monthServedMWh / monthDemandMWh : 1;
@@ -1198,7 +1238,12 @@ public final class GameState {
             c.netHistory.addLast(net);
             while (c.netHistory.size() > 12) c.netHistory.pollFirst();
         }
-        for (Plant p : plants) { p.lastMonthProfit = p.monthProfit; p.monthProfit = 0; }
+        for (Plant p : plants) {
+            p.lastMonthProfit = p.monthProfit; p.yearProfit += p.monthProfit; p.monthProfit = 0;
+            if (month() == 0) p.yearProfit = 0; // biten ay Aralik: yeni yil
+            p.cpFullMonths = p.cpFullHoursMonth > Balance.HOURS_PER_MONTH * GridBalance.CP_FULL_MONTH_SHARE ? p.cpFullMonths + 1 : 0;
+            p.cpFullHoursMonth = 0;
+        }
         for (Substation t : substations) { t.lastAccessIncome = t.accessIncomeMonth; t.accessIncomeMonth = 0; }
 
         for (City c : cities) {
@@ -1223,13 +1268,14 @@ public final class GameState {
                 } else {
                     notify(c.name + " iflas etti!");
                     for (Plant p : new ArrayList<>(plants)) if (p.owner == c) demolishPlant(p);
+                    for (Substation t : new ArrayList<>(substations)) if (t.owner == c) demolishSubstation(t, true);
                 }
             } else if (c.player && c.cash < 0) {
                 notify("UYARI: Nakit negatif! Borçlanın veya giderleri azaltın.");
             }
         }
         evaluateScenario();
-        for (Company c : companies) if (!c.player && !c.neutral && !c.bankrupt) RivalAI.monthly(this, c);
+        for (Company c : companies) if ((!c.player || aiPlayer) && !c.neutral && !c.bankrupt) RivalAI.monthly(this, c);
         if ((hour / Balance.HOURS_PER_MONTH) % 12 == 0) notify("Yeni yıl: " + year());
         for (Equipment e : catalog.equipment.values())
             if (e.availableYear == year() && month() == 0) notify("YENİ TEKNOLOJİ: " + e.fullName() + " (" + e.tech + ") piyasada!");

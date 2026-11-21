@@ -44,3 +44,12 @@ d.rounded_rectangle(P([(16,48),(52,58)]),radius=2*S,fill=GOLD_D)
 d.rectangle(P([(22,30),(30,48)]),fill=CREAM); d.rectangle(P([(34,22),(44,48)]),fill=CREAM)
 d.line(P([(48,14),(48,30)]),fill=GOLD,width=5*S); d.line(P([(40,22),(56,22)]),fill=GOLD,width=5*S)
 save(im,'icon_build')
+
+# assets: liste/pano
+im,d=base()
+d.rounded_rectangle(P([(18,14),(50,60)]),radius=3*S,fill=CREAM,outline=GOLD_D,width=2*S)
+d.rectangle(P([(27,10),(41,18)]),fill=GOLD)
+for k,y in enumerate([26,36,46]):
+    d.rectangle(P([(23,y),(28,y+5)]),fill=(80,170,220,255) if k!=1 else RED)
+    d.rectangle(P([(32,y+1),(45,y+4)]),fill=GOLD_D)
+save(im,'icon_assets')

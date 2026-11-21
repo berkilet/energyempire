@@ -36,4 +36,21 @@ public final class Balance {
 
     public static final double CARBON_START = 12;     // $/ton
     public static final double CARBON_GROWTH_YEAR = 3; // $/ton / yil
+
+    /** Pazar payi hedefli senaryolarin (Yesil Donusum, Komurden Cikis) son yili. Kamu payi paydada oldugu icin genis tutuldu. */
+    public static final int SHARE_SCENARIO_DEADLINE = 2040;
+
+    // ---- Acil kapasite ihalesi (UŞİ)
+    /** Memnuniyet bu degerin altinda TENDER_LOW_MONTHS ay ust uste kalirsa ihale acilir. */
+    public static final double TENDER_SATISFACTION = 0.60;
+    public static final int TENDER_LOW_MONTHS = 12, TENDER_COOLDOWN_YEARS = 3;
+    public static final double TENDER_ROUND_MW = 50;
+    public static final int TENDER_BID_DAYS = 60, TENDER_BUILD_MONTHS = 24, TENDER_CONTRACT_YEARS = 10;
+    public static final double TENDER_MAX_DIST = 15;
+    /** Teminat: tahmini santral bedelinin orani; bedel referansi kombine cevrim gaz. */
+    public static final double TENDER_DEPOSIT = 0.05;
+    public static final String TENDER_REFERENCE_EQ = "at-cc";
+    public static final double TENDER_MIN_PRICE = 20, TENDER_MAX_PRICE = 300;
+    /** Rakip teklifi: 10 yillik sermaye geri kazanim katsayisi ve kar marji (stile gore +/-). */
+    public static final double TENDER_CRF = 0.149, TENDER_RIVAL_MARGIN = 0.15;
 }

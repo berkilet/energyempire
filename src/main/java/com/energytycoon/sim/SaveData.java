@@ -11,11 +11,20 @@ public class SaveData {
         public double[] netHistory; public double[] valHist, cashHist;
         public String aiStyle; public double rateAdd, lastRenew;
         /** v3 */ public boolean neutral; }
-    public static class CityD { public int id, x, y; public String name; public double pop, sat; }
+    public static class CityD { public int id, x, y; public String name; public double pop, sat;
+        /** ihale takibi */ public int lowSatMonths; public long lastTenderHour = Long.MIN_VALUE / 4; public double lastServedRatio = 1; }
+    public static class BidD { public int company; public double price, deposit; public long hour; }
+    public static class TenderD {
+        public int id, city, winner = -1, plantIdMark; public double mw, price, deposit, paidRevenue, paidMWh;
+        public long opened, close, awarded, commissionDeadline, contractEnd; public String status;
+        public List<BidD> bids = new ArrayList<>();
+    }
     public static class PlantD { public int id, x, y, owner, buildLeft, outage; public String type; public long builtAt; public double lifetimeMWh, lastMonthProfit, monthProfit;
         public String equipment, pendingUpgrade; public String[] upgrades; public int upgradeLeft; public long ageStart = Long.MIN_VALUE;
         /** v3 */ public boolean legacy; public int retireYear, retireMonth; public String customName;
-        /** v3 Faz 4 */ public int preferredTm; }
+        /** v3 Faz 4 */ public int preferredTm;
+        /** ihale */ public int tenderId;
+        /** varliklar */ public double[] dailyMWh, dailyCurt; public int dayIdx, daysTracked; public double yearProfit; }
     /** Trafo merkezi (v3, Faz 4). */
     public static class SubstationD {
         public int id, x, y, owner, level = 1, buildHoursLeft, pendingUpgrade, upgradeHoursLeft;
@@ -55,6 +64,7 @@ public class SaveData {
     public List<PlantD> plants = new ArrayList<>();
     public List<LineD> lines = new ArrayList<>();
     public List<SubstationD> substations = new ArrayList<>();
+    public List<TenderD> tenders = new ArrayList<>();
     public double[] monthlyPrice;
 
     public SaveData() {}
@@ -91,13 +101,15 @@ public class SaveData {
         }
         for (City c : s.cities) {
             CityD cd = new CityD(); cd.id = c.id; cd.x = c.x; cd.y = c.y; cd.name = c.name; cd.pop = c.population; cd.sat = c.satisfaction;
+            cd.lowSatMonths = c.lowSatMonths; cd.lastTenderHour = c.lastTenderHour; cd.lastServedRatio = c.lastServedRatio;
             d.cities.add(cd);
         }
         for (Plant p : s.plants) {
             PlantD pd = new PlantD(); pd.id = p.id; pd.x = p.x; pd.y = p.y; pd.type = p.type.name();
             pd.owner = s.companies.indexOf(p.owner); pd.buildLeft = p.buildHoursLeft; pd.outage = p.outageHoursLeft;
             pd.builtAt = p.builtAtHour; pd.lifetimeMWh = p.lifetimeMWh; pd.lastMonthProfit = p.lastMonthProfit; pd.monthProfit = p.monthProfit;
-            pd.legacy = p.legacy; pd.retireYear = p.retireYear; pd.retireMonth = p.retireMonth; pd.customName = p.customName; pd.preferredTm = p.preferredTm;
+            pd.legacy = p.legacy; pd.retireYear = p.retireYear; pd.retireMonth = p.retireMonth; pd.customName = p.customName; pd.preferredTm = p.preferredTm; pd.tenderId = p.tenderId;
+            pd.dailyMWh = p.dailyMWh; pd.dailyCurt = p.dailyCurtailMWh; pd.dayIdx = p.dayIdx; pd.daysTracked = p.daysTracked; pd.yearProfit = p.yearProfit;
             pd.equipment = p.equipment.id; pd.ageStart = p.ageStartHour; pd.upgradeLeft = p.upgradeHoursLeft;
             pd.pendingUpgrade = p.pendingUpgrade == null ? null : p.pendingUpgrade.name();
             pd.upgrades = p.upgrades.stream().map(Enum::name).toArray(String[]::new);
@@ -109,6 +121,14 @@ public class SaveData {
             td.builtAtHour = t.builtAtHour; td.transformerMW = t.transformerMW; td.buildCost = t.buildCost; td.accessFee = t.accessFeePerMWh;
             td.openAccess = t.openAccess;
             d.substations.add(td);
+        }
+        for (Tender t : s.tenders.all) {
+            TenderD td = new TenderD(); td.id = t.id; td.city = t.city.id; td.mw = t.mw; td.opened = t.openedHour; td.close = t.closeHour;
+            td.status = t.status.name(); td.winner = t.winner == null ? -1 : s.companies.indexOf(t.winner); td.price = t.price; td.deposit = t.deposit;
+            td.awarded = t.awardedHour; td.commissionDeadline = t.commissionDeadline; td.contractEnd = t.contractEndHour; td.plantIdMark = t.plantIdMark;
+            td.paidRevenue = t.paidRevenue; td.paidMWh = t.paidMWh;
+            for (Tender.Bid b : t.bids) { BidD bd = new BidD(); bd.company = s.companies.indexOf(b.company); bd.price = b.price; bd.deposit = b.deposit; bd.hour = b.hour; td.bids.add(bd); }
+            d.tenders.add(td);
         }
         for (PowerLine l : s.lines) {
             LineD ld = new LineD(); ld.id = l.id; ld.a = l.a.id; ld.b = l.b.id; ld.owner = l.owner == null ? -1 : s.companies.indexOf(l.owner); ld.cost = l.buildCost;
@@ -158,6 +178,8 @@ public class SaveData {
             if (cd.aiStyle != null) c.aiStyle = cd.aiStyle;
             else if (!c.player) c.aiStyle = c.name.startsWith("Yeşil") ? "green" : "fossil";
             c.neutral = cd.neutral;
+            if (c.neutral) c.colorRgb = GridBalance.NEUTRAL_COLOR; // eski kayitlarda gri
+
             c.rateAdd = cd.rateAdd; c.lastRenewMwh = cd.lastRenew;
             s.companies.add(c);
             if (c.player) s.player = c;
@@ -165,6 +187,7 @@ public class SaveData {
         }
         for (CityD cd : cities) {
             City c = new City(); c.id = cd.id; c.x = cd.x; c.y = cd.y; c.name = cd.name; c.population = cd.pop; c.satisfaction = cd.sat;
+            c.lowSatMonths = cd.lowSatMonths; c.lastTenderHour = cd.lastTenderHour; c.lastServedRatio = cd.lastServedRatio;
             s.map.flatten(c.x, c.y, 1);
             s.cities.add(c); s.nodeById.put(c.id, c);
             for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) s.occ[s.map.idx(c.x + dx, c.y + dy)] = c.id;
@@ -178,7 +201,10 @@ public class SaveData {
             p.ageStartHour = pd.ageStart == Long.MIN_VALUE ? p.builtAtHour : pd.ageStart;
             if (pd.upgrades != null) for (String u : pd.upgrades) p.upgrades.add(Upgrade.valueOf(u));
             if (pd.pendingUpgrade != null) { p.pendingUpgrade = Upgrade.valueOf(pd.pendingUpgrade); p.upgradeHoursLeft = pd.upgradeLeft; }
-            p.legacy = pd.legacy; p.retireYear = pd.retireYear; p.retireMonth = pd.retireMonth; p.customName = pd.customName; p.preferredTm = pd.preferredTm;
+            p.legacy = pd.legacy; p.retireYear = pd.retireYear; p.retireMonth = pd.retireMonth; p.customName = pd.customName; p.preferredTm = pd.preferredTm; p.tenderId = pd.tenderId;
+            if (pd.dailyMWh != null && pd.dailyMWh.length == 30) p.dailyMWh = pd.dailyMWh;
+            if (pd.dailyCurt != null && pd.dailyCurt.length == 30) p.dailyCurtailMWh = pd.dailyCurt;
+            p.dayIdx = pd.dayIdx; p.daysTracked = pd.daysTracked; p.yearProfit = pd.yearProfit;
             s.map.ensureLand(p.x, p.y);
             s.plants.add(p); s.nodeById.put(p.id, p); s.occ[s.map.idx(p.x, p.y)] = p.id;
         }
@@ -204,6 +230,15 @@ public class SaveData {
             l.upgradeTo = ld.upgradeTo == null ? null : LineTier.valueOf(ld.upgradeTo); l.upgradeCost = ld.upgradeCost;
             l.lengthTiles = s.lineLength(a, b);
             s.lines.add(l); a.lines.add(l); b.lines.add(l);
+        }
+        if (tenders != null) for (TenderD td : tenders) {
+            if (!(s.nodeById.get(td.city) instanceof City city)) continue;
+            Tender t = new Tender(); t.id = td.id; t.city = city; t.mw = td.mw; t.openedHour = td.opened; t.closeHour = td.close;
+            t.status = Tender.Status.valueOf(td.status); t.winner = td.winner < 0 ? null : s.companies.get(td.winner); t.price = td.price; t.deposit = td.deposit;
+            t.awardedHour = td.awarded; t.commissionDeadline = td.commissionDeadline; t.contractEndHour = td.contractEnd; t.plantIdMark = td.plantIdMark;
+            t.paidRevenue = td.paidRevenue; t.paidMWh = td.paidMWh;
+            if (td.bids != null) for (BidD bd : td.bids) { Tender.Bid b = new Tender.Bid(); b.company = s.companies.get(bd.company); b.price = bd.price; b.deposit = bd.deposit; b.hour = bd.hour; t.bids.add(b); }
+            s.tenders.add(t);
         }
         if (monthlyPrice != null) for (double v : monthlyPrice) s.history.monthlyPrice.add(v);
         s.rng.setSeed(seed ^ hour * 31);

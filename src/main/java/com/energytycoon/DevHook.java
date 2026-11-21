@@ -39,9 +39,11 @@ final class DevHook {
         if (frame == 3 && get("ET_SCENARIO", "menu").equals("settings") && game.getScreen() instanceof MenuScreen ms) ms.showSettings();
         if (frame == 3 && get("ET_SCENARIO", "menu").equals("game")) startGame();
         if (frame == 30 && gs != null) System.out.println(gs.devPickTest());
+        if (frame == 32 && gs != null) System.out.println(gs.devLinePick());
         if (frame == 31 && gs != null && env.containsKey("ET_VERTS")) for (int d = 0; d < 3; d++) System.out.println("VERTS detay=" + d + " kose=" + gs.devTerrainVerts(d));
         if (gs != null && env.containsKey("ET_PAUSETEST")) pauseTest();
         if (gs != null && env.containsKey("ET_UITEST")) uiTest();
+        if (gs != null && env.containsKey("ET_CLIPSCAN")) clipScan();
         if (frame == 6 && gs != null) {
             String open = get("ET_OPEN", "");
             if (open.startsWith("equip:")) gs.devOpenEquipment(PlantType.valueOf(open.substring(6)));
@@ -53,6 +55,16 @@ final class DevHook {
             else if (open.equals("tm")) gs.devBuildSubstation();
             else if (open.equals("linechoice")) gs.devLineChoice();
             else if (open.equals("lineup")) gs.devSelectOwnLine();
+            else if (open.startsWith("assets_")) gs.devAssets(open.substring(7));
+            else if (open.equals("tmmenu")) {
+                gs.devBuildSubstation();
+                GameState st = gs.devState();
+                Substation tm = st.substations.get(0);
+                st.components();
+                Plant m = tm.cp != null && !tm.cp.members.isEmpty() ? tm.cp.members.get(0) : null;
+                if (m != null) { gs.devSelectNode(m.id); gs.devTmMenu(m.id); }
+            }
+            else if (open.equals("tenderwin")) { gs.devAssets("plants"); gs.devToggle("assets"); gs.devAction("tender:" + gs.devFirstTender()); }
             else if (open.equals("opapps")) gs.devOperatorApps();
             else if (open.equals("opmap")) { gs.devOperatorApps(); gs.devToggle("operator"); }
             else if (open.equals("tmfinance")) { gs.devBuildSubstation(); gs.devToggle("finance"); }
@@ -92,6 +104,55 @@ final class DevHook {
         else if (pendingStep != null && frame % 2 == 1) { System.out.println("UITEST " + pendingStep + " -> " + gs.devUiState()); pendingStep = null; }
     }
     private String pendingStep;
+
+    // ------------------------------------------------------------ metin kirpma taramasi
+    private final String[] scanSteps = { "hud", "invest-santral", "invest-baglanti", "invest-ihale", "finance", "market", "companies", "help", "menu",
+        "settings", "assets-PLANTS", "assets-LINES", "assets-SUBSTATIONS", "assets-OPERATOR", "assets-TENDERS", "equip-COAL", "equip-GAS", "equip-SOLAR",
+        "equip-WIND", "equip-HYDRO", "equip-NUCLEAR", "linechoice", "tender", "sel-plant", "sel-plant-tm", "sel-tm", "sel-line", "sel-city", "tool-line", "tool-plant" };
+    private int scanIdx = -1, scanTotal;
+
+    private void clipScan() {
+        if (frame < 12) return;
+        if (frame == 12) gs.devAssets("plants");
+        int step = (frame - 14) / 3, phase = (frame - 14) % 3;
+        if (frame < 14 || step >= scanSteps.length) {
+            if (step == scanSteps.length && phase == 0) System.out.println("TARAMA TOPLAM: " + scanTotal + " sorun");
+            return;
+        }
+        String s = scanSteps[step];
+        com.energytycoon.ui.Hud hud = gs.devHud();
+        if (phase == 0) {
+            hud.closeWindows(); hud.hideInvest(); gs.devAction("cancelTool"); gs.devSelectNode(-1);
+            GameState st = gs.devState();
+            Plant mine = null; for (Plant p : st.plants) if (p.owner.player) { mine = p; break; }
+            Substation tm = st.substations.isEmpty() ? null : st.substations.get(0);
+            Plant tmMember = tm != null && tm.cp != null && !tm.cp.members.isEmpty() ? tm.cp.members.get(0) : mine;
+            switch (s) {
+                case "invest-santral" -> hud.devShowInvest("Santral Yatırımları");
+                case "invest-baglanti" -> hud.devShowInvest("Bağlantı Yatırımları");
+                case "invest-ihale" -> hud.devShowInvest("İhaleler");
+                case "finance", "market", "companies", "help", "menu", "settings" -> hud.toggle(s);
+                case "linechoice" -> gs.devLineChoice();
+                case "tender" -> gs.devAction("tender:" + gs.devFirstTender());
+                case "sel-plant" -> gs.devSelectNode(mine.id);
+                case "sel-plant-tm" -> { gs.devSelectNode(tmMember.id); gs.devTmMenu(tmMember.id); }
+                case "sel-tm" -> { if (tm != null) gs.devSelectNode(tm.id); }
+                case "sel-line" -> { if (!st.lines.isEmpty()) gs.devSelectLine(st.lines.get(0).id); }
+                case "sel-city" -> gs.devSelectNode(st.cities.get(0).id);
+                case "tool-line" -> gs.devLineTool(LineTier.CYG);
+                case "tool-plant" -> gs.devOpenEquipment(PlantType.NUCLEAR);
+                default -> {
+                    if (s.startsWith("assets-")) hud.openAssets(com.energytycoon.ui.AssetsView.Tab.valueOf(s.substring(7)));
+                    else if (s.startsWith("equip-")) gs.devOpenEquipment(PlantType.valueOf(s.substring(6)));
+                }
+            }
+        } else if (phase == 2) {
+            java.util.List<String> issues = hud.devClipScan();
+            scanTotal += issues.size();
+            System.out.println("TARAMA " + s + ": " + (issues.isEmpty() ? "sorun yok" : issues.size() + " sorun"));
+            for (String i : issues) System.out.println("   - " + i);
+        }
+    }
 
     private long h0, t0, t1;
     /** Durdurma testi: fareyle II'ye tikla, sonra bosluk ile devam/durdur; saat ilerlemesini raporla. */

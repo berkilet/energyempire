@@ -93,6 +93,12 @@ public final class GameScreen implements Screen, Hud.Listener {
     public void devLineTool(LineTier t) { hud.hideHelp(); lineTier = t; tool(Tool.LINE, null); }
     public void devNoHover(boolean b) { devNoHover = b; }
     public void devHideHelp() { hud.hideHelp(); }
+    public Hud devHud() { return hud; }
+    public String devLinePick() { return wr.devLinePickTest(); }
+    public void devSelectNode(int id) { selNode = id; selLine = -1; }
+    public void devSelectLine(int id) { selLine = id; selNode = -1; }
+    public void devTmMenu(int plantId) { tmMenuFor = plantId; }
+    public GameState devState() { return state; }
     /** Dogrulama: oyuncu santrallerinin en cok toplandigi yere TM kurar, sehre hat ceker, secer ve odaklar. */
     public void devBuildSubstation() {
         hud.hideHelp();
@@ -155,12 +161,31 @@ public final class GameScreen implements Screen, Hud.Listener {
         }
     }
 
+    /** Dogrulama: Varliklarim sekmeleri icin ornek veri (TM, UŞİ basvurusu, kazanilmis ihale) ve pencereyi acar. */
+    public void devAssets(String tab) {
+        hud.hideHelp();
+        devBuildSubstation();
+        int k = 0;
+        for (Plant p : state.plants) if (p.owner.player && k < 2) {
+            City best = null; double bd = 1e9;
+            for (City c : state.cities) { double d = Math.hypot(c.x - p.x, c.y - p.y); if (d < bd) { bd = d; best = c; } }
+            if (state.operator.apply(state.player, p, best, LineTier.YG) != null) k++;
+        }
+        Tender t = state.tenders.openTender(state.cities.get(state.cities.size() - 1));
+        state.tenders.bid(state.player, t, 88);
+        for (int h = 0; h < 24 * 65; h++) state.tick();
+        state.messages.clear();
+        selNode = -1;
+        action("assets:" + tab);
+    }
+
     public void devSubstationTool(int level) { hud.hideHelp(); action("substation:" + level); }
     public String devUiState() {
         return "arac=" + tool + " kademe=" + lineTier.shortLabel + " yatirim=" + (hud.investOpen() ? "acik" : "kapali")
             + " pencere=" + (hud.anyWindowOpen() ? "acik" : "kapali") + " katman=" + wr.terrain.layer().label;
     }
     public void devAction(String a) { action(a); }
+    public int devFirstTender() { return state.tenders.all.isEmpty() ? 0 : state.tenders.all.get(0).id; }
 
     public String devPickTest() {
         StringBuilder sb = new StringBuilder();
@@ -190,9 +215,39 @@ public final class GameScreen implements Screen, Hud.Listener {
     @Override public void layer(Layer l) { wr.terrain.setLayer(l); }
     @Override public void action(String a) {
         if (a.startsWith("upgrade:")) { upgradeSelected(Upgrade.valueOf(a.substring(8))); return; }
+        if (a.startsWith("assets:")) {
+            hud.openAssets(switch (a.substring(7)) { case "tenders" -> com.energytycoon.ui.AssetsView.Tab.TENDERS; case "lines" -> com.energytycoon.ui.AssetsView.Tab.LINES;
+                case "tm" -> com.energytycoon.ui.AssetsView.Tab.SUBSTATIONS; case "operator" -> com.energytycoon.ui.AssetsView.Tab.OPERATOR; default -> com.energytycoon.ui.AssetsView.Tab.PLANTS; });
+            return;
+        }
+        if (a.startsWith("focus:")) {
+            String[] f = a.split(":");
+            int id = Integer.parseInt(f[2]);
+            if (f[1].equals("line")) {
+                for (PowerLine l : state.lines) if (l.id == id) { selLine = id; selNode = -1; wr.iso.target.set((l.a.x + l.b.x) / 2f + 0.5f, 0, (l.a.y + l.b.y) / 2f + 0.5f); }
+            } else if (state.nodeById(id) != null) {
+                GridNode n = state.nodeById(id);
+                selNode = id; selLine = -1;
+                wr.iso.target.set(n.x + 0.5f, 0, n.y + 0.5f);
+            }
+            if (tool != Tool.SELECT) cancelTool();
+            return;
+        }
+        if (a.startsWith("tender:")) { hud.showTender(Integer.parseInt(a.substring(7))); return; }
+        if (a.startsWith("bid:")) {
+            String[] f = a.split(":");
+            Tender t = state.tenders.get(Integer.parseInt(f[1]));
+            if (t != null) {
+                String err = state.tenders.bid(state.player, t, Double.parseDouble(f[2]));
+                hud.toast(err != null ? err : "Teklif kaydedildi: " + t.city.name + " $" + Fmt.f1(Double.parseDouble(f[2])) + "/MWh");
+            }
+            return;
+        }
         if (a.startsWith("line:")) { lineTier = LineTier.valueOf(a.substring(5)); tool(Tool.LINE, null); return; }
         if (a.startsWith("substation:")) { tmLevel = Integer.parseInt(a.substring(11)); hud.setTmLevel(tmLevel); tool(Tool.SUBSTATION, null); return; }
+        if (a.startsWith("tmmenu:")) { int id = Integer.parseInt(a.substring(7)); tmMenuFor = tmMenuFor == id ? -1 : id; return; }
         if (a.startsWith("tm:")) {
+            tmMenuFor = -1;
             String[] f = a.split(":");
             if (state.nodeById(Integer.parseInt(f[1])) instanceof Plant p && p.owner.player) {
                 int id = Integer.parseInt(f[2]);
@@ -224,6 +279,7 @@ public final class GameScreen implements Screen, Hud.Listener {
             case "demolish" -> deleteSelected();
             case "removeLine" -> deleteSelected();
             case "operatorApps" -> hud.toggle("operator");
+            case "cancelTool" -> cancelTool();
             case "lineup" -> {
                 for (PowerLine l : state.lines) if (l.id == selLine) {
                     String err = state.upgradeLine(state.player, l);
@@ -251,6 +307,8 @@ public final class GameScreen implements Screen, Hud.Listener {
     }
 
     private GridNode pendingA, pendingB;
+    /** "TM degistir" listesi acik olan santral (-1 kapali). */
+    private int tmMenuFor = -1;
     private LineTier pendingTier;
 
     private void confirmLine(boolean operator) {
@@ -343,6 +401,7 @@ public final class GameScreen implements Screen, Hud.Listener {
                 case Input.Keys.F5 -> action("save");
                 case Input.Keys.F9 -> action("load");
                 case Input.Keys.B -> hud.toggleInvest();
+                case Input.Keys.V -> hud.toggle("assets");
                 case Input.Keys.FORWARD_DEL -> { hud.hideInvest(); tool(Tool.DEMOLISH, null); }
                 case Input.Keys.ESCAPE -> {
                     // Esc: once araci iptal eder, sonra yatirim menusunu kapatir, sonra pencereleri/menuyu.
@@ -359,8 +418,15 @@ public final class GameScreen implements Screen, Hud.Listener {
 
     private void cancelTool() { tool(Tool.SELECT, null); selNode = -1; selLine = -1; }
 
+    /** Hat secimi: imlec ekranda hatta en fazla bu kadar piksel yakinsa (tum hat turleri). */
+    private static final float LINE_PICK_PX = 8f;
+    private int lastSx, lastSy;
+
     private void click(int sx, int sy) {
+        lastSx = sx; lastSy = sy;
+        PowerLine near = wr.pickLineScreen(sx, sy, LINE_PICK_PX);
         int[] t = wr.pickTile(sx, sy);
+        if (t == null && tool == Tool.SELECT && near != null) { selLine = near.id; selNode = -1; return; }
         if (t == null) { selNode = -1; selLine = -1; return; }
         int x = t[0], y = t[1];
         switch (tool) {
@@ -368,7 +434,7 @@ public final class GameScreen implements Screen, Hud.Listener {
                 GridNode n = state.nodeAt(x, y);
                 if (n != null) { selNode = n.id; selLine = -1; }
                 else {
-                    PowerLine l = wr.pickLine(x + 0.5f, y + 0.5f);
+                    PowerLine l = near;
                     if (l != null) { selLine = l.id; selNode = -1; } else { selNode = -1; selLine = -1; }
                 }
             }
@@ -460,7 +526,7 @@ public final class GameScreen implements Screen, Hud.Listener {
                     state.demolishPlant(p);
                     hud.toast("Santral yıkıldı. İade: " + Fmt.money(refund));
                 } else {
-                    PowerLine l = wr.pickLine(x + 0.5f, y + 0.5f);
+                    PowerLine l = wr.pickLineScreen(lastSx, lastSy, LINE_PICK_PX);
                     if (l != null && l.owner != null && l.owner.player) { state.removeLine(l, true); hud.toast("Hat kaldırıldı."); }
                     else if (l != null) hud.toast("Bu hat size ait değil.");
                 }
@@ -550,7 +616,10 @@ public final class GameScreen implements Screen, Hud.Listener {
                           : p.upgrading() ? p.pendingUpgrade.label + ": " + p.upgradeHoursLeft / 24 + " gün" : "Çalışıyor";
             Equipment e = p.equipment;
             StringBuilder sb = new StringBuilder();
-            sb.append(p.customName != null ? p.customName + " (" + p.type.label + ")" : p.type.label).append("  —  ").append(p.owner.name).append('\n')
+            sb.append(p.customName != null ? p.customName + " (" + p.type.label + ")" : p.type.label).append("  —  ").append(p.owner.name).append('\n');
+            if (p.legacy && p.owner.neutral && p.retireYear > 0)
+                sb.append("Kamu Üretim (eski filo) · Kapanış: ").append(GameState.MONTH_NAMES[p.retireMonth]).append(' ').append(p.retireYear).append('\n');
+            sb
               .append(e.supplier.name).append(" ").append(e.model).append(" (").append(e.tech).append(")\n")
               .append("Durum: ").append(status).append('\n')
               .append("Üretim: ").append(Fmt.mw(p.outputMW)).append(" / ").append(Fmt.mw(p.capacityMW())).append('\n');
@@ -697,12 +766,23 @@ public final class GameScreen implements Screen, Hud.Listener {
                 boolean ok = p.canUpgrade(u) && state.player.cash >= u.cost(p);
                 a.add(new String[] { "▲ " + u.label + " — " + Fmt.money(u.cost(p)) + ", " + u.days + " gün\n" + u.desc, "upgrade:" + u.name(), ok ? "1" : "0" });
             }
-            for (Substation t : state.substationsFor(p)) {
-                if (p.cp != null && p.cp.tm == t) continue;
-                String who = t.owner == p.owner ? "kendi TM'niz" : t.owner.name + ", erişim $" + Fmt.f1(t.accessFeePerMWh) + "/MWh";
-                a.add(new String[] { "→ Bağlan: " + t.name() + " (" + who + ")", "tm:" + p.id + ":" + t.id, "1" });
+            // Tek "TM değiştir" dugmesi; acilinca mesafeye gore sirali liste
+            List<Substation> tms = new ArrayList<>(state.substationsFor(p));
+            if (!tms.isEmpty() || p.preferredTm != 0) {
+                boolean open = tmMenuFor == p.id;
+                a.add(new String[] { open ? "TM değiştir (listeyi kapat)" : "TM değiştir… (" + tms.size() + " seçenek)", "tmmenu:" + p.id, "1" });
+                if (open) {
+                    tms.sort(java.util.Comparator.comparingDouble(t -> Math.hypot(t.x - p.x, t.y - p.y)));
+                    for (Substation t : tms) {
+                        boolean cur = p.cp != null && p.cp.tm == t;
+                        double free = t.cp == null ? t.transformerMW : Math.max(0, t.transformerMW - t.cp.installedMW() + (cur ? p.capacityMW() : 0));
+                        a.add(new String[] { (cur ? "✓ " : "→ ") + t.name() + " · " + (t.owner == p.owner ? "kendi" : t.owner.name)
+                            + " · " + Fmt.f1(Math.hypot(t.x - p.x, t.y - p.y)) + " kare · boş trafo " + Fmt.mw(free)
+                            + " · erişim " + (t.owner == p.owner ? "yok" : "$" + Fmt.f1(t.accessFeePerMWh) + "/MWh"), cur ? "none" : "tm:" + p.id + ":" + t.id, cur ? "0" : "1" });
+                    }
+                    if (p.preferredTm != 0) a.add(new String[] { "→ Otomatik bağlantıya dön", "tm:" + p.id + ":0", "1" });
+                }
             }
-            if (p.preferredTm != 0) a.add(new String[] { "→ Otomatik bağlantıya dön", "tm:" + p.id + ":0", "1" });
             a.add(new String[] { "Yık (iade %" + (int) (Balance.DEMOLISH_REFUND * 100) + ")", "demolish", "1" });
         } else if (n instanceof Substation t && t.owner.player) {
             boolean busy = !t.operational() || t.pendingUpgrade != 0;
@@ -754,7 +834,7 @@ public final class GameScreen implements Screen, Hud.Listener {
         else if (!game.dayNight() || speed >= FREEZE_LIGHT_SPEED) wr.hourFloat = 13f;
         else wr.hourFloat = state.hourOfDay() + (float) Math.min(accum, 0.999);
         String m;
-        while ((m = state.messages.poll()) != null) hud.toast(m);
+        while ((m = state.messages.poll()) != null) hud.toast(m, state.messageActions.remove(m));
         if (state.year() != lastAutosaveYear) { lastAutosaveYear = state.year(); SaveManager.save(state, "autosave"); }
 
         hud.setPlaceInfo("");
@@ -766,8 +846,26 @@ public final class GameScreen implements Screen, Hud.Listener {
         hud.setSelection(sel == null ? "Haritada bir santrale, şehre veya hatta tıklayın." : sel, selectionActions());
 
         wr.render(dt, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
+        updateBadges();
         hud.update(state, tool, plantEq, speed, wr.terrain.layer(), lineTier);
         hud.render(dt);
+    }
+
+    private float[] badgeXY = new float[64];
+    private final com.badlogic.gdx.math.Vector3 tmpP = new com.badlogic.gdx.math.Vector3();
+
+    /** Kamu (eski filo) santrallerinin uzerine "K" rozeti. */
+    private void updateBadges() {
+        int n = 0;
+        float sx = 1f, sy = 1f; // project() zaten mantiksal piksel (sahne koordinati) verir
+        for (Plant p : state.plants) {
+            if (!p.owner.neutral) continue;
+            if (!wr.project(p.x + 0.5f, state.map.topAt(p.x, p.y) + 0.95f, p.y + 0.5f, tmpP)) continue;
+            if (badgeXY.length < (n + 1) * 2) badgeXY = java.util.Arrays.copyOf(badgeXY, badgeXY.length * 2);
+            badgeXY[n * 2] = tmpP.x * sx; badgeXY[n * 2 + 1] = tmpP.y * sy;
+            n++;
+        }
+        hud.setBadges(badgeXY, n);
     }
 
     @Override public void resize(int w, int h) { hud.resize(w, h); }

@@ -41,12 +41,30 @@ public final class Hud {
     private final Label company, cash, debt, value, date, price, demand, info, placeInfo;
     private final Table toasts = new Table();
     private final Table dock = new Table(), layerPop = new Table(), ctxBar = new Table();
-    private final ImageButton investBtn, selectBtn, demBtn, layerBtn;
+    private Table right, top;
+    private ScrollPane selScroll;
+    private Cell<ScrollPane> selCell;
+    /** Kamu santrali "K" rozetleri: ekran uzayinda sabit boyut, her yakinlastirmada okunur. */
+    private final com.badlogic.gdx.scenes.scene2d.Group badges = new com.badlogic.gdx.scenes.scene2d.Group();
+    private Label.LabelStyle badgeStyle;
+    private final ImageButton investBtn, assetsBtn, selectBtn, demBtn, layerBtn;
     private final TextTooltip layerTip;
     private final Map<Layer, TextButton> layerBtns = new EnumMap<>(Layer.class);
     private final InvestMenu invest;
     private final Label ctxTitle;
-    @SuppressWarnings("rawtypes") private com.badlogic.gdx.scenes.scene2d.ui.Cell ctxTitleCell;
+    @SuppressWarnings("rawtypes") private com.badlogic.gdx.scenes.scene2d.ui.Cell ctxTitleCell, placeInfoCell;
+
+    /** Ekran genisligini asan metin kirpilmaz: genislik sinirlanir ve satir kaydirilir; kisa metin icerige gore genisler. */
+    @SuppressWarnings("rawtypes")
+    private void wrapToScreen(Label l, com.badlogic.gdx.scenes.scene2d.ui.Cell cell) {
+        if (cell == null || cell.getActor() == null) return;
+        float max = Math.max(320, stage.getWidth() - 340); // sol arac cubugu ve sag panel payi
+        l.setWrap(false);
+        float pref = l.getPrefWidth();
+        boolean wrap = pref > max;
+        l.setWrap(wrap);
+        cell.width(wrap ? max : pref);
+    }
     private Tool curTool = Tool.SELECT;
     private LineTier curTier = LineTier.YG;
     /** Faz 4/5 ozellikleri acildiginda true yapilir. */
@@ -63,9 +81,9 @@ public final class Hud {
     private final Table actions = new Table();
     private String actionsKey = "";
     private final Label scenTitle, scenBody;
-    private final Window finance, market, companies, help, menu, gameOverWin, lineChoice, opWin;
-    private final Table opBody = new Table();
-    private String opKey = "";
+    private final Window finance, market, companies, help, menu, gameOverWin, lineChoice, assetsWin;
+    private final AssetsView assets;
+    private long assetsRefreshAt;
     private final Label lcTitle, lcOwn, lcOp;
     private final TextButton lcOwnBtn, lcOpBtn;
     private final EquipmentWindow equipWin;
@@ -82,7 +100,7 @@ public final class Hud {
         stage = new Stage(new ScreenViewport());
 
         // ----- ust cubuk
-        Table top = new Table(skin);
+        top = new Table(skin);
         top.setBackground("bar");
         top.pad(4, 8, 4, 8);
         company = l("", "title"); cash = l("", "default"); debt = l("", "default"); value = l("", "default");
@@ -137,11 +155,12 @@ public final class Hud {
         investBtn = dockButton("icon_build", "Yatırım (B)", () -> toggleInvest());
         selectBtn = dockButton("icon_cursor", "Seç / İncele (sağ tık veya Esc ile dönülür)", () -> { hideInvest(); cb.tool(Tool.SELECT, null); });
         demBtn = dockButton("icon_demolish", "Yık / Hat Kaldır (Delete)", () -> { hideInvest(); cb.tool(Tool.DEMOLISH, null); });
+        assetsBtn = dockButton("icon_assets", "Varlıklarım (V)", () -> { hideInvest(); toggle("assets"); });
         layerBtn = dockButton("icon_layers", "Harita katmanı (L)", () -> layerPop.setVisible(!layerPop.isVisible()));
         layerTip = (TextTooltip) layerBtn.getListeners().select(l -> l instanceof TextTooltip).iterator().next();
         dock.setBackground(skin.getDrawable("card"));
         dock.pad(5);
-        for (ImageButton b : new ImageButton[] { investBtn, selectBtn, demBtn, layerBtn }) dock.add(b).size(52, 54).pad(2);
+        for (ImageButton b : new ImageButton[] { investBtn, assetsBtn, selectBtn, demBtn, layerBtn }) dock.add(b).size(52, 54).pad(2);
         dock.pack();
 
         layerPop.setBackground(skin.getDrawable("card"));
@@ -173,14 +192,24 @@ public final class Hud {
         InvestMenu.Group tmGroup = new InvestMenu.Group("Trafo Merkezi")
             .add(tmItem(1, "TM154  (yarıçap " + (int) GridBalance.TM_RADIUS + ")", Fmt.mw(GridBalance.TM154_MW) + " trafo · " + Fmt.money(GridBalance.TM154_COST) + " · " + GridBalance.TM154_DAYS + " gün"))
             .add(tmItem(2, "TM380  (ÇYG bağlanabilir)", Fmt.mw(GridBalance.TM380_MW) + " trafo · " + Fmt.money(GridBalance.TM380_COST) + " · " + GridBalance.TM380_DAYS + " gün"));
-        InvestMenu.Group opGroup = new InvestMenu.Group(null)
-            .add(new InvestMenu.Item("icon_city", "UŞİ Başvurularım", () -> "", () -> operatorEnabled, () -> true, () -> false, () -> cb.action("operatorApps")));
-        invest.add(plantsCat).add(new InvestMenu.Category("Bağlantı Yatırımları", false).add(lineGroup).add(tmGroup).add(opGroup));
+        // Ihaleler: acik ihaleler (sabit sayida yuva, gorunurluk listeye gore) + kazanilanlar
+        InvestMenu.Group openTenders = new InvestMenu.Group("Açık ihaleler");
+        for (int k = 0; k < MAX_TENDER_ROWS; k++) {
+            final int idx = k;
+            openTenders.add(new InvestMenu.Item("icon_city", () -> tenderAt(idx) == null ? "" : tenderAt(idx).city.name + " · " + Math.round(tenderAt(idx).mw) + " MW acil kapasite",
+                () -> tenderSub(tenderAt(idx)), () -> tenderAt(idx) != null, () -> true, () -> false,
+                () -> { Tender t = tenderAt(idx); if (t != null) { showTender(t.id); if (!invest.pinned()) hideInvest(); } }));
+        }
+        InvestMenu.Group wonTenders = new InvestMenu.Group(null).add(new InvestMenu.Item("icon_coin",
+            () -> "Kazanılan ihaleler (" + (st == null ? 0 : st.tenders.wonBy(st.player).size()) + ")", () -> "Yükümlülükler Varlıklarım → İhaleler'de",
+            () -> st != null && !st.tenders.wonBy(st.player).isEmpty(), () -> true, () -> false, () -> cb.action("assets:tenders")));
+        invest.add(plantsCat).add(new InvestMenu.Category("Bağlantı Yatırımları", false).add(lineGroup).add(tmGroup))
+            .add(new InvestMenu.Category("İhaleler", false).add(openTenders).add(wonTenders));
         invest.update();
         invest.root.setVisible(false);
 
         // ----- sag: secim + senaryo
-        Table right = new Table(skin);
+        right = new Table(skin);
         info = l("Haritada bir santrale veya şehre tıklayın.", "small");
         info.setWrap(true);
         right.add(info).width(270).left().row();
@@ -193,7 +222,13 @@ public final class Hud {
         scen.add(scenBody).width(270).left();
 
         Table rightCol = new Table();
-        rightCol.add(skins.framedPanel(l("SEÇİM", "title"), right)).top().right().growX().row();
+        selScroll = new ScrollPane(right, skin);
+        selScroll.setFadeScrollBars(false);
+        selScroll.setOverscroll(false, false);
+        selScroll.setScrollingDisabled(true, false);
+        Table selBody = new Table();
+        selCell = selBody.add(selScroll).width(284);
+        rightCol.add(skins.framedPanel(l("SEÇİM", "title"), selBody)).top().right().growX().row();
         rightCol.add(skins.framedPanel(scenTitle, scen)).top().right().growX().padTop(4);
 
         placeInfo = l("", "small");
@@ -203,7 +238,7 @@ public final class Hud {
         ctxBar.pad(6, 16, 6, 16);
         ctxTitleCell = ctxBar.add(ctxTitle);
         ctxBar.row();
-        ctxBar.add(placeInfo);
+        placeInfoCell = ctxBar.add(placeInfo);
         toasts.bottom();
 
         Table root = new Table();
@@ -214,6 +249,8 @@ public final class Hud {
         mid.add().grow();
         mid.add(rightCol).top().right().padRight(6).padTop(4);
         root.add(mid).grow();
+        stage.addActor(badges); // rozetler tum panellerin altinda
+        badges.setTouchable(Touchable.disabled);
         stage.addActor(root);
         stage.addActor(dock);
         stage.addActor(layerPop);
@@ -221,7 +258,10 @@ public final class Hud {
         // Bildirimler ve alt bilgi ayri katmanda: sayilari artinca ana yerlesimi (ust cubugu) itmesinler.
         Table bottom = new Table();
         bottom.setFillParent(true);
-        bottom.setTouchable(Touchable.disabled);
+        // Bildirimler tiklanabilir (ihale vb.); baglam cubugu tiklama almaz.
+        bottom.setTouchable(Touchable.childrenOnly);
+        ctxBar.setTouchable(Touchable.disabled);
+        toasts.setTouchable(Touchable.childrenOnly);
         bottom.bottom();
         bottom.add(ctxBar).padBottom(4).row();
         bottom.add(toasts).padBottom(12);
@@ -230,21 +270,22 @@ public final class Hud {
         // ----- pencereler
         finance = window("Finans");
         financeView = new FinanceView(skins, () -> cb.action("borrow"), () -> cb.action("repay"));
-        finance.add(financeView.root).pad(4);
+        finance.add(scrolled(finance, financeView.root)).pad(4);
         charts.add(financeView.chart);
 
         market = window("Piyasa");
         marketView = new MarketView(skins);
-        market.add(marketView.root).pad(4);
+        market.add(scrolled(market, marketView.root)).pad(4);
         charts.addAll(marketView.charts);
 
         companies = window("Şirketler ve Şehirler");
         companiesView = new CompaniesView(skins);
-        companies.add(companiesView.root).pad(4).padRight(16);
+        companies.add(scrolled(companies, companiesView.root)).pad(4).padRight(16);
 
         help = window("Nasıl Oynanır?");
         Label hl = l(HELP, "small"); hl.setWrap(true);
-        help.add(hl).width(560).pad(10);
+        Table hlBox = new Table(); hlBox.add(hl).width(560).pad(10);
+        help.add(scrolled(help, hlBox));
         help.pack();
 
         menu = window("Menü");
@@ -282,13 +323,15 @@ public final class Hud {
         lineChoice.pack();
 
         // ----- UŞİ Basvurularim
-        opWin = window("UŞİ Başvurularım");
-        opWin.add(opBody).width(620).pad(4);
+        // ----- Varliklarim (santraller, hatlar, TM, UŞİ basvurulari, ihaleler)
+        assetsWin = window("Varlıklarım");
+        assets = new AssetsView(skins, cb::action);
+        assetsWin.add(assets.root).pad(4);
 
         equipWin = new EquipmentWindow(skin);
         skins.decorateWindow(equipWin, () -> equipWin.setVisible(false));
 
-        for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, lineChoice, opWin }) {
+        for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, lineChoice, assetsWin }) {
             stage.addActor(w);
             w.setVisible(false);
         }
@@ -305,13 +348,14 @@ public final class Hud {
       + "Hattın kapasitesi santralin satabileceği gücü sınırlar; uzun hatta kayıp artar. Hatsız santral elektrik satamaz.\n"
       + "Bitişik kendi santralleriniz tek bağlantı noktasıdır (küme): tek hattı paylaşırlar. Trafo merkezi (Yatırım → Bağlantı) "
       + "yarıçapındaki santrallerinizi toplar; ihracatı trafo gücü ve hatlarla sınırlıdır. Başkasının açık TM'sine bağlanınca MWh başına erişim bedeli ödersiniz.\n"
+      + "Bir şehir 12 ay üst üste %60'ın altında kalırsa UŞİ acil kapasite ihalesi açar (Yatırım → İhaleler): en düşük 10 yıllık fiyat teklifi kazanır, kazanan 24 ayda kurmazsa teminatı yanar.\n"
       + "4) Her saat talep en ucuz santralden başlayarak karşılanır (merit order). Fiyat son devreye giren santralin maliyetidir.\n"
       + "5) Kendi santralinizi seçince yükseltme butonları çıkar: güneşte tracker ve robotik temizlik, rüzgarda repowering, "
       + "kömür/gazda karbon yakalama, nükleerde ömür uzatma vb.\n"
       + "6) Yeni teknolojiler yıllar içinde piyasaya çıkar (ör. 2028 dev türbin, 2030 SMR, 2033 tandem panel).\n"
       + "7) Karşılanamayan talep ceza getirir, karbon vergisi her yıl artar. Nakit yetmezse Finans'tan borçlanın.\n\n"
       + "Kontroller: Sağ tık sürükle = kaydır, tekerlek = yakınlaştır, Q/E = döndür, WASD/oklar = kaydır, Boşluk = duraklat, "
-      + "1/2/3 = hız (1x: bir gün 24 sn), B = yatırım, Delete = yık, Tab = hat kademesi, L = katman, F5/F9 = kaydet/yükle, Esc = iptal/menü.";
+      + "1/2/3 = hız (1x: bir gün 24 sn), B = yatırım, V = varlıklarım, Delete = yık, Tab = hat kademesi, L = katman, F5/F9 = kaydet/yükle, Esc = iptal/menü.";
 
     private TextButton btn(String text, String action, String style) {
         TextButton b = new TextButton(text, skin, style);
@@ -355,6 +399,94 @@ public final class Hud {
     }
 
     public void setTmLevel(int level) { curTmLevel = level; }
+
+    static final int MAX_TENDER_ROWS = 8;
+
+    private Tender tenderAt(int i) {
+        if (st == null) return null;
+        List<Tender> o = st.tenders.open();
+        return i < o.size() ? o.get(i) : null;
+    }
+
+    private String tenderSub(Tender t) {
+        if (t == null || st == null) return "";
+        Tender.Bid b = t.bidOf(st.player);
+        return "kalan " + st.tenders.daysLeft(t) + " gün · " + (b == null ? "teklifiniz yok" : "teklifiniz $" + Fmt.f1(b.price) + "/MWh");
+    }
+
+    // ----- ihale teklif penceresi
+    private Window tenderWin;
+    private int tenderId;
+    private double tenderPrice;
+    private Label tenderInfo, tenderPriceLbl;
+
+    public void showTender(int id) {
+        if (st == null || st.tenders.get(id) == null) return;
+        tenderId = id;
+        Tender t = st.tenders.get(id);
+        Tender.Bid b = t.bidOf(st.player);
+        tenderPrice = b != null ? b.price : Math.round(Math.max(Balance.TENDER_MIN_PRICE, st.statPrice * 1.3));
+        if (tenderWin == null) {
+            tenderWin = window("Acil Kapasite İhalesi");
+            tenderInfo = l("", "small"); tenderInfo.setWrap(true);
+            tenderWin.add(tenderInfo).width(520).left().row();
+            Table pr = new Table();
+            pr.add(l("Teklif ($/MWh, 10 yıl):", "default")).padRight(10);
+            for (int d : new int[] { -10, -1 }) pr.add(btnRun((d > 0 ? "+" : "−") + Math.abs(d), () -> adjustTender(d))).size(46, 30).padRight(2);
+            tenderPriceLbl = l("", "kpi");
+            pr.add(tenderPriceLbl).width(90).center();
+            for (int d : new int[] { 1, 10 }) pr.add(btnRun("+" + d, () -> adjustTender(d))).size(46, 30).padLeft(2);
+            tenderWin.add(pr).padTop(10).row();
+            Table bt = new Table();
+            bt.add(btnRun("Teklif ver / güncelle", () -> cb.action("bid:" + tenderId + ":" + tenderPrice))).width(220).height(34).padRight(8);
+            bt.add(btnRun("Kapat", () -> tenderWin.setVisible(false))).width(120).height(34);
+            tenderWin.add(bt).padTop(10);
+            stage.addActor(tenderWin);
+        }
+        refreshTender();
+        tenderWin.pack(); center(tenderWin);
+        tenderWin.setVisible(true); tenderWin.toFront();
+    }
+
+    private void adjustTender(double d) {
+        tenderPrice = Math.max(Balance.TENDER_MIN_PRICE, Math.min(Balance.TENDER_MAX_PRICE, tenderPrice + d));
+        refreshTender();
+    }
+
+    private TextButton btnRun(String text, Runnable r) {
+        TextButton b = new TextButton(text, skin, "small");
+        b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { r.run(); } });
+        return b;
+    }
+
+    private void refreshTender() {
+        if (tenderWin == null || st == null) return;
+        Tender t = st.tenders.get(tenderId);
+        if (t == null) return;
+        Tender.Bid b = t.bidOf(st.player);
+        StringBuilder sb = new StringBuilder();
+        sb.append(t.city.name).append(" için ").append(Math.round(t.mw)).append(" MW acil kapasite · durum: ").append(t.status.label).append('\n')
+          .append("Teknoloji serbest. Santral şehre en fazla ").append((int) Balance.TENDER_MAX_DIST).append(" kare uzakta ve şehrin şebekesine bağlı olmalı.\n")
+          .append("Kazanan, ihale MW'ına kadar üretimini ").append(Balance.TENDER_CONTRACT_YEARS).append(" yıl teklif fiyatından satar; fazlası piyasa fiyatından.\n")
+          .append("Teminat: ").append(Fmt.money(st.tenders.depositFor(t))).append(" (ilk teklifte; kaybederseniz iade, kazanıp ")
+          .append(Balance.TENDER_BUILD_MONTHS).append(" ayda kurmazsanız yanar).\n");
+        if (t.status == Tender.Status.OPEN) sb.append("Kalan süre: ").append(st.tenders.daysLeft(t)).append(" gün · en düşük teklif kazanır · bugünkü piyasa fiyatı $")
+            .append(Fmt.f1(st.statPrice)).append("/MWh\n");
+        else if (t.winner != null) sb.append("Kazanan: ").append(t.winner.name).append(" · $").append(Fmt.f1(t.price)).append("/MWh\n");
+        sb.append(b == null ? "Henüz teklif vermediniz." : "Teklifiniz: $" + Fmt.f1(b.price) + "/MWh");
+        tenderInfo.setText(sb.toString());
+        tenderPriceLbl.setText("$" + Fmt.f1(tenderPrice));
+    }
+
+    /** Tiklanabilir bildirim (ör. ihale): tiklaninca eylem. */
+    public void toast(String msg, String action) {
+        toast(msg);
+        if (action == null) return;
+        Actor last = toasts.getChildren().peek();
+        last.setTouchable(Touchable.enabled);
+        last.addListener(new ClickListener() { @Override public void clicked(InputEvent e, float x, float y) { cb.action(action); } });
+        if (last instanceof Table t && t.getChildren().size > 0 && t.getChildren().first() instanceof Label lb) lb.setText(msg + "  ›");
+    }
 
     private InvestMenu.Group plantGroup(String title, PlantType... types) {
         InvestMenu.Group g = new InvestMenu.Group(title);
@@ -420,6 +552,12 @@ public final class Hud {
     private float investY() { return dock.getY() + dock.getHeight() + 6; }
 
     private void layoutOverlays() {
+        invest.setMaxBodyHeight(stage.getHeight() * 0.70f - 120);
+        // secim paneli: uzun metin/eylem listesi ekranin %70'ini asarsa kaydirilir
+        right.pack();
+        float selMax = Math.max(160, stage.getHeight() * 0.70f - 120);
+        float want = Math.min(right.getPrefHeight(), selMax);
+        if (Math.abs(selCell.getMaxHeight() - want) > 0.5f) { selCell.height(want); selScroll.invalidateHierarchy(); }
         dock.setPosition(8, 8);
         layerPop.setPosition(dock.getX() + layerBtn.getX(), dock.getY() + dock.getHeight() + 6);
         if (invest.root.isVisible() && invest.root.getActions().isEmpty()) {
@@ -429,6 +567,34 @@ public final class Hud {
     }
 
     private Label l(String t, String style) { return new Label(t, skin, style); }
+
+    /** Pencere icerigini kaydirilabilir yapar; toggle() penceresini ekranin %70'i ile sinirlar. */
+    private final java.util.Map<Window, ScrollPane> scrolls = new java.util.HashMap<>();
+
+    private ScrollPane scrolled(Window w, Actor content) {
+        ScrollPane sp = new ScrollPane(content, skin);
+        sp.setFadeScrollBars(false);
+        sp.setOverscroll(false, false);
+        sp.setScrollingDisabled(true, false);
+        scrolls.put(w, sp);
+        return sp;
+    }
+
+    /** Pencere yuksekligi en fazla ekranin %70'i: asarsa icerik kaydirilir. */
+    private void limitHeight(Window w) {
+        ScrollPane sp = scrolls.get(w);
+        if (sp == null) return;
+        Cell<?> c = w.getCell(sp);
+        if (c == null) return;
+        c.height(Value.prefHeight).width(Value.prefWidth);
+        w.pack();
+        float max = stage.getHeight() * 0.70f;
+        if (w.getHeight() > max) {
+            float over = w.getHeight() - max;
+            c.height(sp.getPrefHeight() - over).width(sp.getPrefWidth() + 14);
+            w.pack();
+        }
+    }
 
     private Window window(String title) {
         Window win = new Window(title, skin);
@@ -447,19 +613,31 @@ public final class Hud {
         if (finance.isVisible()) financeView.update(s);
         if (market.isVisible()) marketView.update(s);
         if (companies.isVisible()) companiesView.update(s);
-        if (opWin.isVisible()) updateOperatorWindow(s);
+        if (assetsWin.isVisible() && System.currentTimeMillis() >= assetsRefreshAt) {
+            assetsRefreshAt = System.currentTimeMillis() + 400;
+            assets.setMaxHeight(stage.getHeight() * 0.70f - 170);
+            float h0 = assetsWin.getHeight(), w0 = assetsWin.getWidth();
+            assets.update(s);
+            assetsWin.pack();
+            // ust kenar sabit kalsin; pencere ekrandan tasmasin
+            assetsWin.setPosition(Math.max(0, Math.min(assetsWin.getX(), stage.getWidth() - assetsWin.getWidth())),
+                Math.max(0, assetsWin.getY() + h0 - assetsWin.getHeight()));
+            if (w0 == 0) center(assetsWin);
+        }
+        if (tenderWin != null && tenderWin.isVisible() && (s.hour % 24 == 0)) refreshTender();
     }
 
     public void toggle(String name) {
         if (name.equals("settings")) { showSettings(); return; }
-        Window w = switch (name) { case "finance" -> finance; case "market" -> market; case "companies" -> companies; case "help" -> help; case "operator" -> opWin; default -> menu; };
-        if (w == opWin) opKey = "";
+        Window w = switch (name) { case "finance" -> finance; case "market" -> market; case "companies" -> companies; case "help" -> help; case "operator", "assets" -> assetsWin; default -> menu; };
+        if (name.equals("operator")) { assets.setTab(AssetsView.Tab.OPERATOR); if (assetsWin.isVisible()) return; }
+        if (w == assetsWin) assetsRefreshAt = 0;
         boolean show = !w.isVisible();
         w.setVisible(show);
         if (show) {
             // Once icerik doldurulur, sonra boyutlandirilir: bos metinle paketlenip sonradan tasmasin.
             refreshWindows(st);
-            w.toFront(); w.pack(); center(w);
+            w.toFront(); w.pack(); limitHeight(w); center(w);
         }
     }
 
@@ -473,58 +651,21 @@ public final class Hud {
     public void hideLineChoice() { lineChoice.setVisible(false); }
     public boolean lineChoiceOpen() { return lineChoice.isVisible(); }
 
-    private void updateOperatorWindow(GameState s) {
-        GridOperator op = s.operator;
-        StringBuilder key = new StringBuilder();
-        List<PowerLine> mine = new ArrayList<>(), plans = new ArrayList<>();
-        for (PowerLine l : s.lines) {
-            if (l.requester == s.player) mine.add(l);
-            else if (l.operatorPlan && l.status != LineStatus.ACTIVE) plans.add(l);
-        }
-        for (PowerLine l : mine) { int[] e = op.eta(l); key.append(l.id).append(l.status).append(e[0]).append(l.accelerated).append(s.player.cash >= op.accelerateCost(l)).append(';'); }
-        for (PowerLine l : plans) key.append(l.id).append(op.eta(l)[0]).append(';');
-        if (key.toString().equals(opKey)) return;
-        opKey = key.toString();
-        opBody.clear();
-        opBody.defaults().left();
-        opBody.add(l("Başvurular planlama (" + GridBalance.OP_PLANNING_MONTHS + " ay) → inşaat kuyruğu (aynı anda " + op.slots()
-            + " hat) → inşaat → aktif. Her ay %" + Math.round(GridBalance.OP_SLIP_CHANCE * 100) + " olasılıkla 1 ay kayabilir.", "dim")).width(610).row();
-        ((Label) opBody.getCells().peek().getActor()).setWrap(true);
-        opBody.add(UiKit.section(skin, "BAŞVURULARIM")).padTop(8).padBottom(4).row();
-        if (mine.isEmpty()) opBody.add(l("Henüz başvurunuz yok. Hat Çek aracında ikinci uca tıklayınca 'UŞİ'ye başvur' seçeneği çıkar.", "small")).row();
-        for (PowerLine l : mine) {
-            Table row = new Table(skin); row.setBackground("card"); row.pad(6, 10, 6, 10);
-            int[] e = op.eta(l);
-            String st = l.status == LineStatus.ACTIVE ? "Aktif" : l.status.label + " · tahmini " + e[0] + "–" + e[1] + " ay";
-            if (l.status == LineStatus.BUILDING) st = "İnşaatta · " + Math.max(1, l.buildHoursLeft / 24) + " gün";
-            Label info = l(GridOperator.label(l) + (l.accelerated ? "  (hızlandırıldı)" : "") + "\n" + st + " · yıllık bedel " + Fmt.money(l.annualCharge), "small");
-            row.add(info).width(370).left();
-            boolean pending = l.status == LineStatus.PLANNED || l.status == LineStatus.QUEUED;
-            TextButton acc = btn("Hızlandır " + Fmt.money(op.accelerateCost(l)), "opacc:" + l.id, "small");
-            acc.setDisabled(!pending || l.accelerated || s.player.cash < op.accelerateCost(l));
-            TextButton can = btn(l.status == LineStatus.PLANNED ? "İptal (+" + Fmt.money(l.contribution * GridBalance.OP_CANCEL_REFUND) + ")" : "İptal", "opcancel:" + l.id, "small");
-            can.setDisabled(!pending);
-            row.add(acc).width(120).height(30).padLeft(6);
-            row.add(can).width(100).height(30).padLeft(4);
-            opBody.add(row).width(610).padBottom(3).row();
-        }
-        opBody.add(UiKit.section(skin, "UŞİ PLANLARI")).padTop(10).padBottom(4).row();
-        if (plans.isEmpty()) opBody.add(l("Açıklanmış plan yok (her ocakta değerlendirilir).", "small")).row();
-        for (PowerLine l : plans) {
-            int[] e = op.eta(l);
-            opBody.add(l(GridOperator.label(l) + " · tahmini " + e[0] + "–" + e[1] + " ay · ücretsiz", "small")).row();
-        }
-        opWin.pack();
+    /** Varliklarim penceresini belirli sekmede acar. */
+    public void openAssets(AssetsView.Tab tab) {
+        assets.setTab(tab);
+        assetsRefreshAt = 0;
+        if (!assetsWin.isVisible()) toggle("assets");
     }
 
     public boolean anyWindowOpen() {
         return finance.isVisible() || market.isVisible() || companies.isVisible() || help.isVisible() || menu.isVisible() || equipWin.isVisible()
-            || lineChoice.isVisible() || opWin.isVisible()
+            || lineChoice.isVisible() || assetsWin.isVisible()
             || (settingsWin != null && settingsWin.isVisible());
     }
     public void closeWindows() {
         finance.setVisible(false); market.setVisible(false); companies.setVisible(false); help.setVisible(false);
-        menu.setVisible(false); equipWin.setVisible(false); lineChoice.setVisible(false); opWin.setVisible(false);
+        menu.setVisible(false); equipWin.setVisible(false); lineChoice.setVisible(false); assetsWin.setVisible(false);
         if (settingsWin != null) settingsWin.setVisible(false);
     }
     public void hideHelp() { help.setVisible(false); }
@@ -557,7 +698,11 @@ public final class Hud {
         Label lb = new Label(msg, skin, "default");
         Table t = new Table(skin);
         t.setBackground("row");
-        t.add(lb).pad(4, 16, 4, 16);
+        t.setTouchable(Touchable.disabled);
+        // ekrandan genis metin kirpilmaz, satir kayar
+        float maxW = Math.max(300, stage.getWidth() - 120);
+        if (lb.getPrefWidth() > maxW) { lb.setWrap(true); t.add(lb).width(maxW).pad(4, 16, 4, 16); }
+        else t.add(lb).pad(4, 16, 4, 16);
         t.getColor().a = 0;
         t.addAction(Actions.sequence(Actions.fadeIn(0.2f), Actions.delay(5f), Actions.fadeOut(0.6f), Actions.removeActor()));
         toasts.add(t).padTop(3).row();
@@ -601,12 +746,22 @@ public final class Hud {
     @SuppressWarnings("unchecked")
     public void resize(int w, int h) {
         stage.getViewport().update(w, h, true);
-        // Dar pencerede ust cubuk tasmasin: once sirket adi, sonra borc cipi gizlenir.
-        company.setVisible(w >= 1280);
-        companyCell.setActor(w >= 1280 ? company : null);
-        debtCell.setActor(w >= 1130 ? debtChip : null);
+        fitTopBar();
         for (Actor a : stage.getRoot().getChildren()) if (a instanceof Table t) t.invalidateHierarchy();
     }
+
+    /** Ust cubuk ekrana sigmazsa once sirket adi, sonra borc cipi gizlenir (olculen genislige gore; kirpma yok). */
+    @SuppressWarnings("unchecked")
+    private void fitTopBar() {
+        float w = stage.getWidth();
+        companyCell.setActor(company); debtCell.setActor(debtChip); company.setVisible(true);
+        top.invalidate();
+        if (top.getPrefWidth() > w) { companyCell.setActor(null); company.setVisible(false); top.invalidate(); }
+        if (top.getPrefWidth() > w) { debtCell.setActor(null); top.invalidate(); }
+    }
+
+    private String lastCompanyText = "";
+    private int fitCounter;
 
     private <T extends Actor> T tip(T actor, String text) {
         TextTooltip t = new TextTooltip(text, skin);
@@ -624,7 +779,9 @@ public final class Hud {
         this.st = s;
         curTool = tool; curEq = eq; curTier = tier;
         Company p = s.player;
-        company.setText(p.name.length() > 18 ? p.name.substring(0, 18) : p.name);
+        company.setText(p.name); // kirpilmaz; sigmazsa fitTopBar() tamamen gizler
+        // metinler (nakit, tarih...) uzayip kisaldikca cubuk genisligi degisir: periyodik olarak yeniden sigdir
+        if (!p.name.equals(lastCompanyText) || (fitCounter++ % 20) == 0) { lastCompanyText = p.name; fitTopBar(); }
         cash.setText(Fmt.money(p.cash));
         Label.LabelStyle cs = skin.get(p.cash < 0 ? "valueBad" : "value", Label.LabelStyle.class);
         if (cash.getStyle() != cs) cash.setStyle(cs);
@@ -643,6 +800,7 @@ public final class Hud {
         selectBtn.setChecked(tool == Tool.SELECT && !investOpen());
         demBtn.setChecked(tool == Tool.DEMOLISH);
         layerBtn.setChecked(layerPop.isVisible());
+        assetsBtn.setChecked(assetsWin.isVisible());
         for (Map.Entry<Layer, TextButton> e : layerBtns.entrySet()) e.getValue().setChecked(e.getKey() == layer);
         ((Label) layerTip.getActor()).setText("Harita katmanı (L) · Aktif: " + layer.label);
         if (investOpen()) invest.update();
@@ -650,6 +808,8 @@ public final class Hud {
         boolean ctx = tool != Tool.SELECT;
         ctxBar.setBackground(ctx ? skin.getDrawable("card") : null);
         ctxTitle.setText(contextText(tool, eq, tier));
+        wrapToScreen(ctxTitle, ctxTitleCell);
+        wrapToScreen(placeInfo, placeInfoCell);
         if (ctx != (ctxTitleCell.getActor() != null)) { ctxTitleCell.setActor(ctx ? ctxTitle : null); ctxBar.invalidateHierarchy(); }
 
         // senaryo paneli
@@ -670,6 +830,57 @@ public final class Hud {
             gameOverLbl.setText(s.gameOverReason + "\n\nSon piyasa değeri: " + Fmt.money(s.player.valuation) + "\nSüre: " + (s.year() - Balance.START_YEAR) + " yıl");
             gameOverWin.setVisible(true); center(gameOverWin); gameOverWin.toFront();
         }
+    }
+
+    /** xy: ekran koordinatlari (sol-alt), n adet. */
+    public void setBadges(float[] xy, int n) {
+        if (badgeStyle == null) {
+            badgeStyle = new Label.LabelStyle(skin.get("small", Label.LabelStyle.class));
+            badgeStyle.fontColor = Color.WHITE;
+            badgeStyle.background = skin.newDrawable("white", new Color((GridBalance.NEUTRAL_OUTLINE << 8) | 0xFF));
+        }
+        while (badges.getChildren().size < n) {
+            Label l = new Label("K", badgeStyle);
+            l.setAlignment(Align.center);
+            l.setSize(17, 17);
+            badges.addActor(l);
+        }
+        for (int i = 0; i < badges.getChildren().size; i++) {
+            Actor a = badges.getChildren().get(i);
+            a.setVisible(i < n);
+            if (i < n) a.setPosition(xy[i * 2] - 8.5f, xy[i * 2 + 1] - 8.5f);
+        }
+    }
+
+    /** Dogrulama: gorunen etiketlerde kirpma/tasma taramasi. Bulunan her sorun icin bir satir. */
+    public List<String> devClipScan() {
+        stage.act(0);
+        List<String> out = new ArrayList<>();
+        scan(stage.getRoot(), out);
+        for (Actor a : stage.getActors()) if (a instanceof Window w && w.isVisible()) {
+            if (w.getX() < -1 || w.getY() < -1 || w.getX() + w.getWidth() > stage.getWidth() + 1 || w.getY() + w.getHeight() > stage.getHeight() + 1)
+                out.add("Pencere ekran dışına taşıyor: " + w.getTitleLabel().getText() + " (" + Math.round(w.getWidth()) + "×" + Math.round(w.getHeight()) + ")");
+        }
+        return out;
+    }
+
+    private void scan(Actor a, List<String> out) {
+        if (!a.isVisible() || a.getColor().a < 0.05f) return;
+        if (a instanceof Label l && l.getText().length() > 0) {
+            boolean inScroll = false;
+            for (Actor p = l.getParent(); p != null; p = p.getParent()) if (p instanceof ScrollPane) { inScroll = true; break; }
+            String t = l.getText().toString().replace('\n', ' ');
+            if (t.length() > 60) t = t.substring(0, 60) + "…";
+            if (!l.getWrap() && l.getPrefWidth() > l.getWidth() + 1.5f) out.add("Genişlik: \"" + t + "\" (" + Math.round(l.getPrefWidth()) + " > " + Math.round(l.getWidth()) + ")");
+            else if (l.getWrap() && l.getPrefHeight() > l.getHeight() + 1.5f && l.getHeight() > 0) out.add("Yükseklik: \"" + t + "\" (" + Math.round(l.getPrefHeight()) + " > " + Math.round(l.getHeight()) + ")");
+            if (!inScroll && l.getWidth() > 0) {
+                com.badlogic.gdx.math.Vector2 v = l.localToStageCoordinates(new com.badlogic.gdx.math.Vector2(0, 0));
+                if (v.x < -1 || v.x + Math.min(l.getWidth(), l.getPrefWidth()) > stage.getWidth() + 1)
+                    out.add("Ekran dışı: \"" + t + "\" (x " + Math.round(v.x) + ", genişlik " + Math.round(l.getWidth()) + ", ekran " + Math.round(stage.getWidth())
+                        + (l == company ? ", üst çubuk " + Math.round(top.getPrefWidth()) : "") + ")");
+            }
+        }
+        if (a instanceof com.badlogic.gdx.scenes.scene2d.Group g) for (Actor c : g.getChildren()) scan(c, out);
     }
 
     public void render(float dt) {

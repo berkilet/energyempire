@@ -21,13 +21,19 @@ import java.util.function.Supplier;
 public final class InvestMenu {
 
     public static final class Item {
-        final String icon, title;
-        final Supplier<String> sub;
+        final String icon;
+        final Supplier<String> title, sub;
         final BooleanSupplier visible, affordable, active;
         final Runnable onClick;
         ImageTextButton button;
 
         public Item(String icon, String title, Supplier<String> sub, BooleanSupplier visible, BooleanSupplier affordable,
+                    BooleanSupplier active, Runnable onClick) {
+            this(icon, () -> title, sub, visible, affordable, active, onClick);
+        }
+
+        /** Basligi degisebilen satir (ör. acik ihaleler). */
+        public Item(String icon, Supplier<String> title, Supplier<String> sub, BooleanSupplier visible, BooleanSupplier affordable,
                     BooleanSupplier active, Runnable onClick) {
             this.icon = icon; this.title = title; this.sub = sub; this.visible = visible; this.affordable = affordable;
             this.active = active; this.onClick = onClick;
@@ -74,7 +80,11 @@ public final class InvestMenu {
         pin.addListener(tt);
         head.add(pin).width(64).height(24).right();
         inner.add(head).width(BODY_W).padBottom(4).row();
-        inner.add(body).width(BODY_W).left().top();
+        scroll = new ScrollPane(body, skin);
+        scroll.setFadeScrollBars(false);
+        scroll.setOverscroll(false, false);
+        scroll.setScrollingDisabled(true, false);
+        bodyCell = inner.add(scroll).width(BODY_W + 14).left().top();
         root = skins.framedPanel(new Label("YATIRIM", skin, "title"), inner);
         root.setTouchable(Touchable.enabled);
     }
@@ -82,6 +92,17 @@ public final class InvestMenu {
     static final float BODY_W = 268;
 
     public boolean pinned() { return pin.isChecked(); }
+
+    private final ScrollPane scroll;
+    private final Cell<ScrollPane> bodyCell;
+    private float maxBodyHeight = 600;
+
+    /** Menu govdesinin en fazla yuksekligi (ekranin %70'i eksi ust/alt paylar); asarsa kaydirilir. */
+    public void setMaxBodyHeight(float h) {
+        if (Math.abs(h - maxBodyHeight) < 1) return;
+        maxBodyHeight = h;
+        layoutKey = "";
+    }
 
     public InvestMenu add(Category c) { categories.add(c); return this; }
 
@@ -102,7 +123,7 @@ public final class InvestMenu {
             if (!c.open) continue;
             for (Group g : c.groups) for (Item i : g.items) {
                 if (i.button == null) continue;
-                String txt = i.title + "\n" + i.sub.get();
+                String txt = i.title.get() + "\n" + i.sub.get();
                 if (!i.button.getText().toString().equals(txt)) i.button.setText(txt);
                 i.button.getLabel().setColor(i.affordable.getAsBoolean() ? Color.WHITE : new Color(1f, 0.55f, 0.5f, 1));
                 i.button.setChecked(i.active.getAsBoolean());
@@ -137,7 +158,7 @@ public final class InvestMenu {
                     if (!i.visible.getAsBoolean()) { i.button = null; continue; }
                     ImageTextButton.ImageTextButtonStyle st = new ImageTextButton.ImageTextButtonStyle(skin.get("small", TextButton.TextButtonStyle.class));
                     st.imageUp = skin.getDrawable(i.icon);
-                    ImageTextButton b = new ImageTextButton(i.title, st);
+                    ImageTextButton b = new ImageTextButton(i.title.get(), st);
                     b.getImageCell().size(28, 30).padLeft(4);
                     b.getLabel().setAlignment(Align.left);
                     b.getLabel().setWrap(true);
@@ -151,6 +172,8 @@ public final class InvestMenu {
                 }
             }
         }
+        body.pack();
+        bodyCell.height(Math.min(body.getPrefHeight(), Math.max(160, maxBodyHeight)));
         root.pack();
     }
 }

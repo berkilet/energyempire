@@ -59,3 +59,12 @@ tasks.register('simCheck', JavaExec) {
     workingDir = projectDir
     jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
 }
+
+tasks.register('balanceCheck', JavaExec) {
+    group = 'verification'
+    description = 'Denge ölçümü: 10 yıl (rakip TM/yükseltme, UŞİ oranları, kuyruk, ihaleler) ve senaryo payları (2040).'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.energytycoon.harness.BalanceCheck'
+    workingDir = projectDir
+    jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
+}

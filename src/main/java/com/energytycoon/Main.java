@@ -39,6 +39,9 @@ public final class Main {
         cfg.disableAudio(true);
         cfg.setTitle("Enerji İmparatorluğu");
         cfg.setWindowedMode(1360, 800);
+        // Dogrulama: ET_SIZE=GxY (yalnizca gelistirici kancasi; normal oyunda tanimsiz)
+        String size = System.getenv("ET_SIZE");
+        if (size != null && size.matches("\\d+x\\d+")) { String[] wh = size.split("x"); cfg.setWindowedMode(Integer.parseInt(wh[0]), Integer.parseInt(wh[1])); }
         cfg.setWindowSizeLimits(960, 600, -1, -1);
         cfg.useVsync(true);
         cfg.setForegroundFPS(120);

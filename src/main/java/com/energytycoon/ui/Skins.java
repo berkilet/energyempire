@@ -170,7 +170,7 @@ public final class Skins implements Disposable {
         skin.add("toggle", toggle);
 
         // ---- ikonlar
-        for (String n : new String[] { "solar", "wind", "hydro", "pylon", "battery", "bolt", "factory", "leaf", "coin", "city", "upgrade", "gear", "build", "cursor", "demolish", "layers" })
+        for (String n : new String[] { "solar", "wind", "hydro", "pylon", "battery", "bolt", "factory", "leaf", "coin", "city", "upgrade", "gear", "build", "cursor", "demolish", "layers", "assets" })
             skin.add("icon_" + n, new TextureRegionDrawable(new TextureRegion(tex("icon_" + n))), Drawable.class);
         skin.add("closeRound", new TextureRegionDrawable(new TextureRegion(tex("close_round"))), Drawable.class);
         skin.add("gearButton", new TextureRegionDrawable(new TextureRegion(tex("btn_icon_gear"))), Drawable.class);

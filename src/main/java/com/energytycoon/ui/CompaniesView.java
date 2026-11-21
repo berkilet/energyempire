@@ -18,8 +18,9 @@ public final class CompaniesView {
     private final Skin skin;
     private boolean built;
 
-    private static final String[] C_HEAD = { "Şirket", "Piyasa değeri", "Nakit", "Borç", "Santral", "Kurulu güç", "Üretim/ay", "Pay" };
-    private static final float[] C_W = { 170, 96, 84, 70, 60, 84, 84, 60 };
+    private static final String[] C_HEAD = { "Şirket", "Piyasa değeri", "Nakit", "Borç", "Santral", "Kurulu güç", "Üretim/ay", "Pay", "Kâr (geçen ay)", "" };
+    private static final float[] C_W = { 170, 96, 84, 70, 60, 84, 84, 60, 104, 100 };
+    private static final int PROFIT = 8, TAG = 9;
     private static final String[] T_HEAD = { "Şehir", "Nüfus", "Tepe talep", "Şu an", "Memnuniyet", "", "Hat" };
     private static final float[] T_W = { 140, 80, 90, 80, 130, 50, 50 };
 
@@ -61,11 +62,12 @@ public final class CompaniesView {
             Image dot = new Image(skin.newDrawable("white", new Color((c.colorRgb << 8) | 0xFF)));
             nameCell.add(dot).size(10, 10).padRight(6);
             cells[0] = new Label(c.name, skin, c.player ? "title" : "default");
-            nameCell.add(cells[0]).left().growX();
+            cells[0].setWrap(true); // uzun sirket adi kirpilmaz, satir kayar
+            nameCell.add(cells[0]).left().width(C_W[0] - 16);
             row.add(nameCell).width(C_W[0]).left();
             for (int i = 1; i < C_HEAD.length; i++) {
-                cells[i] = new Label("", skin, "value");
-                row.add(UiKit.col(new Table(), cells[i], C_W[i], Align.right).getTable()).width(C_W[i]);
+                cells[i] = new Label("", skin, i == TAG ? "warn" : "value");
+                row.add(UiKit.col(new Table(), cells[i], C_W[i], i == TAG ? Align.left : Align.right).getTable()).width(C_W[i]).padLeft(i == TAG ? 8 : 0);
             }
             ct.add(row).colspan(C_HEAD.length).padBottom(2).row();
             compRows.add(cells);
@@ -118,6 +120,10 @@ public final class CompaniesView {
             r[5].setText(Fmt.mw(cap));
             r[6].setText(c.lastMwhGenerated > 0 ? String.format(Locale.ROOT, "%.0f GWh", c.lastMwhGenerated / 1000) : "—");
             r[7].setText(totalGen > 0 ? "%" + Math.round(100 * c.lastMwhGenerated / totalGen) : "—");
+            boolean anyMonth = !c.netHistory.isEmpty();
+            if (anyMonth) UiKit.setMoney(skin, r[PROFIT], c.lastNet, true); else r[PROFIT].setText("—");
+            // Kamu: yalnizca zarardayken "Gorev zarari" etiketi
+            r[TAG].setText(c.neutral && anyMonth && c.lastNet < 0 ? "Görev zararı" : "");
         }
         for (int k = 0; k < s.cities.size() && k < cityRows.size(); k++) {
             City c = s.cities.get(k);

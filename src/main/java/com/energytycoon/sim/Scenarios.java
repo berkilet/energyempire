@@ -27,14 +27,15 @@ public final class Scenarios {
             "Süre sınırı yok. Şirketinizi dilediğiniz gibi büyütün. Hedef: $4 milyar piyasa değeri.",
             null, 0, List.of(valuation(4e9)), s -> {}));
         reg(new Scenario("green", "Yeşil Dönüşüm",
-            "Karbon vergisi iki kat hızlı artıyor. 2035 sonuna kadar üretiminizin %60'ı yenilenebilir olsun, "
+            "Karbon vergisi iki kat hızlı artıyor. " + Balance.SHARE_SCENARIO_DEADLINE + " sonuna kadar üretiminizin %60'ı yenilenebilir olsun, "
           + "pazarın en az %25'ini tutun ve bölgenin talebinin %95'i karşılansın.",
-            null, 2035, List.of(renewShare(0.60), marketShare(0.25), served(0.95)),
+            null, Balance.SHARE_SCENARIO_DEADLINE, List.of(renewShare(0.60), marketShare(0.25), served(0.95)),
             s -> s.markets.carbonGrowthMult = 2.0));
         reg(new Scenario("coal", "Kömürden Çıkış",
-            "Eski ve kirli bir kömür filosu devraldınız. 2032 sonuna kadar tüm kömür santrallerinizi kapatın, "
-          + "ama pazarın %30'unu ve %95 arz güvenliğini koruyun.",
-            null, 2032, List.of(noCoal(), marketShare(0.30), served(0.95)), Scenarios::setupCoal));
+            "Eski ve kirli bir kömür filosu devraldınız. " + Balance.SHARE_SCENARIO_DEADLINE + " sonuna kadar tüm kömür santrallerinizi kapatın, "
+          + "ama pazarın %30'unu ve %95 arz güvenliğini koruyun. Kamunun eski kömür santralleri en geç "
+          + GridBalance.LEGACY_COAL_EXIT_RETIRE_TO + "'de kapanıyor.",
+            null, Balance.SHARE_SCENARIO_DEADLINE, List.of(noCoal(), marketShare(0.30), served(0.95)), Scenarios::setupCoal));
         reg(new Scenario("crisis", "Enerji Krizi",
             "Doğalgaz fiyatı kalıcı olarak ikiye katlandı, kömür de pahalı. 2030 sonuna kadar iflas etmeden "
           + "$3 milyar değere ulaşın. Elinizdeki eski açık çevrim gaz santralleri krizde zarar ediyor.",
@@ -52,6 +53,7 @@ public final class Scenarios {
         // Kendi eski filosunu oyuncuya veren senaryolarda kamu filosu daha kucuk (oyuncu filosu da sayilir).
         ALL.get("coal").legacyCoverage = GridBalance.LEGACY_COVERAGE_SCENARIO;
         ALL.get("crisis").legacyCoverage = GridBalance.LEGACY_COVERAGE_SCENARIO;
+        ALL.get("coal").legacyCoalRetireTo = GridBalance.LEGACY_COAL_EXIT_RETIRE_TO;
     }
 
     public static Scenario get(String id) { return ALL.getOrDefault(id, ALL.get("free")); }

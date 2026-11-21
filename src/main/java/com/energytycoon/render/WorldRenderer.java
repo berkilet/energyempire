@@ -145,6 +145,14 @@ public final class WorldRenderer implements Disposable {
     }
 
     // -------------------------------------------------------------- yardimci
+    /** Dunya noktasini ekran koordinatina (sol-alt orijin) cevirir; kamera onunde ve ekranda ise true. */
+    public boolean project(float x, float y, float z, Vector3 out) {
+        out.set(x, y, z);
+        iso.cam.project(out);
+        // Camera.project mantiksal pencere pikseli dondurur (sol-alt orijin)
+        return out.z > 0 && out.z < 1 && out.x > -20 && out.y > -20 && out.x < Gdx.graphics.getWidth() + 20 && out.y < Gdx.graphics.getHeight() + 20;
+    }
+
     public float topAt(float wx, float wz) {
         int x = MathUtils.clamp((int) Math.floor(wx), 0, state.map.size - 1);
         int z = MathUtils.clamp((int) Math.floor(wz), 0, state.map.size - 1);
@@ -172,6 +180,76 @@ public final class WorldRenderer implements Disposable {
             if (py <= state.map.top[state.map.idx(x, z)]) return new int[] { x, z };
         }
         return null;
+    }
+
+    /**
+     * Ekran uzayinda hat secimi: imlec, hattin ekrandaki cizgisine maxPx pikselden yakinsa secilir (yakinlastirmadan bagimsiz).
+     * sx, sy: girdi koordinatlari (sol-ust orijin). Hat; uclar ve direk tepeleri boyunca cizgi parcalariyla yaklasiklanir,
+     * planlanan/kuyruktaki hatlar zemindeki kesikli cizgiyle.
+     */
+    public PowerLine pickLineScreen(int sx, int sy, float maxPx) {
+        // Camera.project mantiksal pencere pikseli verir; girdi de mantiksal (sol-ust orijin)
+        float px = sx, py = Gdx.graphics.getHeight() - sy;
+        double best = maxPx;
+        PowerLine bestL = null;
+        Vector3 a = new Vector3(), b = new Vector3(), p0 = new Vector3(), p1 = new Vector3();
+        for (PowerLine l : state.lines) {
+            boolean ground = l.status == LineStatus.PLANNED || l.status == LineStatus.QUEUED;
+            if (ground) {
+                a.set(l.a.x + 0.5f, topAt(l.a.x + 0.5f, l.a.y + 0.5f) + 0.03f, l.a.y + 0.5f);
+                b.set(l.b.x + 0.5f, topAt(l.b.x + 0.5f, l.b.y + 0.5f) + 0.03f, l.b.y + 0.5f);
+            } else { attach(l.a, a); attach(l.b, b); }
+            float len = (float) Math.hypot(b.x - a.x, b.z - a.z);
+            int n = ground ? 1 : Math.max(1, (int) Math.floor(len / 1.6f));
+            for (int i = 0; i < n; i++) {
+                float t0 = i / (float) n, t1 = (i + 1) / (float) n;
+                point(a, b, t0, i == 0, ground, p0);
+                point(a, b, t1, i + 1 == n, ground, p1);
+                iso.cam.project(p0); iso.cam.project(p1);
+                if (p0.z <= 0 || p0.z >= 1 || p1.z <= 0 || p1.z >= 1) continue;
+                double d = segDist(px, py, p0.x, p0.y, p1.x, p1.y);
+                if (d < best) { best = d; bestL = l; }
+            }
+        }
+        return bestL;
+    }
+
+    /** Dogrulama: her hattin ilk parcasinin ortasindan dik yonde 6 ve 12 px uzakta secim denemesi. */
+    public String devLinePickTest() {
+        int ok6 = 0, miss12 = 0, n = 0, none6 = 0;
+        Vector3 a = new Vector3(), b = new Vector3(), p0 = new Vector3(), p1 = new Vector3();
+        for (PowerLine l : state.lines) {
+            boolean ground = l.status == LineStatus.PLANNED || l.status == LineStatus.QUEUED;
+            if (ground) { a.set(l.a.x + 0.5f, topAt(l.a.x + 0.5f, l.a.y + 0.5f) + 0.03f, l.a.y + 0.5f); b.set(l.b.x + 0.5f, topAt(l.b.x + 0.5f, l.b.y + 0.5f) + 0.03f, l.b.y + 0.5f); }
+            else { attach(l.a, a); attach(l.b, b); }
+            float len = (float) Math.hypot(b.x - a.x, b.z - a.z);
+            int segs = ground ? 1 : Math.max(1, (int) Math.floor(len / 1.6f));
+            point(a, b, 0, true, ground, p0); point(a, b, 1f / segs, segs == 1, ground, p1);
+            iso.cam.project(p0); iso.cam.project(p1);
+            float mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2;
+            float dx = p1.x - p0.x, dy = p1.y - p0.y, dl = (float) Math.hypot(dx, dy);
+            if (dl < 20 || mx < 20 || my < 20 || mx > Gdx.graphics.getWidth() - 20 || my > Gdx.graphics.getHeight() - 20) continue;
+            float nx = -dy / dl, ny = dx / dl;
+            n++;
+            PowerLine h6 = pickLineScreen(Math.round(mx + nx * 6), Math.round(Gdx.graphics.getHeight() - (my + ny * 6)), 8);
+            if (h6 != null && (h6 == l || (h6.a == l.a && h6.b == l.b) || (h6.a == l.b && h6.b == l.a))) ok6++;
+            else if (h6 == null) none6++;
+            PowerLine h12 = pickLineScreen(Math.round(mx + nx * 12), Math.round(Gdx.graphics.getHeight() - (my + ny * 12)), 8);
+            if (h12 != l) miss12++;
+        }
+        return "LINEPICK 6px isabet " + ok6 + "/" + n + " (hiç seçilmeyen " + none6 + ", kalanında daha yakın başka hat) · 12px'te bu hat seçilmedi " + miss12 + "/" + n;
+    }
+
+    private void point(Vector3 a, Vector3 b, float t, boolean end, boolean ground, Vector3 out) {
+        float x = MathUtils.lerp(a.x, b.x, t), z = MathUtils.lerp(a.z, b.z, t);
+        if (ground || end || t == 0) out.set(x, MathUtils.lerp(a.y, b.y, t), z);
+        else out.set(x, topAt(x, z) + ModelFactory.PYLON_H, z); // ara direk tepesi
+    }
+
+    private static double segDist(float px, float py, float ax, float ay, float bx, float by) {
+        double dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+        double t = len2 == 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+        return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
     }
 
     public PowerLine pickLine(float wx, float wz) {

@@ -14,6 +14,8 @@ public final class Scenario {
     final Consumer<GameState> setup;
     /** Kamu eski filosunun kapsama orani (sehrin gercek tepe talebine gore). */
     public double legacyCoverage = GridBalance.LEGACY_COVERAGE;
+    /** > 0 ise kamu komur santralleri en gec bu yil kapanir (LEGACY_RETIRE_FROM..bu yil); gaz normal takvimde. */
+    public int legacyCoalRetireTo;
 
     Scenario(String id, String title, String desc, MapPreset forced, int deadline, List<Objective> obj, Consumer<GameState> setup) {
         this.id = id; this.title = title; this.desc = desc; this.forcedPreset = forced; this.deadlineYear = deadline;

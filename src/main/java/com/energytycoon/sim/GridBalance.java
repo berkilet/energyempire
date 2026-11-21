@@ -24,7 +24,9 @@ public final class GridBalance {
     /** Eski santrallerin sehre uzakligi (kare). */
     public static final double LEGACY_MIN_DIST = 3, LEGACY_MAX_DIST = 9;
     public static final String NEUTRAL_NAME = "Kamu Üretim";
-    public static final int NEUTRAL_COLOR = 0x95a5a6;
+    public static final int NEUTRAL_COLOR = 0xa9b8e8; // soluk mavi-gri; arazi/su ve rakip renklerinden ayrik (koyu lacivert kenarla)
+    /** Kamu rozeti ve onizleme isaretinin koyu kenar rengi. */
+    public static final int NEUTRAL_OUTLINE = 0x1f2d4d;
 
     // ---- Faz 1: Rakip kurallari
     /** Rakip insaat kararinda santral + hat maliyetinin ustune tutulan nakit rezervi. */
@@ -86,7 +88,8 @@ public final class GridBalance {
     public static final double OP_ANNUAL_CHARGE = 0.06;
     public static final int OP_PLANNING_MONTHS = 6;
     /** Ayni anda insaat slotu: OP_BASE_SLOTS + sehir sayisi / OP_CITIES_PER_SLOT. */
-    public static final int OP_BASE_SLOTS = 2, OP_CITIES_PER_SLOT = 4;
+    // Denge olcumu (10 yil, oyuncu botu): baglantilarin %94-95i kendi hattindan, kuyrukta bekleme 0 ay -> formul 2 + sehir/4 iken 1 + sehir/6 yapildi.
+    public static final int OP_BASE_SLOTS = 1, OP_CITIES_PER_SLOT = 6;
     /** UŞİ insaati, kendi insaat suresinin bu kati. */
     public static final double OP_BUILD_MULT = 1.5;
     /** Planlama/kuyrukta aylik kayma olasiligi (+1 ay). */
@@ -117,4 +120,21 @@ public final class GridBalance {
     /** Hat arizasi: saatlik olasilik = kademe.outagePerTileHour x uzunluk; sure (saat); onarim hat maliyetinin orani (UŞİ ucretsiz). */
     public static final int LINE_OUTAGE_MIN_H = 12, LINE_OUTAGE_MAX_H = 48;
     public static final double LINE_REPAIR_COST = 0.005;
+
+    /** Komurden Cikis senaryosunda kamu komur santrallerinin en gec kapanis yili (kapanislar LEGACY_RETIRE_FROM..bu yila yayilir). */
+    public static final int LEGACY_COAL_EXIT_RETIRE_TO = 2032;
+
+    // ---- Rakip YZ: trafo merkezi ve hat yukseltme
+    /** TM degerlendirmesi: yaricapta en az bu kadar kendi santrali (insaattakiler dahil) veya bu kadar ay dolu baglanti noktasi. */
+    public static final int RIVAL_TM_MIN_PLANTS = 3, RIVAL_TM_FULL_MONTHS = 2;
+    /** Baglanti noktasi bir ayda bu oranin ustunde saat dolu (%99+) ise "dolu ay" sayilir. */
+    public static final double CP_FULL_MONTH_SHARE = 0.5;
+    /** Kume bu kurulu gucu gecerse TM380'e yukseltme degerlendirilir. */
+    public static final double RIVAL_TM380_MW = 600;
+    /** Rakibin kendi bolgesindeki buyukluk karsilastirma yaricapi (erisim politikasi). */
+    public static final double RIVAL_TM_REGION = 15;
+    /** Talebin yillik en dusuk oldugu ay (0 = Ocak; mevsim egrisi Temmuz'da en dusuk). */
+    public static final int LOW_DEMAND_MONTH = 6;
+    /** Ikinci yol yokken rakibin kabul ettigi en uzun yukseltme kesintisi (gun); uzunsa paralel hat. */
+    public static final int RIVAL_MAX_OFFLINE_DAYS = 60;
 }

@@ -244,4 +244,27 @@ class OperatorTest {
         assertEquals(l.buildHoursLeft, l2.buildHoursLeft);
         assertTrue(g.settings.operatorGrowth);
     }
+
+    /** Başvuru sayısı arttıkça kuyrukta bekleme uzar (yuva formülü darboğazı). */
+    @Test
+    void queueWaitGrowsWithApplications() {
+        GameState s = grid(0, false);
+        int slots = s.operator.slots();
+        List<PowerLine> apps = new ArrayList<>();
+        int k = 0;
+        for (City c : s.cities) for (int j = 0; j < 3 && apps.size() < slots * 4; j++) {
+            Plant p = plantNear(s, c, 5 + j * 3 + k++ % 2);
+            PowerLine l = s.operator.apply(s.player, p, c, LineTier.YG);
+            if (l != null) apps.add(l);
+        }
+        for (PowerLine l : apps) l.buildHoursLeft = 1;
+        int guard = 0;
+        while (apps.stream().anyMatch(l -> l.status != LineStatus.ACTIVE) && guard++ < 10 * Balance.HOURS_PER_YEAR) { s.tick(); s.messages.clear(); }
+        List<double[]> q = s.operator.statQueue;
+        System.out.printf("kuyruk: %d yuva, %d başvuru; sıraya göre bekleme (ay): %s%n", slots, q.size(),
+            q.stream().map(x -> String.format(java.util.Locale.ROOT, "%.1f", x[0])).toList());
+        assertEquals(apps.size(), q.size());
+        assertEquals(0, q.get(0)[0], 0.01, "ilk başvuru beklemez");
+        assertTrue(q.get(q.size() - 1)[0] > q.get(slots - 1)[0] + 1, "son başvuru belirgin uzun bekler");
+    }
 }

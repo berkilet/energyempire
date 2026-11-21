@@ -119,7 +119,9 @@ public final class FinanceView {
     }
 
     private void row(Table t, String caption, Label value) {
-        t.add(new Label(caption, skin, "small")).width(150);
+        Label c = new Label(caption, skin, "small");
+        c.setWrap(true);
+        t.add(c).width(150);
         t.add(value).width(80).right().row();
     }
 
