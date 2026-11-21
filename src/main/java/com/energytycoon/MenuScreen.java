@@ -113,6 +113,27 @@ public final class MenuScreen implements Screen {
         root.add(col).expand().left().padLeft(Math.max(40, Gdx.graphics.getWidth() * 0.07f));
     }
 
+    /**
+     * Dogrulama: kurulum ekraninda metni bu onekle baslayan dugmelere sirayla tiklar (gercek tiklama gibi isaretler ve
+     * ChangeEvent tetikler). Ornek: "Ada Şebekesi" senaryosu, ardindan "Oyunu Başlat".
+     */
+    public void devClick(String prefix) {
+        java.util.List<com.badlogic.gdx.scenes.scene2d.ui.TextButton> found = new java.util.ArrayList<>();
+        collect(stage.getRoot(), prefix, found);
+        for (com.badlogic.gdx.scenes.scene2d.ui.TextButton b : found) {
+            b.toggle();
+        }
+        if (found.isEmpty()) System.out.println("devClick: dugme yok: " + prefix);
+    }
+
+    private static void collect(com.badlogic.gdx.scenes.scene2d.Actor a, String prefix, java.util.List<com.badlogic.gdx.scenes.scene2d.ui.TextButton> out) {
+        if (a instanceof com.badlogic.gdx.scenes.scene2d.ui.TextButton b && b.getText().toString().startsWith(prefix)) out.add(b);
+        if (a instanceof com.badlogic.gdx.scenes.scene2d.Group g) {
+            com.badlogic.gdx.scenes.scene2d.Actor[] ch = g.getChildren().toArray(com.badlogic.gdx.scenes.scene2d.Actor.class);
+            for (com.badlogic.gdx.scenes.scene2d.Actor c : ch) collect(c, prefix, out);
+        }
+    }
+
     public void showSetup() {
         root.clear();
         scenDesc = presetDesc = cityLbl = rivalLbl = null;
@@ -258,7 +279,10 @@ public final class MenuScreen implements Screen {
         Scenario sc = settings.scenario();
         scenDesc.setText(sc.desc);
         MapPreset eff = sc.forcedPreset != null ? sc.forcedPreset : settings.preset;
-        for (TextButton b : presetGroup.getButtons()) {
+        // kopya uzerinde indeksle: setChecked dugme grubunu da dolasir (ic ice yineleyici hatasi)
+        com.badlogic.gdx.utils.Array<TextButton> presets = new com.badlogic.gdx.utils.Array<>(presetGroup.getButtons());
+        for (int pi = 0; pi < presets.size; pi++) {
+            TextButton b = presets.get(pi);
             boolean forced = sc.forcedPreset != null;
             b.setDisabled(forced && !b.getName().equals(sc.forcedPreset.name()));
             if (forced) b.setChecked(b.getName().equals(sc.forcedPreset.name()));

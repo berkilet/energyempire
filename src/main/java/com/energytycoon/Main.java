@@ -22,7 +22,7 @@ public final class Main {
                 launch(4);
             } catch (Throwable first) {
                 // Bazi ekran kartlari 4x kenar yumusatmali pencere acamaz: bir kez yumusatmasiz dene.
-                String m = String.valueOf(first.getMessage()).toLowerCase();
+                String m = String.valueOf(first.getMessage()).toLowerCase(java.util.Locale.ROOT);
                 if (m.contains("window") || m.contains("opengl") || m.contains("pixel format")) launch(0);
                 else throw first;
             }
@@ -75,7 +75,7 @@ public final class Main {
 
     /** macOS GLFW ana thread'de olmali: gerekirse -XstartOnFirstThread ile yeniden baslat. */
     private static boolean restartOnMacFirstThread() throws Exception {
-        if (!System.getProperty("os.name", "").toLowerCase().contains("mac")) return false;
+        if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac")) return false;
         String pid = ManagementFactory.getRuntimeMXBean().getName().split("@")[0];
         if ("1".equals(System.getenv("JAVA_STARTED_ON_FIRST_THREAD_" + pid))) return false;
         String jar = new File(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getPath();

@@ -182,7 +182,7 @@ public final class Hud {
         layerPop.pad(6);
         layerPop.add(l("HARİTA KATMANI (L)", "dim")).left().padBottom(4).row();
         for (Layer ly : Layer.values()) {
-            com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = UiKit.iconButton(skin, ly.label, "layer_" + ly.name().toLowerCase(), "small", 22, 23);
+            com.badlogic.gdx.scenes.scene2d.ui.ImageTextButton b = UiKit.iconButton(skin, ly.label, "layer_" + ly.name().toLowerCase(java.util.Locale.ROOT), "small", 22, 23);
             b.getLabel().setAlignment(Align.left);
             b.getLabelCell().padLeft(4).left().expandX();
             b.setProgrammaticChangeEvents(false);
@@ -390,6 +390,7 @@ public final class Hud {
             w.setVisible(false);
         }
         help.setVisible(true);
+        limitHeight(help); // acilista da ekranin %70'i; uzun metin kaydirilir
         center(help);
     }
 
@@ -948,6 +949,8 @@ public final class Hud {
         stage.getViewport().update(w, h, true);
         fitTopBar();
         for (Actor a : stage.getRoot().getChildren()) if (a instanceof Table t) t.invalidateHierarchy();
+        // acik pencereler yeni ekran yuksekliginin %70'ine sigdirilir
+        for (Window win : scrolls.keySet()) if (win.isVisible()) { limitHeight(win); win.setPosition(Math.max(0, Math.min(win.getX(), stage.getWidth() - win.getWidth())), Math.max(0, Math.min(win.getY(), stage.getHeight() - win.getHeight()))); }
     }
 
     /** Ust cubuk ekrana sigmazsa once sirket adi, sonra borc cipi gizlenir (olculen genislige gore; kirpma yok). */

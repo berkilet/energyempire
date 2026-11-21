@@ -364,7 +364,7 @@ public final class FinanceCenter {
                 "%" + Math.round(100 * exp / Math.max(1, cap)) + " (" + Fmt.money(cap) + ")", b.profile };
             for (int i = 0; i < c.length; i++) {
                 Label lb = new Label(c[i], skin, "small"); lb.setWrap(true);
-                if (i == 0) { lb.setWrap(false); row.add(UiKit.iconLabel(skin, "bank_" + b.name().toLowerCase(), lb, 26, 28)).width(bw[i]).left().padRight(6); }
+                if (i == 0) { lb.setWrap(false); row.add(UiKit.iconLabel(skin, "bank_" + b.name().toLowerCase(java.util.Locale.ROOT), lb, 26, 28)).width(bw[i]).left().padRight(6); }
                 else row.add(lb).width(bw[i]).padRight(6);
             }
             loans.add(row).padBottom(2).row();

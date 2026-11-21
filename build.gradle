@@ -34,7 +34,8 @@ application {
 
 test {
     useJUnitPlatform()
-    jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
+    // Turkce Windows'ta olusan hatalar (I -> ı donusumu) burada da yakalansin
+    jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8', '-Duser.language=tr', '-Duser.country=TR'
     testLogging { events 'passed', 'failed'; showStandardStreams = true }
 }
 

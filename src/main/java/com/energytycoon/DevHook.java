@@ -37,6 +37,12 @@ final class DevHook {
         if (frame == 2 && env.containsKey("ET_SHADOW")) game.setShadowQuality(Integer.parseInt(get("ET_SHADOW", "1")));
         if (frame == 3 && get("ET_SCENARIO", "menu").equals("setup") && game.getScreen() instanceof MenuScreen ms) ms.showSetup();
         if (frame == 3 && get("ET_SCENARIO", "menu").equals("settings") && game.getScreen() instanceof MenuScreen ms) ms.showSettings();
+        // ET_CLICKS="Ada Şebekesi|Oyunu Başlat": kurulum ekraninda sirayla tiklanir (her biri ayri karede)
+        if (get("ET_SCENARIO", "menu").equals("setup") && frame >= 6 && !get("ET_CLICKS", "").isEmpty()) {
+            String[] cl = get("ET_CLICKS", "").split("\\|");
+            int k = frame - 6;
+            if (k < cl.length && game.getScreen() instanceof MenuScreen ms) { System.out.println("tıkla: " + cl[k]); ms.devClick(cl[k]); }
+        }
         if (frame == 3 && get("ET_SCENARIO", "menu").equals("game")) startGame();
         if (frame == 30 && gs != null) System.out.println(gs.devPickTest());
         if (frame == 32 && gs != null) System.out.println(gs.devLinePick());
