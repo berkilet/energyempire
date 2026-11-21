@@ -157,16 +157,17 @@ public final class Mna {
     /** Odeme: nakit, kredi (imzalanir), pay takasi (alici yeni hisse basar, serbest dolasima). */
     void pay(Company buyer, Company target, double amount, Financing f, String to) {
         double left = amount;
+        // odeme sirasi: nakit, pay takasi, devralma kredisi (borc son care)
         double c = Math.min(left, Math.min(f.cash, Math.max(0, buyer.cash)));
         buyer.cash -= c; left -= c;
-        if (left > 1 && f.loan > 0 && f.bank != null) {
-            double l = Math.min(left, f.loan);
-            if (s.finance.signAcquisition(buyer, f.bank, l, target) != null) { buyer.cash -= l; left -= l; }
-        }
         if (left > 1 && f.swapValue > 0 && buyer.eq.listed && buyer.eq.price > 0) {
             double v = Math.min(left, f.swapValue);
             buyer.eq.shares += v / buyer.eq.price;
             left -= v;
+        }
+        if (left > 1 && f.loan > 0 && f.bank != null) {
+            double l = Math.min(left, f.loan);
+            if (s.finance.signAcquisition(buyer, f.bank, l, target) != null) { buyer.cash -= l; left -= l; }
         }
         if (left > 1) buyer.cash -= left; // kalan nakitten (gerekirse isletme kredisi otomatik)
     }
@@ -312,6 +313,8 @@ public final class Mna {
         t.prePrice = target.eq.listed ? target.eq.price : fundamentalPerShare(target);
         t.startHour = s.hour; t.endHour = s.hour + FinanceBalance.TENDER_DAYS * 24L;
         t.cash = Math.max(0, acq.cash - RivalAI.reserve(s, acq)); // rezerv ustu nakit
+        // halka acik alici kendi hissesiyle de oder (kurucu payi %55'in altina inmeden); kredi son care
+        if (acq.eq.listed && acq.eq.price > 0) t.swapShares = Math.max(0, acq.eq.founder / FinanceBalance.SWAP_FOUNDER_FLOOR - acq.eq.shares) * acq.eq.price;
         Bank b = s.finance.bestAcquisitionBank(acq, 10e6, target);
         if (b != null) { t.loanBank = b.ordinal() + 1; t.loanApproved = s.finance.maxAcquisitionLoan(acq, b, target); }
         d().offers.add(t);

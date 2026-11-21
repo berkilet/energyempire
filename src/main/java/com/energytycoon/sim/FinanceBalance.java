@@ -165,6 +165,8 @@ public final class FinanceBalance {
     /** Devralma kredisi: ticari faiz + 1 puan (Lemon Brothers 0,5 puan ucuz), hedef degerinin en fazla %50'si, 7 yil, ceyreklik. */
     public static final double ACQ_SPREAD = 0.01, ACQ_DEMIRTAS_DISCOUNT = 0.005, ACQ_MAX_SHARE = 0.50;
     public static final int ACQ_YEARS = 7;
+    /** Zorunlu teklifte pay takasi: alicinin kurucu payi bu oranin altina inmez. */
+    public static final double SWAP_FOUNDER_FLOOR = 0.55;
     /** Devralma kredisi geri odemesi: yilda anaparanin %5'i, kalani vade sonunda toplu (satin alma finansmaninda olagan yapi). */
     public static final double ACQ_AMORTIZATION = 0.05;
     /** Bagli ortakligin ana sirkete temettusu (kar orani, %): buyume, temkinli, nakit uret. Halka kapali olsa da odenir. */
