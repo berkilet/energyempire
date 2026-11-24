@@ -34,6 +34,15 @@ public final class Balance {
     public static final double DEMOLISH_REFUND = 0.15;
     public static final double OUTAGE_CHANCE_PER_HOUR = 0.0004;
 
+    /**
+     * Yakit fiyati ortalamalari ($/MWh isil). Gaz ~7,9 $/MMBtu (Avrupa/Turkiye ithal kontrat duzeyine yakin; ABD'den
+     * pahali), komur ~12 $/MWh isil (~105 $/ton ithal komur). Elektrik fiyati genelde gazin marjinal maliyetinden olusur.
+     */
+    public static final double GAS_PRICE_MEAN = 27, COAL_PRICE_MEAN = 12;
+    /** Gunes: fabrika ciktisi -> gerceklesen kapasite faktoru olcegi (ılıman ~%17-18, colde ~%20-22 sabit egimli). */
+    public static final double SOLAR_CF_SCALE = 1.46;
+    /** Hidro: ortalama kapasite faktoru ~%40, iyi havzada ~%50 (dunya filosu ortalamasi ~%39). */
+    public static final double HYDRO_CF_BASE = 0.36;
     public static final double CARBON_START = 12;     // $/ton
     public static final double CARBON_GROWTH_YEAR = 3; // $/ton / yil
 

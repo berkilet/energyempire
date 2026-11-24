@@ -18,7 +18,7 @@ class RivalStrategyTest {
     void carbonExpectationRaisesThermalRisk() {
         GameState s = GameState.newGame(SimHarness.reference(3));
         Company f = byStyle(s, "fossil");
-        Equipment coal = s.catalog.cheapest(PlantType.COAL, s.year());
+        Equipment coal = s.catalog.get("th-usc"); // devreye girecek verimlilikte (ultra-superkritik) bir komur santrali
         f.carbonBelief = 0.3;
         double optimistic = RivalStrategy.projectIndex(s, f, coal, s.cities.get(0));
         f.carbonBelief = 1.0;

@@ -964,7 +964,7 @@ public final class GameState {
                 if (p.upgrades.contains(Upgrade.TRACKER)) sunH = Math.pow(sunH, 0.6);
                 double season = 0.62 + 0.38 * (1 - winter);
                 double heat = 1 - e.paramA * Math.max(0, (map.sun[i] - 0.8) / 0.2) * (0.5 + 0.5 * (1 - winter));
-                return Math.min(1.2, sunH * season * markets.cloud * map.sun[i] * 1.15 * heat * p.renewableMult(hour) / 1.07);
+                return Math.min(1.2, sunH * season * markets.cloud * map.sun[i] * Balance.SOLAR_CF_SCALE * heat * p.renewableMult(hour) / 1.07);
             }
             case WIND: {
                 double speed = markets.wind * map.wind[i];
@@ -975,7 +975,7 @@ public final class GameState {
             case HYDRO: {
                 double s = 1 + 0.4 * Math.sin(2 * Math.PI * (m - 1) / 12.0);
                 double match = 1.12 - 0.45 * Math.abs(e.paramA - map.head(p.x, p.y));
-                return Math.max(0.08, Math.min(0.98, 0.5 * (0.6 + 0.8 * map.hydro[i]) * s * match * p.renewableMult(hour)));
+                return Math.max(0.08, Math.min(0.98, Balance.HYDRO_CF_BASE * (0.6 + 0.8 * map.hydro[i]) * s * match * p.renewableMult(hour)));
             }
             default:
                 return 1.0;
@@ -988,13 +988,13 @@ public final class GameState {
         switch (e.type) {
             case SOLAR: {
                 double heat = 1 - e.paramA * Math.max(0, (map.sun[i] - 0.8) / 0.2) * 0.75;
-                return 0.21 * map.sun[i] / 0.85 * heat * e.outputMult;
+                return 0.169 * map.sun[i] / 0.85 * heat * e.outputMult;
             }
             case WIND:
                 return expectedWindCf(e, map.wind[i]);
             case HYDRO: {
                 double match = 1.12 - 0.45 * Math.abs(e.paramA - map.head(x, y));
-                return Math.min(0.98, 0.5 * (0.6 + 0.8 * map.hydro[i]) * match);
+                return Math.min(0.98, Balance.HYDRO_CF_BASE * (0.6 + 0.8 * map.hydro[i]) * match);
             }
             default: return 0.9;
         }

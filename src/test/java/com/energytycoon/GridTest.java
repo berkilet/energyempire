@@ -151,7 +151,9 @@ class GridTest {
         System.out.printf("uyum (5 tohum): karşılanan %+.2f%%, fiyat %+.2f%%, üretim %+.2f%%%n",
             (ms / rs - 1) * 100, (mp / rp - 1) * 100, (mm / rm - 1) * 100);
         assertEquals(1, ms / rs, 0.03);
-        assertEquals(1, mp / rp, 0.03);
+        // Fiyat: yakit kalibrasyonu (gaz 22 -> 27 $/MWh isil, komur 11 -> 12) bilincli olarak fiyati Faz 1'e gore
+        // yukseltti; gaz marjinal santral oldugu icin artis gaz artisinin (+%23) altinda kalmali.
+        assertTrue(mp / rp > 1.03 && mp / rp < 1.23, "yakit kalibrasyonu sonrasi fiyat Faz 1'e gore +%3..+%23 araliginda: " + mp / rp);
         assertEquals(1, mm / rm, 0.03);
     }
 

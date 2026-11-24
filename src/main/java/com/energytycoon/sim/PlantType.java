@@ -5,7 +5,7 @@ public enum PlantType {
     //          etiket              yakit        MW   capex/MW  sabitOM/MW/yil varOM  verim  co2/MWh insaatGun omur  yenilenebilir
     COAL("Kömür Santrali",      Fuel.COAL,    200, 1.80e6, 45e3, 4.0, 0.38, 0.95, 240, 35, false),
     GAS("Doğalgaz Santrali",    Fuel.GAS,     150, 0.90e6, 20e3, 3.0, 0.52, 0.40, 120, 30, false),
-    SOLAR("Güneş Santrali",     Fuel.NONE,    100, 1.05e6, 14e3, 0.5, 1.00, 0.00, 90,  25, true),
+    SOLAR("Güneş Santrali",     Fuel.NONE,    100, 0.80e6, 14e3, 0.5, 1.00, 0.00, 90,  25, true),
     WIND("Rüzgar Santrali",     Fuel.NONE,     60, 1.35e6, 32e3, 1.0, 1.00, 0.00, 100, 25, true),
     HYDRO("Hidroelektrik",      Fuel.NONE,    120, 2.60e6, 28e3, 1.0, 1.00, 0.00, 330, 60, true),
     NUCLEAR("Nükleer Santral",  Fuel.URANIUM, 500, 4.40e6, 95e3, 2.0, 0.33, 0.00, 600, 50, false);

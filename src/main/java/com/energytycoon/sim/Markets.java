@@ -5,14 +5,14 @@ import java.util.Random;
 /** Yakit fiyatlari, karbon fiyati ve hava durumu. */
 public final class Markets {
     // $/MWh (isil girdisi)
-    public double coalPrice = 11, gasPrice = 22, uraniumPrice = 4.5;
+    public double coalPrice = Balance.COAL_PRICE_MEAN, gasPrice = Balance.GAS_PRICE_MEAN, uraniumPrice = 4.5;
     public double carbonPrice = Balance.CARBON_START;
     /** Rüzgar (0..1), bulutluluk-gunes carpani (0.15..1). */
     public double wind = 0.36, cloud = 0.75;
     public double demandNoise = 1.0;
 
     // Ortalama seviyeler (yillik enflasyon/trend yok, sok olaylari var)
-    private double coalMean = 11, gasMean = 22;
+    private double coalMean = Balance.COAL_PRICE_MEAN, gasMean = Balance.GAS_PRICE_MEAN;
     private int shockDaysLeft;
     private double shockGas = 1.0;
 

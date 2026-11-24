@@ -31,13 +31,13 @@ public final class EquipmentCatalog {
 
         //  id, type, supplier, model, tech, MW, capex/MW, eff, outMult, a, b, deg, build, om, year, visA, visB, not
         // GUNES: a = sicak saha kaybi
-        add("sp-perc", PlantType.SOLAR, sunpeak, "SP-540", "Mono PERC", 100, 0.92e6, 1, 1.00, 0.10, 0, 0.0065, 0.9, 1.0, 2025, 0f, 0f,
+        add("sp-perc", PlantType.SOLAR, sunpeak, "SP-540", "Mono PERC", 100, 0.72e6, 1, 1.00, 0.10, 0, 0.0065, 0.9, 1.0, 2025, 0f, 0f,
             "En ucuz panel. Sıcak bölgelerde verim kaybı yüksek, hızlı yaşlanır.");
-        add("hx-topcon", PlantType.SOLAR, helion, "HX-580", "N-tipi TOPCon", 100, 1.06e6, 1, 1.07, 0.06, 0, 0.0040, 1.0, 1.0, 2025, 1f, 0f,
+        add("hx-topcon", PlantType.SOLAR, helion, "HX-580", "N-tipi TOPCon", 100, 0.80e6, 1, 1.07, 0.06, 0, 0.0040, 1.0, 1.0, 2025, 1f, 0f,
             "Dengeli fiyat/performans, düşük degradasyon.");
-        add("lu-hjt", PlantType.SOLAR, lumina, "Bifacial HJT-610", "Heteroeklem, çift yüzlü", 120, 1.22e6, 1, 1.14, 0.02, 0, 0.0025, 1.0, 0.95, 2025, 2f, 0f,
+        add("lu-hjt", PlantType.SOLAR, lumina, "Bifacial HJT-610", "Heteroeklem, çift yüzlü", 120, 0.92e6, 1, 1.14, 0.02, 0, 0.0025, 1.0, 0.95, 2025, 2f, 0f,
             "Arka yüzden de üretir; sıcakta en az kayıp. Pahalı ama uzun ömürlü.");
-        add("kg-tandem", PlantType.SOLAR, kuzey, "KG Tandem-700", "Perovskit-silisyum tandem", 150, 1.28e6, 1, 1.32, 0.04, 0, 0.0085, 1.0, 1.0, 2033, 3f, 0f,
+        add("kg-tandem", PlantType.SOLAR, kuzey, "KG Tandem-700", "Perovskit-silisyum tandem", 150, 0.95e6, 1, 1.32, 0.04, 0, 0.0085, 1.0, 1.0, 2033, 3f, 0f,
             "Yeni nesil yüksek verim; degradasyonu henüz yüksek.");
 
         // RUZGAR: a = cut-in, b = rated (ruzgar*saha birimi); visA = kule yuksekligi, visB = rotor yaricapi
