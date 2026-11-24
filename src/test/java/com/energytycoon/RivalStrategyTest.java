@@ -27,23 +27,25 @@ class RivalStrategyTest {
     }
 
     @Test
-    void rivalsLearnAndAdapt() {
-        GameSettings g = SimHarness.reference(2); g.rivals = 3; g.cities = 6;
+    void everyRivalIsRational() {
+        GameSettings g = SimHarness.reference(2); g.rivals = 7; g.size = 96; g.cities = 8;
         GameState s = GameState.newGame(g);
-        Company f = byStyle(s, "fossil"), gr = byStyle(s, "green");
-        double b0 = f.carbonBelief, w0 = f.priorWeight;
-        assertTrue(b0 < 0.5, "fosil kokenli sirket baslangicta karbonu hafife alir");
-        assertTrue(gr.carbonBelief > 1.0, "yesil kokenli sirket karbon artisini fazla bekler");
-        int announcements = 0;
-        for (int h = 0; h < 8 * Balance.HOURS_PER_YEAR; h++) {
-            s.tick();
-            for (String m : s.messages) if (m.startsWith("STRATEJİ")) announcements++;
-            s.messages.clear();
+        for (Company c : s.companies) if (!c.player && !c.neutral)
+            assertEquals(1.0, c.carbonBelief, 1e-9, c.name + ": ilan edilen karbon yolunu dogru bilir");
+        int checked = 0;
+        for (int y = 0; y < 10; y++) {
+            for (int h = 0; h < Balance.HOURS_PER_YEAR; h++) { s.tick(); s.messages.clear(); }
+            for (Company c : s.companies) {
+                if (c.player || c.neutral || c.bankrupt) continue;
+                for (City city : s.cities) for (Equipment e : RivalStrategy.candidates(s, c, city)) {
+                    if (e == null) continue;
+                    checked++;
+                    assertTrue(RivalStrategy.projectIndex(s, c, e, city) >= 0, c.name + " (" + c.aiStyle + ") degeri negatif proje secti: " + e.fullName());
+                }
+            }
         }
-        assertTrue(f.carbonBelief > b0 + 0.3, "beklenti gozleme yaklasir: " + b0 + " -> " + f.carbonBelief);
-        assertTrue(Math.abs(gr.carbonBelief - 1) < 0.2, "yesil sirketin beklentisi de gercege yaklasir");
-        assertTrue(f.priorWeight < w0 * 0.8, "tarzin agirligi zamanla azalir");
-        System.out.println("8 yilda strateji duyurusu: " + announcements + ", fosil kokenli yonelim: " + f.orientation);
+        System.out.println("rasyonellik kontrolu: " + checked + " aday proje, hepsi NBD >= 0");
+        assertTrue(checked > 0);
     }
 
     @Test

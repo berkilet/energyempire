@@ -3,7 +3,10 @@ package com.energytycoon.sim;
 import java.util.Random;
 
 /**
- * Rakip yatirim stratejisi. Sirketin tarzi ("fossil", "green", "balanced") yalnizca baslangic egilimidir:
+ * Rakip yatirim stratejisi: tum rakipler iktisadi olarak rasyoneldir. Tarz ("fossil", "green", "balanced") yalnizca
+ * getirisi birbirine yakin secenekler arasinda kucuk bir tercih ve tedarik aliskanligidir; zarar edecegi belli olan
+ * (net bugunku degeri negatif) yatirim hicbir sirket tarafindan yapilmaz. Karbon fiyat yolu kamuya ilan edildigi icin
+ * herkes onu dogru bilir.
  * <ul>
  *   <li>Teknoloji secimi her kararda projenin beklenen getirisine dayanir (NBD / yatirim): elektrik fiyati, yakit,
  *       karbon fiyati ve saha verimi. Karbon fiyatinin ne kadar hizli artacagi sirketin <b>kendi beklentisidir</b>
@@ -22,9 +25,13 @@ public final class RivalStrategy {
     static final PlantType[] TYPES = PlantType.values();
     /** Karbon fiyatinin elektrik fiyatina yansima orani ($/MWh basina $/ton; marjinal gaz santrali ~0,4 t/MWh). */
     static final double CARBON_PASS_THROUGH = 0.35;
-    static final double DISCOUNT = 0.085;
+    /** Sermaye maliyeti: politika faizi + proje risk primi + kredi notu primi (sirketin gercek borclanma kosuluna gore). */
+    static double costOfCapital(GameState s, Company c) {
+        return Math.max(0.06, s.macro.policyRate + 0.035 + s.finance.rating(c).premium());
+    }
     /** Bu getiri endeksinin (NBD/yatirim) altinda proje yapilmaz. */
-    static final double HURDLE = -0.12;
+    /** Getiri endeksi (NBD / yatirim) bunun altindaysa proje yapilmaz: deger yaratmayan yatirim yok. */
+    static final double HURDLE = 0.0;
     /** Bu kaldiracin (Net borc / FAVOK) ustunde yeni santral yatirimi yapilmaz. */
     static final double MAX_BUILD_LEVERAGE = 3.0;
     /** Yenilenebilirde uretim profili nedeniyle ortalama fiyata gore elde edilen fiyat orani. */
@@ -59,9 +66,10 @@ public final class RivalStrategy {
     static double prior(String style, PlantType t) {
         switch (style) {
             // fosil kokenli: yakit tedarik ve isletme deneyimi, esnek kapasiteye guven (puant/ihale gelirleri)
-            case "fossil": return switch (t) { case COAL -> 0.55; case GAS -> 0.75; case NUCLEAR -> 0.10; case SOLAR, WIND -> -0.12; case HYDRO -> -0.08; };
-            case "green": return switch (t) { case SOLAR, WIND -> 0.18; case HYDRO -> 0.10; case GAS -> -0.08; case COAL -> -0.50; case NUCLEAR -> -0.10; };
-            default: return switch (t) { case GAS -> 0.30; case COAL -> 0.05; default -> 0; };
+            // yalnizca esitlik bozucu: getirisi neredeyse ayni iki secenekten aliskin olunani
+            case "fossil": return switch (t) { case GAS -> 0.03; case COAL -> 0.02; default -> 0; };
+            case "green": return switch (t) { case SOLAR, WIND -> 0.03; case HYDRO -> 0.02; default -> 0; };
+            default: return 0;
         }
     }
 
@@ -71,9 +79,10 @@ public final class RivalStrategy {
         c.techView = new double[TYPES.length];
         c.priorWeight = 1;
         switch (c.aiStyle) {
-            case "fossil" -> { c.carbonBelief = 0.30 + 0.15 * r.nextDouble(); c.learnRate = 0.22 + 0.22 * r.nextDouble(); }
-            case "green" -> { c.carbonBelief = 1.10 + 0.20 * r.nextDouble(); c.learnRate = 0.30 + 0.20 * r.nextDouble(); }
-            default -> { c.carbonBelief = 0.70 + 0.20 * r.nextDouble(); c.learnRate = 0.32 + 0.22 * r.nextDouble(); }
+            // karbon fiyat yolu ilan edilmistir: herkes dogru bilir (1 = gercek artis hizi)
+            case "fossil" -> { c.carbonBelief = 1; c.learnRate = 0.25 + 0.2 * r.nextDouble(); }
+            case "green" -> { c.carbonBelief = 1; c.learnRate = 0.30 + 0.2 * r.nextDouble(); }
+            default -> { c.carbonBelief = 1; c.learnRate = 0.30 + 0.2 * r.nextDouble(); }
         }
         c.orientation = orientation(c);
     }
@@ -147,6 +156,7 @@ public final class RivalStrategy {
         double obs = observedCashPerMw(s, t), calib = 1;
         int years = Math.min(t.lifeYears, 25);
         double capex = e.capex(), fixed = e.fixedOmPerHour() * Balance.HOURS_PER_YEAR, npv = -capex;
+        double disc = costOfCapital(s, c);
         double build = e.buildDays() / 365.0;
         for (int y = 0; y <= years; y++) {
             double tt = y + build;
@@ -171,7 +181,7 @@ public final class RivalStrategy {
                 if (!Double.isNaN(obs) && operating > 0) calib = Math.max(0.5, Math.min(1.5, obs * e.capacityMW / operating));
                 continue;
             }
-            npv += (operating * calib - fixed) / Math.pow(1 + DISCOUNT, tt);
+            npv += (operating * calib - fixed) / Math.pow(1 + disc, tt);
         }
         return npv / capex;
     }
@@ -190,13 +200,12 @@ public final class RivalStrategy {
         if (c.quarters >= 8 && s.finance.leverage(c) > MAX_BUILD_LEVERAGE) return best;
         double[] bu = { -1e9, -1e9, -1e9 };
         for (PlantType t : TYPES) {
-            Equipment e = RivalAI.pick(s, c, t);
-            if (e == null || e.availableYear > s.year()) continue;
+            Equipment e = bestModel(s, c, t, city);
+            if (e == null) continue;
             if (t == PlantType.NUCLEAR && c.cash < e.capex() * 1.4) continue;
             double idx = projectIndex(s, c, e, city);
-            double u = utility(c, t, idx);
-            if (u < HURDLE) continue;   // sirketin kendi degerlendirmesiyle (egilim dahil) esigi gecmeyen proje yapilmaz
-            u += s.rng.nextGaussian() * 0.03;
+            if (idx < HURDLE) continue;   // degeri negatif proje yapilmaz (tarz ne olursa olsun)
+            double u = utility(c, t, idx) + s.rng.nextGaussian() * 0.01;
             for (int k = 0; k < 3; k++) if (u > bu[k]) {
                 for (int m = 2; m > k; m--) { bu[m] = bu[m - 1]; best[m] = best[m - 1]; }
                 bu[k] = u; best[k] = e; break;
@@ -205,10 +214,24 @@ public final class RivalStrategy {
         return best;
     }
 
+    /** Bir tur icin getiri endeksi en yuksek ekipman modeli (yesil kokenli yeniye, digerleri ucuza hafif egilimli). */
+    static Equipment bestModel(GameState s, Company c, PlantType t, City city) {
+        Equipment best = null; double bi = Double.NEGATIVE_INFINITY;
+        Equipment newest = s.catalog.newest(t, s.year()), cheapest = s.catalog.cheapest(t, s.year());
+        for (Equipment e : s.catalog.available(t, s.year())) {
+            double i = projectIndex(s, c, e, city);
+            if (c.aiStyle.equals("green") && e == newest) i += 0.01;
+            if (c.aiStyle.equals("fossil") && e == cheapest) i += 0.01;
+            if (i > bi) { bi = i; best = e; }
+        }
+        return best;
+    }
+
     /** Ihale icin: ruzgar ve gaz arasinda karar puani yuksek olan. */
     public static Equipment tenderChoice(GameState s, Company c, City city) {
         if (c.techView == null) init(c, s.seed);
-        Equipment w = RivalAI.pick(s, c, PlantType.WIND), g = RivalAI.pick(s, c, PlantType.GAS);
+        Equipment w = bestModel(s, c, PlantType.WIND, city), g = bestModel(s, c, PlantType.GAS, city);
+        if (w == null || g == null) return w != null ? w : g != null ? g : RivalAI.pick(s, c, PlantType.GAS);
         double uw = utility(c, PlantType.WIND, projectIndex(s, c, w, city)), ug = utility(c, PlantType.GAS, projectIndex(s, c, g, city));
         return uw >= ug ? w : g;
     }
@@ -286,8 +309,9 @@ public final class RivalStrategy {
         if (ref == null) return orientation(c);
         double fossil = -9, green = -9;
         for (PlantType t : TYPES) {
-            Equipment e = RivalAI.pick(s, c, t);
-            if (e == null || e.availableYear > s.year() || t == PlantType.NUCLEAR) continue;
+            if (t == PlantType.NUCLEAR) continue;
+            Equipment e = bestModel(s, c, t, ref);
+            if (e == null) continue;
             double u = utility(c, t, projectIndex(s, c, e, ref));
             if (t.renewable) green = Math.max(green, u); else fossil = Math.max(fossil, u);
         }
@@ -295,7 +319,7 @@ public final class RivalStrategy {
         return d > 0.12 ? "yenilenebilir ağırlıklı" : d < -0.12 ? "fosil ağırlıklı" : "dengeli";
     }
 
-    /** Zarar eden santral: ileriye donuk nakit de olumsuzsa omrunun %60'ini gecmisse kapatilir, degilse satisa cikar. */
+    /** Zarar eden santral: kalan omurdeki isletme nakdi de negatifse omrunun %60'ini gecmisse kapatilir, degilse satisa cikar. */
     static void review(GameState s, Company c) {
         for (Plant p : new java.util.ArrayList<>(s.plants)) {
             if (p.owner != c || p.legacy || p.tenderId != 0 || !fullYear(s, p) || p.lastYearProfit >= 0) continue;
@@ -305,7 +329,8 @@ public final class RivalStrategy {
             // kalan omur boyunca beklenen nakit (yatirim batik): getiri endeksi * yatirim + yatirim = beklenen NBD'nin isletme kismi
             double fwd = (projectIndex(s, c, p.equipment, city) + 1) * p.equipment.capex();
             double lifeShare = (s.hour - p.ageStartHour) / (double) (p.type.lifeYears * Balance.HOURS_PER_YEAR);
-            if (fwd > p.bookValue(s.hour) * 0.5) continue;  // gecici zarar: beklenti hala makul
+            // yatirim batik maliyettir: kalan omurde isletme nakdi (sabit giderler dahil) hala pozitifse santral tutulur
+            if (fwd > 0) continue;
             if (lifeShare > 0.6) {
                 s.notify("STRATEJİ: " + c.name + " zarar eden " + p.name() + " santralini kapattı.");
                 s.demolishPlant(p, true);
