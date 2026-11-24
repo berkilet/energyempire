@@ -42,7 +42,8 @@
 
 ## Öne çıkanlar
 
-- **Saatlik elektrik piyasası:** Talep her saat en ucuz santralden başlayarak karşılanır (merit order). Hava, yakıt fiyatları ve karbon vergisi fiyatı belirler.
+- **Saatlik elektrik piyasası:** Talep her saat en ucuz santralden başlayarak karşılanır (merit order). Hava, yakıt fiyatları ve karbon vergisi fiyatı belirler. Saatlik yedek %10'un altına inince kesinti olmadan da kıtlık primi oluşur.
+- **Kapasite mekanizması:** Her santrale güvenilir kapasitesi kadar aylık ödeme yapılır (nükleer %90, gaz %90, kömür %85, hidro %50, rüzgâr %10, güneş %4). Birim fiyat, son 12 ayın en sıkışık puant saatindeki yedek marjına göre belirlenir: yedek bolken sıfır, %15 hedefte ~80 bin $/MW-yıl, kıtlıkta daha yüksek. Kömür, nükleer ve gaz santralleri enerji satışının yanında bu gelirle de ayakta kalır.
 - **Gerçekçi şebeke:** OG / YG / ÇYG hat kademeleri, kümeler, trafo merkezleri, hat kayıpları, doluluk ve arızalar. İletim sistemi işletmecisi (UŞİ) başvuruyla hat kurar.
 - **16 kurgusal tedarikçi, 20 ekipman modeli:** Güneş, rüzgar, doğalgaz, kömür, hidro ve nükleer. Her modelin fiyatı, verimi, yaşlanması ve inşaat süresi farklı; teknolojiler yıllar içinde piyasaya çıkar.
 - **Derin finans sistemi:**

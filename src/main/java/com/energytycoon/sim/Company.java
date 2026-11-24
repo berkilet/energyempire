@@ -67,6 +67,8 @@ public final class Company {
     public double revenue, fuelCost, omCost, carbonCost, interest, fines, capexSpent;
     /** Trafo merkezi erisim bedeli: alinan / odenen (devam eden ay). */
     public double accessIncome, accessCost;
+    /** Kapasite mekanizmasi odemesi (aylik) ve gecen ayki. */
+    public double capacityIncome, lastCapacityIncome;
     /** UŞİ yillik baglanti bedelinin bu aya dusen kismi. */
     public double connectionCharge, lastConnectionCharge;
     // Gecen ay
@@ -100,11 +102,11 @@ public final class Company {
 
     /** Bu ayin FAVOK'u: faaliyet geliri - faaliyet giderleri (faiz, finansman masrafi ve amortisman haric). */
     public double monthEbitda() {
-        return revenue - fuelCost - omCost - carbonCost - fines + accessIncome - accessCost - connectionCharge;
+        return revenue + capacityIncome - fuelCost - omCost - carbonCost - fines + accessIncome - accessCost - connectionCharge;
     }
 
     public double monthNetSoFar() {
-        return revenue - fuelCost - omCost - carbonCost - interest - fines + accessIncome - accessCost - connectionCharge - fees;
+        return revenue + capacityIncome - fuelCost - omCost - carbonCost - interest - fines + accessIncome - accessCost - connectionCharge - fees;
     }
 
 }

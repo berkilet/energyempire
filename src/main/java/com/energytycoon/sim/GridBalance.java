@@ -24,6 +24,21 @@ public final class GridBalance {
     /** Eski santrallerin sehre uzakligi (kare). */
     public static final double LEGACY_MIN_DIST = 3, LEGACY_MAX_DIST = 9;
     public static final String NEUTRAL_NAME = "Kamu Üretim";
+    // ------------------------------------------------------------ kapasite mekanizmasi ve kitlik primi
+    /**
+     * Guvenilir kapasite katsayisi (de-rating): puant aninda bulunma olasiligi. Ingiltere kapasite piyasasi
+     * katsayilarina yakin: nukleer ~0,90, komur ~0,85, gaz ~0,90, hidro (akarsu, mevsimsel) ~0,50, ruzgar ~0,10, gunes ~0,04.
+     */
+    public static double derate(PlantType t) {
+        return switch (t) { case NUCLEAR -> 0.90; case COAL -> 0.85; case GAS -> 0.90; case HYDRO -> 0.50; case WIND -> 0.10; case SOLAR -> 0.04; };
+    }
+    /** Referans kapasite fiyati: yeni gaz puant santralinin yillik net maliyeti (~0,7 M$/MW yatirim, %8, 30 yil + sabit gider), $/MW-yil. */
+    public static final double CAPACITY_CONE = 80_000;
+    /** Hedef guvenilir yedek marji; bunun 10 puan ustunde fiyat sifira iner, 5 puan altinda 1,5 x CONE (egimli talep egrisi). */
+    public static final double CAPACITY_TARGET_MARGIN = 0.15, CAPACITY_SLOPE = 0.10, CAPACITY_MAX_MULT = 1.5;
+    /** Saatlik yedek bu oranin altina inince enerji fiyatina kitlik primi eklenir (kesinti olmadan da). */
+    public static final double SCARCITY_RESERVE = 0.10, SCARCITY_ADDER_MAX = 70;
+
     public static final int NEUTRAL_COLOR = 0xa9b8e8; // soluk mavi-gri; arazi/su ve rakip renklerinden ayrik (koyu lacivert kenarla)
     /** Kamu rozeti ve onizleme isaretinin koyu kenar rengi. */
     public static final int NEUTRAL_OUTLINE = 0x1f2d4d;

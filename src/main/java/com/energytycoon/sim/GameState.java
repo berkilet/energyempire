@@ -82,6 +82,10 @@ public final class GameState {
     // Gozlem istatistikleri (son saat)
     public double statDemand, statServed, statPrice = 40, statPlayerMW, statRivalMW, statCo2Hour;
     public double statRenewShare;
+    /** Kapasite mekanizmasi: bu ayin puant talebi, son 12 ayin aylik puanlari, son kapasite fiyati ($/MW-yil) ve guvenilir yedek marji. */
+    public double monthPeakMW, monthPeakAvail, capacityPrice, capacityMargin = 0.2;
+    /** Son 12 ayin puant talebi ve o saatte kullanilabilir toplam guc. */
+    public double[] peak12 = new double[12], peakAvail12 = new double[12];
     // Aylik sistem istatistikleri
     public double monthDemandMWh, monthServedMWh, lastServedRatio = 1;
     public final History history = new History();
@@ -940,6 +944,38 @@ public final class GameState {
         return Math.min(1, best);
     }
 
+    /**
+     * Kapasite mekanizmasi (teknoloji-tarafsiz, egimli talep egrisi): son 12 ayin en yuksek puant talebine gore
+     * guvenilir yedek marji hesaplanir; marj hedefin altinda kaldikca birim fiyat artar. Calisir durumdaki her santrale
+     * guvenilir kapasitesi (kurulu guc x de-rating) kadar aylik odeme yapilir (tuketici tarifesinden finanse edilir).
+     */
+    public void capacityMarket() {
+        int mi = (int) ((hour / Balance.HOURS_PER_MONTH) % 12);
+        peak12[mi] = monthPeakMW; peakAvail12[mi] = monthPeakAvail;
+        monthPeakMW = 0; monthPeakAvail = 0;
+        // yedek marji: son 12 ayin en sikisik puant saati (o saatte gercekten kullanilabilir guc / talep)
+        double tight = Double.MAX_VALUE;
+        for (int k = 0; k < 12; k++) if (peak12[k] > 0) tight = Math.min(tight, peakAvail12[k] / peak12[k] - 1);
+        if (tight == Double.MAX_VALUE) return;
+        // yeni devreye giren santraller (son 12 ayda olculmemis) guvenilir kapasiteleriyle marja eklenir
+        double peak = 0;
+        for (double v : peak12) peak = Math.max(peak, v);
+        double fresh = 0;
+        for (Plant p : plants) if (p.operational() && hour - (p.builtAtHour + (long) p.equipment.buildDays() * 24) < Balance.HOURS_PER_MONTH)
+            fresh += p.capacityMW() * GridBalance.derate(p.type);
+        capacityMargin = tight + (peak > 0 ? fresh / peak : 0);
+        double mult = Math.max(0, Math.min(GridBalance.CAPACITY_MAX_MULT,
+            (GridBalance.CAPACITY_TARGET_MARGIN + GridBalance.CAPACITY_SLOPE - capacityMargin) / GridBalance.CAPACITY_SLOPE));
+        capacityPrice = GridBalance.CAPACITY_CONE * mult;
+        if (capacityPrice <= 0) return;
+        for (Plant p : plants) {
+            if (!p.operational() || p.owner == null) continue;
+            double pay = p.capacityMW() * GridBalance.derate(p.type) * capacityPrice / 12.0;
+            p.owner.cash += pay; p.owner.capacityIncome += pay;
+            p.monthProfit += pay; p.capacityIncomeMonth = pay; p.capacityYear += pay;
+        }
+    }
+
     public double fuelCostPerMWh(Plant p) {
         if (p.type.fuel == PlantType.Fuel.NONE) return 0;
         double legacy = p.legacy ? GridBalance.LEGACY_FUEL_MULT : 1.0;
@@ -1099,6 +1135,7 @@ public final class GameState {
         for (City c : cities) { c.demandMW = c.peakMW() * dmult; c.servedMW = 0; c.flowMW = 0; }
         for (Plant p : plants) { p.outputMW = 0; p.flowMW = 0; p.availableMW = 0; p.curtailedMW = 0; p.idleReason = null; }
 
+        double totAvail = 0;
         double totDemand = 0, totServed = 0, priceWeighted = 0, priceDemand = 0, playerMW = 0, rivalMW = 0, renew = 0, co2 = 0;
         double fineMult = settings.difficulty.fineMult;
 
@@ -1164,7 +1201,15 @@ public final class GameState {
             double unserved = rawDemand;
             for (City ct : comp.cities) unserved -= ct.servedMW;
             double unservedFrac = rawDemand > 0 ? Math.max(0, unserved) / rawDemand : 0;
-            comp.price = shortage ? Math.min(Balance.SCARCITY_PRICE, Math.max(price, 40) * (1 + 2.5 * unservedFrac)) : price;
+            // Kitlik primi: saatlik yedek (kullanilabilir guc - talep) daraldikca kesinti olmadan da fiyat yukselir
+            double availSum = 0;
+            for (Plant p : cand) availSum += p.availableMW;
+            totAvail += availSum;
+            double reserve = demand > 0 ? (availSum - demand) / demand : 1;
+            double adder = reserve < GridBalance.SCARCITY_RESERVE
+                ? GridBalance.SCARCITY_ADDER_MAX * Math.pow((GridBalance.SCARCITY_RESERVE - Math.max(0, reserve)) / GridBalance.SCARCITY_RESERVE, 2) : 0;
+            comp.price = shortage ? Math.min(Balance.SCARCITY_PRICE, Math.max(price, 40) * (1 + 2.5 * unservedFrac))
+                                  : Math.min(Balance.SCARCITY_PRICE, price + adder);
             totServed += rawDemand - unserved;
             priceWeighted += comp.price * rawDemand; priceDemand += rawDemand;
 
@@ -1211,6 +1256,7 @@ public final class GameState {
             p.owner.cash -= fx; p.owner.omCost += fx; p.monthProfit -= fx; p.monthCost += fx;
         }
         statDemand = totDemand; statServed = totServed;
+        if (totDemand > monthPeakMW) { monthPeakMW = totDemand; monthPeakAvail = totAvail; }
         monthDemandMWh += totDemand; monthServedMWh += totServed;
         statPrice = priceDemand > 0 ? priceWeighted / priceDemand : statPrice;
         statPlayerMW = playerMW; statRivalMW = rivalMW; statCo2Hour = co2;
@@ -1234,6 +1280,7 @@ public final class GameState {
     // ------------------------------------------------------------ aylik
     private void monthly() {
         refreshComponentStats();
+        capacityMarket();
         macro.monthly();
         operator.monthly();
         for (City c : cities) { c.lastServedRatio = c.monthDemandMWh > 0 ? c.monthServedMWh / c.monthDemandMWh : 1; c.monthDemandMWh = c.monthServedMWh = 0; }
@@ -1252,6 +1299,7 @@ public final class GameState {
             c.lastInterest = c.interest; c.lastFines = c.fines; c.lastNet = net; c.lastFees = c.fees; c.fees = 0;
             c.lastDebtService = c.debtServicePaid; c.debtServicePaid = 0; c.lastCapex = c.capexSpent;
             c.lastAccessIncome = c.accessIncome; c.lastAccessCost = c.accessCost; c.accessIncome = c.accessCost = 0;
+            c.lastCapacityIncome = c.capacityIncome; c.capacityIncome = 0;
             c.lastConnectionCharge = c.connectionCharge; c.connectionCharge = 0;
             c.lastDividendIncome = c.dividendIncome; c.dividendIncome = 0; c.lastAffiliateIncome = c.affiliateIncome; c.affiliateIncome = 0;
             c.lastMwhGenerated = c.mwhGenerated; c.lastCo2 = c.co2Tons; c.lastRenewMwh = c.renewMwh;
@@ -1266,7 +1314,7 @@ public final class GameState {
             p.lastMonthMWh = p.monthMWh; p.lastMonthCost = p.monthCost; p.monthMWh = 0; p.monthCost = 0;
             p.lastMonthProfit = p.monthProfit; p.yearProfit += p.monthProfit; p.qProfitAcc += p.monthProfit; p.monthProfit = 0;
             if (month() % 3 == 0) { p.qProfitLast = p.qProfitAcc; p.qProfitAcc = 0; }
-            if (month() == 0) { p.lastYearProfit = p.yearProfit; p.yearProfit = 0; } // biten ay Aralik: yeni yil
+            if (month() == 0) { p.lastYearProfit = p.yearProfit; p.yearProfit = 0; p.lastYearCapacity = p.capacityYear; p.capacityYear = 0; } // biten ay Aralik: yeni yil
             p.cpFullMonths = p.cpFullHoursMonth > Balance.HOURS_PER_MONTH * GridBalance.CP_FULL_MONTH_SHARE ? p.cpFullMonths + 1 : 0;
             p.cpFullHoursMonth = 0;
         }

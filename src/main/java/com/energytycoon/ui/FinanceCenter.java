@@ -37,9 +37,9 @@ public final class FinanceCenter {
 
     // ozet
     private final Label kCash, kValue, kRating, kNet, kNetSub, kRatingSub;
-    private static final String[] PL_ROWS = { "Elektrik satışı", "Erişim geliri", "Yakıt", "İşletme ve bakım", "Karbon vergisi", "Faiz",
+    private static final String[] PL_ROWS = { "Elektrik satışı", "Kapasite ödemesi", "Erişim geliri", "Yakıt", "İşletme ve bakım", "Karbon vergisi", "Faiz",
         "Finansman masrafları", "Kesinti cezası", "Erişim gideri", "Bağlantı bedeli (UŞİ)", "Temettü geliri", "İştirak kâr payı (nakitsiz)", "", "Net kâr" };
-    private static final int NET = 13, DIV = 10, AFF = 11;
+    private static final int NET = 14, DIV = 11, AFF = 12;
     private final Label[][] pl = new Label[PL_ROWS.length][2];
     private final Label invest;
     private final Label assets, cashB, debtB, equity, cfOp, cfDebt, cfCapex, cfNet, dayNote;
@@ -204,9 +204,9 @@ public final class FinanceCenter {
         kNet.setText(anyMonth ? Fmt.money(p.lastNet) : "—");
         kNet.setStyle(skin.get(!anyMonth ? "kpi" : p.lastNet >= 0 ? "kpiGood" : "kpiBad", Label.LabelStyle.class));
         kNetSub.setText(anyMonth ? "Son " + p.netHistory.size() + " ay: " + Fmt.money(p.trailingNet()) : "Henüz kapanmış ay yok");
-        double[] last = { p.lastRevenue, p.lastAccessIncome, p.lastFuel, p.lastOm, p.lastCarbon, p.lastInterest, p.lastFees, p.lastFines, p.lastAccessCost, p.lastConnectionCharge,
+        double[] last = { p.lastRevenue, p.lastCapacityIncome, p.lastAccessIncome, p.lastFuel, p.lastOm, p.lastCarbon, p.lastInterest, p.lastFees, p.lastFines, p.lastAccessCost, p.lastConnectionCharge,
             p.lastDividendIncome, p.lastAffiliateIncome, 0, p.lastNet + p.lastDividendIncome + p.lastAffiliateIncome };
-        double[] now = { p.revenue, p.accessIncome, p.fuelCost, p.omCost, p.carbonCost, p.interest, p.fees, p.fines, p.accessCost, p.connectionCharge,
+        double[] now = { p.revenue, p.capacityIncome, p.accessIncome, p.fuelCost, p.omCost, p.carbonCost, p.interest, p.fees, p.fines, p.accessCost, p.connectionCharge,
             p.dividendIncome, p.affiliateIncome, 0, p.monthNetSoFar() + p.dividendIncome + p.affiliateIncome };
         for (int i = 0; i < PL_ROWS.length; i++) {
             if (pl[i][0] == null) continue;
@@ -214,7 +214,7 @@ public final class FinanceCenter {
                 double v = k == 0 ? last[i] : now[i];
                 Label l = pl[i][k];
                 if (i == 0) UiKit.setMoney(skin, l, v, false);
-                else if (i == 1 || i == DIV || i == AFF) { if (Math.abs(v) < 1) UiKit.setCost(skin, l, 0); else UiKit.setMoney(skin, l, v, true); }
+                else if (i == 1 || i == 2 || i == DIV || i == AFF) { if (Math.abs(v) < 1) UiKit.setCost(skin, l, 0); else UiKit.setMoney(skin, l, v, true); }
                 else if (i == NET) UiKit.setMoney(skin, l, v, true);
                 else UiKit.setCost(skin, l, v);
                 if (k == 0 && !anyMonth) { l.setText("—"); l.setStyle(skin.get("dimValue", Label.LabelStyle.class)); }
@@ -227,7 +227,7 @@ public final class FinanceCenter {
         double inv = s.capital.holdingsValue(p);
         if (inv < 1) { invest.setText("—"); invest.setStyle(skin.get("dimValue", Label.LabelStyle.class)); } else UiKit.setMoney(skin, invest, inv, false);
         UiKit.setMoney(skin, equity, p.cash + assetsV + inv - p.debt(), true);
-        double op = p.lastRevenue - p.lastFuel - p.lastOm - p.lastCarbon - p.lastFines + p.lastAccessIncome - p.lastAccessCost - p.lastConnectionCharge;
+        double op = p.lastRevenue + p.lastCapacityIncome - p.lastFuel - p.lastOm - p.lastCarbon - p.lastFines + p.lastAccessIncome - p.lastAccessCost - p.lastConnectionCharge;
         UiKit.setMoney(skin, cfOp, op, true);
         UiKit.setCost(skin, cfDebt, p.lastDebtService);
         UiKit.setCost(skin, cfCapex, p.lastCapex);

@@ -27,8 +27,8 @@ public final class RivalStrategy {
     /** Karbon fiyatinin elektrik fiyatina yansima orani ($/MWh basina $/ton; marjinal gaz santrali ~0,4 t/MWh). */
     static final double CARBON_PASS_THROUGH = 0.35;
     /** Sermaye maliyeti: politika faizi + proje risk primi + kredi notu primi (sirketin gercek borclanma kosuluna gore). */
-    static double costOfCapital(GameState s, Company c) {
-        return Math.max(0.06, s.macro.policyRate + 0.035 + s.finance.rating(c).premium());
+    public static double costOfCapital(GameState s, Company c) {
+        return Math.max(0.06, s.macro.policyRate + 0.02 + s.finance.rating(c).premium());
     }
     /** Bu getiri endeksinin (NBD/yatirim) altinda proje yapilmaz. */
     /** Getiri endeksi (NBD / yatirim) bunun altindaysa proje yapilmaz: deger yaratmayan yatirim yok. */
@@ -53,11 +53,11 @@ public final class RivalStrategy {
      * Piyasa kiyaslamasi: bu turdeki (eski filo haric) tam yil calismis santrallerin gecen yilki isletme nakdi
      * (kar + sabit gider) / MW-yil. Veri yoksa NaN. Oyuncunun da gorebildigi kamuya acik sonuclar.
      */
-    static double observedCashPerMw(GameState s, PlantType t) {
+    public static double observedCashPerMw(GameState s, PlantType t) {
         double cash = 0, mw = 0; int n = 0;
         for (Plant p : s.plants) {
             if (p.type != t || p.legacy || !fullYear(s, p)) continue;
-            cash += p.lastYearProfit + p.equipment.fixedOmPerHour() * Balance.HOURS_PER_YEAR;
+            cash += p.lastYearProfit - p.lastYearCapacity + p.equipment.fixedOmPerHour() * Balance.HOURS_PER_YEAR;
             mw += p.capacityMW(); n++;
         }
         return n >= 2 && mw > 0 ? cash / mw : Double.NaN;
@@ -106,6 +106,30 @@ public final class RivalStrategy {
         return p0 * (1 + (supplyFactor(s) - 1) * c.scarcityView);
     }
 
+    /** Son 12 ayin ortalama fiyati (arz duzeltmesi olmadan). */
+    static double averagePrice(GameState s) {
+        java.util.ArrayList<Double> m = s.history.monthlyPrice;
+        if (m.isEmpty()) return s.statPrice;
+        double sum = 0; int n = 0;
+        for (int i = Math.max(0, m.size() - 12); i < m.size(); i++) { sum += m.get(i); n++; }
+        return sum / n;
+    }
+
+    /** Arz fazlasi/kitligi gecicidir: etkisi ~4 yilda sonumlenir (eski santraller kapanir, yeni yatirim gelir). */
+    static final double SUPPLY_DECAY_YEARS = 4;
+    /** Cesitlendirme: filodaki pay basina karar puani cezasi (tum filo tek teknolojiyse -0,45). */
+    static final double DIVERSIFY = 0.45;
+
+    /**
+     * Beklenen kapasite fiyati ($/MW-yil), t yil sonra: bugunku fiyattan uzun donem dengesine (sistem hedef yedege doner;
+     * fiyat referans degerin ~%80'i) gecici farkin sonumlenmesiyle. Kitliga duyarli sirket bugunku fiyata daha cok guvenir.
+     */
+    static double expectedCapacityPrice(GameState s, Company c, double t) {
+        double longRun = GridBalance.CAPACITY_CONE * 0.8;
+        double decay = Math.exp(-t / (SUPPLY_DECAY_YEARS * Math.max(0.5, c.scarcityView)));
+        return longRun + (s.capacityPrice - longRun) * decay;
+    }
+
     static double clamp(double v, double lo, double hi) { return Math.max(lo, Math.min(hi, v)); }
 
     /**
@@ -121,10 +145,12 @@ public final class RivalStrategy {
         double firm = 0;
         for (Plant p : s.plants) {
             if (p.legacy && p.retireYear > 0 && p.retireYear <= s.year() + 3) continue; // yakinda kapanacak eski filo
-            double k = switch (p.type) { case SOLAR -> 0.05; case WIND -> 0.15; case HYDRO -> 0.6; default -> 0.9; };
+            double k = GridBalance.derate(p.type);
             firm += p.capacityMW() * k;
         }
         double ratio = firm / peak;
+        // gozlenen puant marjiyla (kapasite mekanizmasinin olctugu) harmanla: katsayilar bu sistemde fazla temkinli olabilir
+        ratio = 0.5 * ratio + 0.5 * (1 + s.capacityMargin);
         return Math.max(0.4, Math.min(1.3, 1 + 1.2 * (1.15 - ratio)));
     }
 
@@ -148,7 +174,7 @@ public final class RivalStrategy {
         Plant probe = new Plant();
         probe.type = t; probe.equipment = e; probe.owner = c; probe.x = city.x; probe.y = city.y;
         probe.builtAtHour = s.hour; probe.ageStartHour = s.hour;
-        double p0 = expectedPrice(s, c), carbon0 = s.markets.carbonPrice;
+        double pAvg = averagePrice(s), sfNow = 1 + (supplyFactor(s) - 1) * c.scarcityView, carbon0 = s.markets.carbonPrice;
         double growth = Balance.CARBON_GROWTH_YEAR * s.markets.carbonGrowthMult * c.carbonBelief;
         double co2 = probe.co2PerMWh(s.hour);
         double mcNoCarbon = s.marginalCost(probe) - carbon0 * co2;
@@ -158,13 +184,14 @@ public final class RivalStrategy {
         double capture = captureRate(s, t);
         // ilk yilin model nakdi piyasadaki gercek sonuclarla olceklenir (puant fiyatlari, kisinti, ariza gibi modelin gormedikleri)
         double obs = observedCashPerMw(s, t), calib = 1;
-        int years = Math.min(t.lifeYears, 25);
+        int years = Math.min(t.lifeYears, 40);
         double capex = e.capex(), fixed = e.fixedOmPerHour() * Balance.HOURS_PER_YEAR, npv = -capex;
         double disc = costOfCapital(s, c);
         double build = e.buildDays() / 365.0;
         for (int y = 0; y <= years; y++) {
             double tt = y + build;
             double carbon = carbon0 + growth * tt;
+            double p0 = pAvg * (1 + (sfNow - 1) * Math.exp(-tt / SUPPLY_DECAY_YEARS));
             double price = p0 + CARBON_PASS_THROUGH * (carbon - carbon0) * Math.min(1, c.carbonBelief + 0.3);
             double mwh, margin;
             if (t.renewable) {
@@ -180,12 +207,15 @@ public final class RivalStrategy {
                 margin = Math.max(spread, 0) * 0.9 + 0.08 * price * (1 - run);
             }
             double operating = mwh * margin;
+            // kapasite mekanizmasi: guvenilir kapasite x beklenen birim fiyat (bugunku fiyatla uzun donem referansin karisimi;
+            // sirketin kitlik duyarliligi agirligi belirler)
+            double capRev = e.capacityMW * GridBalance.derate(t) * expectedCapacityPrice(s, c, tt);
             if (y == 0) {
                 // y=0: yalnizca kalibrasyon (bugunku kosullarda bir yil)
-                if (!Double.isNaN(obs) && operating > 0) calib = Math.max(0.5, Math.min(1.5, obs * e.capacityMW / operating));
+                if (!Double.isNaN(obs) && operating > 0) calib = Math.max(0.75, Math.min(1.25, obs * e.capacityMW / operating));
                 continue;
             }
-            npv += (operating * calib - fixed) / Math.pow(1 + disc, tt);
+            npv += (operating * calib + capRev - fixed) / Math.pow(1 + disc, tt);
         }
         return npv / capex;
     }
@@ -202,14 +232,19 @@ public final class RivalStrategy {
         // borc disiplini: konsolide Net borc / FAVOK yuksekse yeni proje yok (once borc azaltilir)
         // (gelisme asamasindaki, henuz FAVOK'u olusmamis sirkete uygulanmaz: iki yillik isletme gecmisi gerekir)
         if (c.quarters >= 8 && s.finance.leverage(c) > MAX_BUILD_LEVERAGE) return best;
+        // portfoy cesitlendirmesi: kendi filosunda payi buyuk teknolojiye yeni yatirim daha az cazip (hava/fiyat riski yogunlasir)
+        double[] mix = new double[TYPES.length]; double tot = 0;
+        for (Plant p : s.plants) if (p.owner == c) { mix[p.type.ordinal()] += p.capacityMW(); tot += p.capacityMW(); }
         double[] bu = { -1e9, -1e9, -1e9 };
         for (PlantType t : TYPES) {
             Equipment e = bestModel(s, c, t, city);
             if (e == null) continue;
-            if (t == PlantType.NUCLEAR && c.cash < e.capex() * 1.4) continue;
+            // nukleer: ozkaynak payi (~%40) nakitte olmali; kalani kredi/ECA ile (sirketin normal finansman kurallari)
+            if (t == PlantType.NUCLEAR && c.cash < e.capex() * 0.4) continue;
             double idx = projectIndex(s, c, e, city);
             if (idx < c.hurdle) continue;   // sirket kendi beklentisiyle esigini gecmeyen projeyi yapmaz
             double u = utility(c, t, idx) + s.rng.nextGaussian() * 0.01;
+            if (tot > 0) u -= DIVERSIFY * mix[t.ordinal()] / tot;
             for (int k = 0; k < 3; k++) if (u > bu[k]) {
                 for (int m = 2; m > k; m--) { bu[m] = bu[m - 1]; best[m] = best[m - 1]; }
                 bu[k] = u; best[k] = e; break;

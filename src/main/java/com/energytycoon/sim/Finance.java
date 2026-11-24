@@ -330,7 +330,7 @@ public final class Finance {
     /** Aylik tahmini faaliyet nakdi: son 4 ceyregin FAVOK ortalamasi; yoksa gecen ayin FAVOK'u. */
     public double monthlyOperatingCash(Company c) {
         if (c.quarters >= 4) return ebitda4(c) / 12;
-        return c.lastRevenue - c.lastFuel - c.lastOm - c.lastCarbon - c.lastFines + c.lastAccessIncome - c.lastAccessCost - c.lastConnectionCharge;
+        return c.lastRevenue + c.lastCapacityIncome - c.lastFuel - c.lastOm - c.lastCarbon - c.lastFines + c.lastAccessIncome - c.lastAccessCost - c.lastConnectionCharge;
     }
 
     /** 12 aylik nakit projeksiyonu: nakit + isletme kredisi bosluğu, her ay faaliyet nakdi eklenir, taksitler duser. Aylik bakiye. */

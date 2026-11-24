@@ -86,7 +86,7 @@ public class SaveData {
         /** v3 */ public boolean legacy; public int retireYear, retireMonth; public String customName;
         /** v3 Faz 4 */ public int preferredTm;
         /** ihale */ public int tenderId;
-        /** varliklar */ public double[] dailyMWh, dailyCurt; public int dayIdx, daysTracked; public double yearProfit, lastYearProfit;
+        /** varliklar */ public double[] dailyMWh, dailyCurt; public int dayIdx, daysTracked; public double yearProfit, lastYearProfit, capacityYear, lastYearCapacity;
         /** rekabet: son 12 ay uretim */ public double[] gen12; public int genIdx; public double monthMWh, monthCost, lastMonthMWh, lastMonthCost, priceCap; }
     /** Trafo merkezi (v3, Faz 4). */
     public static class SubstationD {
@@ -122,6 +122,7 @@ public class SaveData {
     public int nextId;
     public boolean won;
     public double coal, gas, uranium, carbon, wind, cloud, demandNoise;
+    /** kapasite mekanizmasi */ public double[] peak12, peakAvail12; public double monthPeakAvail, monthPeakMW, capacityPrice, capacityMargin = 0.2;
     public List<CompanyD> companies = new ArrayList<>();
     public List<CityD> cities = new ArrayList<>();
     public List<PlantD> plants = new ArrayList<>();
@@ -158,6 +159,7 @@ public class SaveData {
         d.coalMult = s.markets.coalMult; d.gasMult = s.markets.gasMult; d.uraniumMult = s.markets.uraniumMult;
         d.carbonGrowthMult = s.markets.carbonGrowthMult; d.lastServedRatio = s.lastServedRatio;
         for (Supplier sp : s.catalog.allSuppliers()) d.supplierIndex.put(sp.id, sp.priceIndex);
+        d.peak12 = s.peak12; d.peakAvail12 = s.peakAvail12; d.monthPeakAvail = s.monthPeakAvail; d.monthPeakMW = s.monthPeakMW; d.capacityPrice = s.capacityPrice; d.capacityMargin = s.capacityMargin;
         d.coal = s.markets.coalPrice; d.gas = s.markets.gasPrice; d.uranium = s.markets.uraniumPrice; d.carbon = s.markets.carbonPrice;
         d.wind = s.markets.wind; d.cloud = s.markets.cloud; d.demandNoise = s.markets.demandNoise;
         for (Company c : s.companies) {
@@ -185,7 +187,7 @@ public class SaveData {
             pd.owner = s.companies.indexOf(p.owner); pd.buildLeft = p.buildHoursLeft; pd.outage = p.outageHoursLeft;
             pd.builtAt = p.builtAtHour; pd.lifetimeMWh = p.lifetimeMWh; pd.lastMonthProfit = p.lastMonthProfit; pd.monthProfit = p.monthProfit;
             pd.legacy = p.legacy; pd.retireYear = p.retireYear; pd.retireMonth = p.retireMonth; pd.customName = p.customName; pd.preferredTm = p.preferredTm; pd.tenderId = p.tenderId;
-            pd.dailyMWh = p.dailyMWh; pd.dailyCurt = p.dailyCurtailMWh; pd.dayIdx = p.dayIdx; pd.daysTracked = p.daysTracked; pd.yearProfit = p.yearProfit; pd.lastYearProfit = p.lastYearProfit;
+            pd.dailyMWh = p.dailyMWh; pd.dailyCurt = p.dailyCurtailMWh; pd.dayIdx = p.dayIdx; pd.daysTracked = p.daysTracked; pd.yearProfit = p.yearProfit; pd.lastYearProfit = p.lastYearProfit; pd.capacityYear = p.capacityYear; pd.lastYearCapacity = p.lastYearCapacity;
             pd.gen12 = p.gen12; pd.genIdx = p.genIdx; pd.monthMWh = p.monthMWh; pd.monthCost = p.monthCost; pd.lastMonthMWh = p.lastMonthMWh; pd.lastMonthCost = p.lastMonthCost; pd.priceCap = p.priceCap;
             pd.equipment = p.equipment.id; pd.ageStart = p.ageStartHour; pd.upgradeLeft = p.upgradeHoursLeft;
             pd.pendingUpgrade = p.pendingUpgrade == null ? null : p.pendingUpgrade.name();
@@ -258,6 +260,10 @@ public class SaveData {
             Double v = supplierIndex.get(sp.id);
             if (v != null) sp.priceIndex = v;
         }
+        if (peak12 != null && peak12.length == 12) s.peak12 = peak12;
+        if (peakAvail12 != null && peakAvail12.length == 12) s.peakAvail12 = peakAvail12;
+        s.monthPeakAvail = monthPeakAvail;
+        s.monthPeakMW = monthPeakMW; s.capacityPrice = capacityPrice; s.capacityMargin = capacityMargin;
         s.markets.coalPrice = coal; s.markets.gasPrice = gas; s.markets.uraniumPrice = uranium; s.markets.carbonPrice = carbon;
         s.markets.wind = wind; s.markets.cloud = cloud; s.markets.demandNoise = demandNoise;
         for (CompanyD cd : companies) {
@@ -302,7 +308,7 @@ public class SaveData {
             p.legacy = pd.legacy; p.retireYear = pd.retireYear; p.retireMonth = pd.retireMonth; p.customName = pd.customName; p.preferredTm = pd.preferredTm; p.tenderId = pd.tenderId;
             if (pd.dailyMWh != null && pd.dailyMWh.length == 30) p.dailyMWh = pd.dailyMWh;
             if (pd.dailyCurt != null && pd.dailyCurt.length == 30) p.dailyCurtailMWh = pd.dailyCurt;
-            p.dayIdx = pd.dayIdx; p.daysTracked = pd.daysTracked; p.yearProfit = pd.yearProfit; p.lastYearProfit = pd.lastYearProfit;
+            p.dayIdx = pd.dayIdx; p.daysTracked = pd.daysTracked; p.yearProfit = pd.yearProfit; p.lastYearProfit = pd.lastYearProfit; p.capacityYear = pd.capacityYear; p.lastYearCapacity = pd.lastYearCapacity;
             if (pd.gen12 != null && pd.gen12.length == 12) p.gen12 = pd.gen12;
             p.genIdx = Math.floorMod(pd.genIdx, 12); p.monthMWh = pd.monthMWh; p.monthCost = pd.monthCost; p.lastMonthMWh = pd.lastMonthMWh; p.lastMonthCost = pd.lastMonthCost; p.priceCap = pd.priceCap;
             s.map.ensureLand(p.x, p.y);

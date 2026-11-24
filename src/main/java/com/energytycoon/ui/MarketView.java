@@ -17,7 +17,7 @@ public final class MarketView {
     private final Skin skin;
     private GameState st;
 
-    private final Label price, coal, gas, uranium, carbon, gasSub, wind, cloud, renew, served;
+    private final Label price, coal, gas, uranium, carbon, gasSub, wind, cloud, renew, served, capPrice, capSub;
     private final Table supTable = new Table();
     private final List<Label[]> supRows = new ArrayList<>();
     public final List<LineChart> charts = new ArrayList<>();
@@ -26,7 +26,8 @@ public final class MarketView {
         this.skin = skins.skin;
         root.defaults().left();
         price = kpi(); coal = kpi(); gas = kpi(); uranium = kpi(); carbon = kpi();
-        wind = kpi(); cloud = kpi(); renew = kpi(); served = kpi();
+        wind = kpi(); cloud = kpi(); renew = kpi(); served = kpi(); capPrice = kpi();
+        capSub = new Label("", skin, "dim");
         gasSub = new Label("", skin, "dim");
 
         Table r1 = new Table();
@@ -37,9 +38,10 @@ public final class MarketView {
         r1.add(UiKit.card(skin, "Karbon vergisi", carbon, new Label("$/ton CO₂", skin, "dim"), "fuel_carbon")).width(130);
         root.add(r1).padBottom(6).row();
         Table r2 = new Table();
-        r2.add(UiKit.card(skin, "Rüzgar", wind, null, "fuel_wind")).width(150).padRight(6);
+        r2.add(UiKit.card(skin, "Rüzgar", wind, null, "fuel_wind")).width(130).padRight(6);
         r2.add(UiKit.card(skin, "Bulut örtüsü", cloud, null)).width(112).padRight(6);
-        r2.add(UiKit.card(skin, "Yenilenebilir pay", renew, null)).width(236).padRight(6);
+        r2.add(UiKit.card(skin, "Yenilenebilir pay", renew, null)).width(126).padRight(6);
+        r2.add(UiKit.card(skin, "Kapasite fiyatı", capPrice, capSub)).width(124).padRight(6);
         r2.add(UiKit.card(skin, "Karşılanan talep", served, new Label("geçen ay", skin, "dim"))).width(130);
         root.add(r2).padBottom(10).row();
 
@@ -96,6 +98,9 @@ public final class MarketView {
         cloud.setText(Fmt.pct(1 - mk.cloud));
         renew.setText(Fmt.pct(s.statRenewShare));
         served.setText(Fmt.pct(s.lastServedRatio));
+        // kapasite mekanizmasi: guvenilir kapasiteye aylik odeme; yedek marji daraldikca birim fiyat artar
+        capPrice.setText("$" + Math.round(s.capacityPrice / 1000) + "K/MW-yıl");
+        capSub.setText("yedek marjı %" + Math.round(s.capacityMargin * 100));
         served.setStyle(skin.get(s.lastServedRatio >= 0.97 ? "kpiGood" : s.lastServedRatio >= 0.9 ? "kpi" : "kpiBad", Label.LabelStyle.class));
 
         if (supRows.isEmpty()) {

@@ -31,17 +31,18 @@ public final class StrategyCheck {
                     long n = s.plants.stream().filter(p -> p.owner == c).count();
                     trail.computeIfAbsent(c, k -> new StringBuilder()).append(String.format(Locale.ROOT, " %d:n%d nakit%.0f borc%.0f lev%.1f not%s;", s.year(), n, c.cash / 1e6, c.debt() / 1e6, s.finance.leverage(c), s.finance.rating(c)));
                 }
-                if (seed == 1 && s.hour % (Balance.HOURS_PER_YEAR * 5) == 0) {
+                if (seed <= 2 && s.hour % (Balance.HOURS_PER_YEAR * 3) == 0) {
                     Company c = s.companies.get(1);
                     StringBuilder sb = new StringBuilder("  endeks " + s.year() + " (inan=" + String.format(Locale.ROOT, "%.2f", c.carbonBelief) + "): ");
                     for (PlantType t : PlantType.values()) {
-                        Equipment e = s.catalog.cheapest(t, s.year());
-                        if (e != null) sb.append(t.name()).append(String.format(Locale.ROOT, "=%.2f ", RivalStrategy.projectIndex(s, c, e, s.cities.get(0))));
+                        double bi = -9;
+                        for (Equipment e : s.catalog.available(t, s.year())) bi = Math.max(bi, RivalStrategy.projectIndex(s, c, e, s.cities.get(0)));
+                        sb.append(t.name()).append(String.format(Locale.ROOT, "=%.2f ", bi));
                     }
                     double[] g12 = new double[PlantType.values().length], cp = new double[PlantType.values().length]; int[] n = new int[g12.length];
                     for (Plant p : s.plants) if (p.operational() && s.hour - p.builtAtHour > Balance.HOURS_PER_YEAR * 1.5) { g12[p.type.ordinal()] += p.gen12(); cp[p.type.ordinal()] += p.capacityMW() * Balance.HOURS_PER_YEAR; n[p.type.ordinal()]++; }
                     for (PlantType t : PlantType.values()) if (cp[t.ordinal()] > 0) sb.append(String.format(Locale.ROOT, " cf_%s=%.2f(n%d)", t.name(), g12[t.ordinal()] / cp[t.ordinal()], n[t.ordinal()]));
-                    System.out.println(sb + " fiyat=" + String.format(Locale.ROOT, "%.1f", s.statPrice) + " karbon=" + String.format(Locale.ROOT, "%.0f", s.markets.carbonPrice));
+                    System.out.println(sb + String.format(Locale.ROOT, " kapFiyat=%.0fk marj=%.2f", s.capacityPrice / 1e3, s.capacityMargin) + " fiyat=" + String.format(Locale.ROOT, "%.1f", s.statPrice) + " karbon=" + String.format(Locale.ROOT, "%.0f", s.markets.carbonPrice));
                 }
             }
             System.out.println("tohum " + seed + ":");

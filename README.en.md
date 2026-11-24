@@ -44,7 +44,8 @@
 
 ## Highlights
 
-- **Hourly electricity market:** Every hour, demand is met starting with the cheapest plant (merit order). Weather, fuel prices and the carbon tax set the price.
+- **Hourly electricity market:** Every hour, demand is met starting with the cheapest plant (merit order). Weather, fuel prices and the carbon tax set the price. When the hourly reserve drops below 10%, a scarcity premium appears even without load shedding.
+- **Capacity mechanism:** Every plant is paid monthly for its firm capacity (nuclear 90%, gas 90%, coal 85%, hydro 50%, wind 10%, solar 4%). The unit price follows the reserve margin at the tightest peak hour of the last 12 months: zero when capacity is plentiful, ~$80k/MW-year at the 15% target, higher in scarcity. Coal, nuclear and gas plants earn this on top of energy sales.
 - **Realistic grid:** MV / HV / EHV line tiers, plant clusters, substations, line losses, congestion and outages. The transmission system operator (UŞİ) builds lines on application.
 - **16 fictional suppliers, 20 equipment models:** Solar, wind, gas, coal, hydro and nuclear. Each model differs in price, efficiency, degradation and build time; new technologies arrive over the years.
 - **Deep finance system:**

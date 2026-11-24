@@ -44,6 +44,10 @@ public final class Plant extends GridNode {
     public double yearProfit;
     /** Gecen takvim yilinin net kari (rakip stratejisi ve getiri istatistikleri). */
     public double lastYearProfit;
+    /** Son kapasite mekanizmasi odemesi (aylik). */
+    public double capacityIncomeMonth;
+    /** Kapasite odemesi: bu yil biriken ve gecen yil toplami. */
+    public double capacityYear, lastYearCapacity;
     /** Ceyreklik kar (ECA DSCR): biriken ve gecen ceyrek. */
     public double qProfitAcc, qProfitLast;
 
