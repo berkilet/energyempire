@@ -3,10 +3,11 @@ package com.energytycoon.sim;
 import java.util.Random;
 
 /**
- * Rakip yatirim stratejisi: tum rakipler iktisadi olarak rasyoneldir. Tarz ("fossil", "green", "balanced") yalnizca
- * getirisi birbirine yakin secenekler arasinda kucuk bir tercih ve tedarik aliskanligidir; zarar edecegi belli olan
- * (net bugunku degeri negatif) yatirim hicbir sirket tarafindan yapilmaz. Karbon fiyat yolu kamuya ilan edildigi icin
- * herkes onu dogru bilir.
+ * Rakip yatirim stratejisi: sinirli rasyonellik. Her sirket KENDI beklentileriyle tutarli karar verir (kendi gozunde
+ * degeri negatif proje yapmaz), ama beklentileri, ogrenme hizlari, risk istahlari ve aliskanliklari her oyunda farkli
+ * cizilir: kimi fosil kokenli sirket karbonu gec ciddiye alir ve zorlanir, kimi erken donusur; kimi yesil sirket kitlik
+ * doneminde gaza yonelir. Ara sira yonetim degisikligi, buyume atagi, temkin donemi, teknoloji bahsi gibi stratejik
+ * surprizler olur. Boylece her oyun farkli akar; hicbir sirketin kaderi bastan belli degildir.
  * <ul>
  *   <li>Teknoloji secimi her kararda projenin beklenen getirisine dayanir (NBD / yatirim): elektrik fiyati, yakit,
  *       karbon fiyati ve saha verimi. Karbon fiyatinin ne kadar hizli artacagi sirketin <b>kendi beklentisidir</b>
@@ -31,7 +32,7 @@ public final class RivalStrategy {
     }
     /** Bu getiri endeksinin (NBD/yatirim) altinda proje yapilmaz. */
     /** Getiri endeksi (NBD / yatirim) bunun altindaysa proje yapilmaz: deger yaratmayan yatirim yok. */
-    static final double HURDLE = 0.0;
+    static final double HURDLE = 0.0; // referans (sirketlerin kendi esigi Company.hurdle)
     /** Bu kaldiracin (Net borc / FAVOK) ustunde yeni santral yatirimi yapilmaz. */
     static final double MAX_BUILD_LEVERAGE = 3.0;
     /** Yenilenebilirde uretim profili nedeniyle ortalama fiyata gore elde edilen fiyat orani. */
@@ -65,11 +66,10 @@ public final class RivalStrategy {
     /** Tarza gore baslangic egilimi (getiri endeksine eklenen tercih puani). */
     static double prior(String style, PlantType t) {
         switch (style) {
-            // fosil kokenli: yakit tedarik ve isletme deneyimi, esnek kapasiteye guven (puant/ihale gelirleri)
-            // yalnizca esitlik bozucu: getirisi neredeyse ayni iki secenekten aliskin olunani
-            case "fossil": return switch (t) { case GAS -> 0.03; case COAL -> 0.02; default -> 0; };
-            case "green": return switch (t) { case SOLAR, WIND -> 0.03; case HYDRO -> 0.02; default -> 0; };
-            default: return 0;
+            // fosil kokenli: yakit tedarik ve isletme deneyimi, esnek kapasiteye guven; yesil: proje gelistirme deneyimi
+            case "fossil": return switch (t) { case GAS -> 0.10; case COAL -> 0.07; case NUCLEAR -> 0.03; default -> 0; };
+            case "green": return switch (t) { case SOLAR, WIND -> 0.10; case HYDRO -> 0.06; default -> 0; };
+            default: return switch (t) { case GAS -> 0.03; default -> 0; };
         }
     }
 
@@ -78,12 +78,14 @@ public final class RivalStrategy {
         Random r = new Random(seed * 31 + c.name.hashCode());
         c.techView = new double[TYPES.length];
         c.priorWeight = 1;
-        switch (c.aiStyle) {
-            // karbon fiyat yolu ilan edilmistir: herkes dogru bilir (1 = gercek artis hizi)
-            case "fossil" -> { c.carbonBelief = 1; c.learnRate = 0.25 + 0.2 * r.nextDouble(); }
-            case "green" -> { c.carbonBelief = 1; c.learnRate = 0.30 + 0.2 * r.nextDouble(); }
-            default -> { c.carbonBelief = 1; c.learnRate = 0.30 + 0.2 * r.nextDouble(); }
-        }
+        // Karakter her oyunda yeniden cizilir; koken yalnizca ortalamayi kaydirir (genis dagilim: surprizler).
+        double beliefMean = switch (c.aiStyle) { case "fossil" -> 0.62; case "green" -> 1.10; default -> 0.85; };
+        c.carbonBelief = clamp(beliefMean + 0.22 * r.nextGaussian(), 0.25, 1.45);
+        c.learnRate = 0.08 + 0.42 * r.nextDouble();                 // kimi hizli, kimi cok yavas ogrenir
+        c.hurdleBase = clamp(0.02 * r.nextGaussian() + (r.nextDouble() < 0.3 ? -0.06 : 0.02), -0.12, 0.10);
+        c.hurdle = c.hurdleBase;
+        c.scarcityView = 0.5 + r.nextDouble();                       // arz sikisikligina duyarlilik
+        c.styleStrength = 0.4 + 1.4 * r.nextDouble();                // kokenine bagliligi
         c.orientation = orientation(c);
     }
 
@@ -92,7 +94,7 @@ public final class RivalStrategy {
      * santraller dahil beklenen uretim talebi asiyorsa fiyat duser (yatirimcilar boru hattini izler; herkes ayni anda
      * kurarsa fiyat coker).
      */
-    static double expectedPrice(GameState s) {
+    static double expectedPrice(GameState s, Company c) {
         java.util.ArrayList<Double> m = s.history.monthlyPrice;
         double p0;
         if (m.isEmpty()) p0 = s.statPrice;
@@ -101,8 +103,10 @@ public final class RivalStrategy {
             for (int i = Math.max(0, m.size() - 12); i < m.size(); i++) { sum += m.get(i); n++; }
             p0 = sum / n;
         }
-        return p0 * supplyFactor(s);
+        return p0 * (1 + (supplyFactor(s) - 1) * c.scarcityView);
     }
+
+    static double clamp(double v, double lo, double hi) { return Math.max(lo, Math.min(hi, v)); }
 
     /**
      * Guvenilir kapasite yedegi -> fiyat carpani. Puant talep (son gunlerin en yuksegi, buyume payiyla) ile insaattakiler
@@ -144,7 +148,7 @@ public final class RivalStrategy {
         Plant probe = new Plant();
         probe.type = t; probe.equipment = e; probe.owner = c; probe.x = city.x; probe.y = city.y;
         probe.builtAtHour = s.hour; probe.ageStartHour = s.hour;
-        double p0 = expectedPrice(s), carbon0 = s.markets.carbonPrice;
+        double p0 = expectedPrice(s, c), carbon0 = s.markets.carbonPrice;
         double growth = Balance.CARBON_GROWTH_YEAR * s.markets.carbonGrowthMult * c.carbonBelief;
         double co2 = probe.co2PerMWh(s.hour);
         double mcNoCarbon = s.marginalCost(probe) - carbon0 * co2;
@@ -188,7 +192,7 @@ public final class RivalStrategy {
 
     /** Karar puani: getiri + tarz egilimi (zamanla azalan) + ogrenilmis teknoloji gorusu. */
     static double utility(Company c, PlantType t, double index) {
-        return index + prior(c.aiStyle, t) * c.priorWeight + c.techView[t.ordinal()];
+        return index + prior(c.aiStyle, t) * c.styleStrength * c.priorWeight + c.techView[t.ordinal()];
     }
 
     /** Hedef sehir icin en cok tercih edilen uc ekipman (getiri esigini gecenler), tercih sirasiyla. */
@@ -204,7 +208,7 @@ public final class RivalStrategy {
             if (e == null) continue;
             if (t == PlantType.NUCLEAR && c.cash < e.capex() * 1.4) continue;
             double idx = projectIndex(s, c, e, city);
-            if (idx < HURDLE) continue;   // degeri negatif proje yapilmaz (tarz ne olursa olsun)
+            if (idx < c.hurdle) continue;   // sirket kendi beklentisiyle esigini gecmeyen projeyi yapmaz
             double u = utility(c, t, idx) + s.rng.nextGaussian() * 0.01;
             for (int k = 0; k < 3; k++) if (u > bu[k]) {
                 for (int m = 2; m > k; m--) { bu[m] = bu[m - 1]; best[m] = best[m - 1]; }
@@ -248,7 +252,11 @@ public final class RivalStrategy {
             if (p.lastYearProfit < 0) fossilLoss += -p.lastYearProfit;
         }
         double pain = fossilCapex > 0 ? Math.min(1, fossilLoss / fossilCapex * 10) : 0;
-        c.carbonBelief += (1 - c.carbonBelief) * Math.min(1, lr * (1 + 1.5 * pain));
+        // ogrenme gurultulu: kimi yil yanlis ders cikarilir
+        c.carbonBelief = clamp(c.carbonBelief + (1 - c.carbonBelief) * Math.min(1, lr * (1 + 1.5 * pain)) + 0.04 * s.rng.nextGaussian(), 0.25, 1.5);
+        // risk istahi zamanla kendi karakterine doner
+        c.hurdle += 0.35 * (c.hurdleBase - c.hurdle);
+        if (!c.player) surprise(s, c, pain);
         // 2) teknoloji gorusu: piyasadaki santrallerin gecen yilki getirisi (kar / yatirim), ortalamaya gore
         double[] roi = new double[TYPES.length], cap = new double[TYPES.length];
         double tot = 0, totCap = 0;
@@ -276,6 +284,40 @@ public final class RivalStrategy {
         } else c.pendingOrientation = o;
         // 4) portfoy: zarar eden ve beklentisi de olumsuz santraller
         if (!c.player) review(s, c);
+    }
+
+    /** Stratejik surprizler (sirket basina yilda ~%9): oyuncunun ezberleyemeyecegi kararlar. */
+    static void surprise(GameState s, Company c, double pain) {
+        if (s.rng.nextDouble() > 0.09) return;
+        int kind = s.rng.nextInt(5);
+        switch (kind) {
+            case 0 -> { // yonetim degisikligi: karakter yeniden cizilir, karbon beklentisi tazelenir
+                c.carbonBelief = clamp(0.95 + 0.2 * s.rng.nextGaussian(), 0.5, 1.4);
+                c.hurdleBase = clamp(0.03 * s.rng.nextGaussian(), -0.08, 0.08); c.hurdle = c.hurdleBase;
+                c.styleStrength = 0.3 + s.rng.nextDouble(); c.learnRate = 0.15 + 0.35 * s.rng.nextDouble();
+                s.notify("STRATEJİ: " + c.name + " yönetimi değişti; yeni yönetim yatırım planını baştan gözden geçiriyor.");
+            }
+            case 1 -> { // buyume atagi: dusuk getiriyi de kabul eder (pazar payi icin)
+                c.hurdle = c.hurdleBase - 0.10;
+                s.notify("STRATEJİ: " + c.name + " agresif büyüme planı açıkladı: pazar payı için yatırımları hızlandıracak.");
+            }
+            case 2 -> { // temkin donemi
+                c.hurdle = c.hurdleBase + 0.12;
+                s.notify("STRATEJİ: " + c.name + " temkinli döneme girdi: yeni yatırımları erteliyor, borç azaltacak.");
+            }
+            case 3 -> { // teknoloji bahsi: piyasada geri planda kalmis bir teknolojiye yonelir
+                PlantType[] bets = { PlantType.GAS, PlantType.WIND, PlantType.SOLAR, PlantType.HYDRO, PlantType.NUCLEAR, PlantType.COAL };
+                PlantType t = bets[s.rng.nextInt(bets.length)];
+                if (t == PlantType.COAL && c.carbonBelief > 0.8) t = PlantType.GAS;
+                c.techView[t.ordinal()] += 0.15;
+                s.notify("STRATEJİ: " + c.name + " " + t.label.toLowerCase(java.util.Locale.ROOT) + " yatırımlarına odaklanacağını açıkladı.");
+            }
+            default -> { // karbon tartismasi: beklenti bir yone sapar
+                double d = (s.rng.nextBoolean() ? 1 : -1) * (0.15 + 0.15 * s.rng.nextDouble());
+                c.carbonBelief = clamp(c.carbonBelief + d, 0.25, 1.5);
+                s.notify("STRATEJİ: " + c.name + (d > 0 ? " karbon fiyatlarının beklenenden hızlı artacağını öngörüyor." : " karbon fiyatı artışının yavaşlayacağına bahis oynuyor."));
+            }
+        }
     }
 
     static boolean fullYear(GameState s, Plant p) {

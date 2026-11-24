@@ -16,6 +16,11 @@ public final class Company {
      * kalan agirligi, teknoloji basina ogrenilmis gorus ve duyurulan yonelim. Tarz yalnizca baslangic egilimidir.
      */
     public double carbonBelief = 1, learnRate = 0.4, priorWeight = 1;
+    /**
+     * Her oyunda rastgele cizilen yonetim karakteri: kabul edilen en dusuk getiri endeksi (hurdle; agresif negatife,
+     * temkinli pozitife yakin) ve kalici degeri, kitlik/esnek kapasiteye verilen agirlik, aliskin teknolojiye bagliligi.
+     */
+    public double hurdle, hurdleBase, scarcityView = 1, styleStrength = 1;
     public double[] techView;
     public String orientation, pendingOrientation;
     public int colorRgb;

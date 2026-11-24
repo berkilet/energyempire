@@ -71,7 +71,7 @@ public class SaveData {
         public double lastRevenue, lastFuel, lastOm, lastCarbon, lastInterest, lastFines, lastNet, lastMwh, lastCo2;
         public double[] netHistory; public double[] valHist, cashHist;
         public String aiStyle; public double rateAdd, lastRenew;
-        /** rakip stratejisi */ public double carbonBelief, learnRate, priorWeight; public double[] techView; public String orientation, pendingOrientation;
+        /** rakip stratejisi */ public double carbonBelief, learnRate, priorWeight, hurdle, hurdleBase, scarcityView = 1, styleStrength = 1; public double[] techView; public String orientation, pendingOrientation;
         /** v3 */ public boolean neutral; }
     public static class CityD { public int id, x, y; public String name; public double pop, sat;
         /** ihale takibi */ public int lowSatMonths; public long lastTenderHour = Long.MIN_VALUE / 4; public double lastServedRatio = 1; }
@@ -172,7 +172,7 @@ public class SaveData {
             cd.valHist = c.valuationHistory.stream().mapToDouble(Double::doubleValue).toArray();
             cd.cashHist = c.cashHistory.stream().mapToDouble(Double::doubleValue).toArray();
             cd.aiStyle = c.aiStyle; cd.lastRenew = c.lastRenewMwh; cd.neutral = c.neutral;
-            cd.carbonBelief = c.carbonBelief; cd.learnRate = c.learnRate; cd.priorWeight = c.priorWeight; cd.techView = c.techView; cd.orientation = c.orientation; cd.pendingOrientation = c.pendingOrientation;
+            cd.hurdle = c.hurdle; cd.hurdleBase = c.hurdleBase; cd.scarcityView = c.scarcityView; cd.styleStrength = c.styleStrength; cd.carbonBelief = c.carbonBelief; cd.learnRate = c.learnRate; cd.priorWeight = c.priorWeight; cd.techView = c.techView; cd.orientation = c.orientation; cd.pendingOrientation = c.pendingOrientation;
             d.companies.add(cd);
         }
         for (City c : s.cities) {
@@ -272,7 +272,7 @@ public class SaveData {
             if (cd.aiStyle != null) c.aiStyle = cd.aiStyle;
             else if (!c.player) c.aiStyle = c.name.startsWith("Yeşil") ? "green" : "fossil";
             c.neutral = cd.neutral;
-            if (cd.techView != null) { c.techView = cd.techView; c.carbonBelief = cd.carbonBelief; c.learnRate = cd.learnRate; c.priorWeight = cd.priorWeight; c.orientation = cd.orientation; c.pendingOrientation = cd.pendingOrientation; }
+            if (cd.techView != null) { c.techView = cd.techView; c.hurdle = cd.hurdle; c.hurdleBase = cd.hurdleBase; c.scarcityView = cd.scarcityView; c.styleStrength = cd.styleStrength; c.carbonBelief = cd.carbonBelief; c.learnRate = cd.learnRate; c.priorWeight = cd.priorWeight; c.orientation = cd.orientation; c.pendingOrientation = cd.pendingOrientation; }
             else if (!c.player && !c.neutral) RivalStrategy.init(c, g.seed);
             if (c.neutral) c.colorRgb = GridBalance.NEUTRAL_COLOR; // eski kayitlarda gri
             if (cd.fin != null) cd.fin.apply(c);
