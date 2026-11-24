@@ -118,6 +118,8 @@ To uninstall, delete the folder.
 
 Choosing a plant type opens a model selection window. Each model sets output, efficiency and emissions, annual degradation, price and build time. A supplier's reputation affects outage frequency and the risk of delivery delays. Repairs are free during the warranty period. Supplier price indices fluctuate monthly.
 
+After choosing a model you pick a site on the map; clicking it opens the **Purchase and Installation** screen. At the top it summarises the project at that site (expected capacity factor, annual output, first-year operating profit incl. capacity payment, project return: NPV / investment — the same calculation rivals use); below, two options side by side: **equity** (price paid up front) or **loan** (ECA or commercial; choose bank, instalment frequency, debt share and tenor; it shows rate, instalment, up-front equity and DSCR, and the reason if a bank refuses). The game pauses automatically while the equipment, purchase and line connection screens are open and returns to the previous speed when they close.
+
 | Type | Models |
 |---|---|
 | Solar | SunPeak PERC (cheap, ages fast) · Helion TOPCon · Lumina bifacial HJT (low heat loss) · Kuzey Güneş tandem (next generation) |
@@ -182,7 +184,7 @@ The Finance window (**F** key, or click the cash indicator) has six tabs: **Summ
   Your relationship score with each bank rises with instalments paid on time and gradually unlocks fee discounts and lower spreads.
 - **Loan products:**
   - **Commercial loan:** 3–7 years (10 years at Crédit Agricool); fixed or floating; monthly or quarterly instalments.
-  - **ECA export credit:** 85% of the equipment price; with a grace period and a lower rate. Chosen in the equipment window when ordering a plant. The plant's debt service coverage ratio (DSCR) is monitored.
+  - **ECA export credit:** 85% of the equipment price; with a grace period and a lower rate. Chosen on the Purchase and Installation screen when ordering a plant. The plant's debt service coverage ratio (DSCR) is monitored.
   - **Revolving credit facility:** Drawn automatically when cash goes negative.
   - **Acquisition loan:** For mergers and acquisitions.
 - **Collection and default:**

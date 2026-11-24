@@ -30,6 +30,9 @@ public final class GameScreen implements Screen, Hud.Listener {
     private Tool tool = Tool.SELECT;
     private Equipment plantEq;
     private int speed = 1, lastSpeed = 1;
+    /** Karar penceresi acilinca otomatik duraklatildi mi ve onceki hiz. */
+    private boolean autoPaused;
+    private int autoPausedFrom = 1;
     private double accum;
     private GridNode lineFrom;
     /** Hat araci kademesi (Tab ile OG → YG → ÇYG). */
@@ -94,6 +97,13 @@ public final class GameScreen implements Screen, Hud.Listener {
     public void devNoHover(boolean b) { devNoHover = b; }
     public void devHideHelp() { hud.hideHelp(); }
     public void devShowLog() { hud.devShowLog(); }
+    /** Dogrulama: verilen ekipman icin sehir yakininda uygun yerde satin alma ekranini acar. */
+    public void devPurchase(String eqId) {
+        hud.hideHelp();
+        Equipment eq = state.catalog.get(eqId);
+        int[] site = com.energytycoon.sim.RivalAI.findSite(state, eq, state.cities.get(0), 2, 8);
+        if (site != null) hud.showPurchase(state, eq, site[0], site[1], c -> purchase(eq, site[0], site[1], c), null);
+    }
     /** Dogrulama: ornek krediler (ticari + ECA'li santral) ve finans sekmesi. */
     public void devFinance(String tab) {
         hud.hideHelp();
@@ -565,22 +575,33 @@ public final class GameScreen implements Screen, Hud.Listener {
                 String why = state.checkPlacement(plantEq.type, x, y);
                 if (why == null) why = state.checkEquipment(plantEq);
                 if (why != null) { hud.toast(why); return; }
-                boolean eca = hud.ecaOn() && Finance.ecaEligible(plantEq);
-                String ecaNo = eca ? state.finance.ecaRefusal(state.player, plantEq, hud.ecaBank()) : null;
-                if (ecaNo != null) { hud.toast("ECA: " + ecaNo + ". Başka banka seçin veya ECA'sız alın."); return; }
-                double needCash = eca ? state.finance.ecaCashNeed(state.player, plantEq, hud.ecaBank(), hud.ecaFreq()) : plantEq.capex();
-                if (state.player.cash < needCash) { hud.toast("Yetersiz nakit (" + Fmt.money(needCash) + " gerekli). Finans'tan kredi kullanabilirsiniz."); return; }
-                Plant p = eca ? state.finance.buildWithEca(state.player, plantEq, x, y, hud.ecaBank(), hud.ecaFreq()) : state.buildPlant(state.player, plantEq, x, y);
-                if (p != null && eca) hud.toast("ECA kredisi: " + plantEq.supplier.origin + " İhracat Kredi Kuruluşu · " + hud.ecaBank().label);
-                if (p != null) {
-                    hud.toast(plantEq.fullName() + " inşaatı başladı (" + p.buildHoursLeft / 24 + " gün). Şimdi bir hat çekin!");
-                    selNode = p.id;
-                }
+                // Model ve yer secildi: satin alma ve kurulum karari (oz kaynak / kredi) ayri ekranda, oyun duraklar
+                final Equipment eq = plantEq; final int px = x, py = y;
+                hud.showPurchase(state, eq, px, py, c -> purchase(eq, px, py, c), null);
             }
             case LINE -> clickNode(state.nodeAt(x, y));
             case SUBSTATION -> clickSubstation(x, y);
             case DEMOLISH -> clickDemolish(x, y);
         }
+    }
+
+    /** Kurulum ekranindaki karari uygular (oyuncu ve rakipler ayni finans yollarini kullanir). */
+    private void purchase(Equipment eq, int x, int y, com.energytycoon.ui.PurchaseWindow.Choice c) {
+        String why = state.checkPlacement(eq.type, x, y);
+        if (why != null) { hud.toast(why); return; }
+        Plant p = switch (c.mode) {
+            case CASH -> state.player.cash >= eq.capex() ? state.buildPlant(state.player, eq, x, y) : null;
+            case ECA -> state.finance.buildWithEca(state.player, eq, x, y, c.bank, c.freqMonths);
+            case COMMERCIAL -> state.finance.buildWithCommercial(state.player, eq, x, y, c.bank, c.loanAmount, c.years, c.freqMonths);
+        };
+        if (p == null) { hud.toast("Kurulum yapılamadı (nakit, banka koşulu ya da yer)."); return; }
+        String fin = switch (c.mode) {
+            case CASH -> "öz kaynakla";
+            case ECA -> "ECA kredisiyle (" + eq.supplier.origin + " İhracat Kredi Kuruluşu · " + c.bank.label + ")";
+            case COMMERCIAL -> "ticari krediyle (" + c.bank.label + ", " + Fmt.money(c.loanAmount) + ", " + c.years + " yıl)";
+        };
+        hud.toast(eq.fullName() + " " + fin + " sipariş edildi; inşaat " + p.buildHoursLeft / 24 + " gün. Şimdi bir hat çekin!");
+        selNode = p.id;
     }
 
     private String routeText(GridNode a, GridNode b) {
@@ -694,10 +715,9 @@ public final class GameScreen implements Screen, Hud.Listener {
                 if (plantEq == null) return;
                 String why = state.checkPlacement(plantEq.type, t[0], t[1]);
                 if (why == null) why = state.checkEquipment(plantEq);
-                boolean afford = state.player.cash >= (hud.ecaOn() && Finance.ecaEligible(plantEq) ? state.finance.ecaCashNeed(state.player, plantEq, hud.ecaBank(), hud.ecaFreq()) : plantEq.capex());
-                wr.ghostEquipment = plantEq; wr.ghostValid = why == null && afford;
-                hud.setPlaceInfo(siteInfo(plantEq, t[0], t[1])
-                    + (why != null ? "   ✗ " + why : !afford ? "   ✗ Yetersiz nakit" : ""));
+                // nakit/kredi karari kurulum ekraninda; burada yalnizca yerin uygunlugu
+                wr.ghostEquipment = plantEq; wr.ghostValid = why == null;
+                hud.setPlaceInfo(siteInfo(plantEq, t[0], t[1]) + (why != null ? "   ✗ " + why : "   · tıklayın: satın alma ve kurulum"));
             }
             case LINE -> {
                 if (n != null) n = connectionTarget(n);
@@ -969,6 +989,12 @@ public final class GameScreen implements Screen, Hud.Listener {
         if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) fw += k;
         if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) fw -= k;
         if (rx != 0 || fw != 0) wr.iso.pan(rx, fw);
+
+        // Karar ekranlari (ekipman secimi, satin alma/kurulum, hat baglantisi) acikken oyun duraklar; kapaninca onceki hiza doner.
+        // Oyuncu bu sirada hizi kendisi acarsa ona dokunulmaz.
+        boolean decision = hud.decisionOpen();
+        if (decision && !autoPaused && speed > 0) { autoPausedFrom = speed; speed = 0; autoPaused = true; }
+        else if (!decision && autoPaused) { if (speed == 0) speed(autoPausedFrom); autoPaused = false; }
 
         if (!state.gameOver && speed > 0) {
             accum += dt * HOURS_PER_SEC[speed];

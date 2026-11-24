@@ -320,6 +320,22 @@ public final class Finance {
         return p;
     }
 
+    /**
+     * Ticari krediyle santral siparisi (oyuncunun kurulum penceresi): kredi imzalanir, santral kurulur. Null: yapilamadi
+     * (banka reddi, nakit yetmez ya da yer uygun degil; yer kontrolu cagiranda). Kredinin amaci santral turu (yesil indirim/ret).
+     */
+    public Plant buildWithCommercial(Company c, Equipment e, int x, int y, Bank b, double amount, int years, int freqMonths) {
+        Plant purpose = new Plant(); purpose.type = e.type; purpose.equipment = e;
+        if (refusal(c, b, Loan.Type.COMMERCIAL, amount, purpose) != null || years > b.maxYears()) return null;
+        double fee = amount * FinanceBalance.COMMERCIAL_FEE * Bank.feeMult(c.bankScore[b.ordinal()]);
+        if (c.cash + amount - fee < e.capex()) return null;
+        if (s.checkPlacement(e.type, x, y) != null) return null;
+        Loan l = signCommercial(c, b, amount, years, freqMonths, false, purpose);
+        if (l == null) return null;
+        Plant p = s.buildPlant(c, e, x, y);
+        return p;
+    }
+
     /** Santral icin pesin gereken nakit (ECA ile): bedel - kredi + prim + masraf. */
     public double ecaCashNeed(Company c, Equipment e, Bank b, int freqMonths) {
         EcaQuote q = ecaQuote(c, e, b, freqMonths);

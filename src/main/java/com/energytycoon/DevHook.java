@@ -54,6 +54,7 @@ final class DevHook {
         if (frame == 6 && gs != null) {
             String open = get("ET_OPEN", "");
             if (open.startsWith("equip:")) gs.devOpenEquipment(PlantType.valueOf(open.substring(6)));
+            else if (open.startsWith("buy:")) gs.devPurchase(open.substring(4));
             else if (open.equals("market") || open.equals("menu") || open.equals("finance") || open.equals("help") || open.equals("settings") || open.equals("companies")) gs.devToggle(open);
             else if (open.equals("invest")) gs.devShowInvest("Santral Yatırımları");
             else if (open.equals("invest2")) gs.devShowInvest("Bağlantı Yatırımları");

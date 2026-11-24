@@ -116,6 +116,8 @@ Oyunu kaldırmak için klasörü silmeniz yeterlidir.
 
 Bir santral türü seçildiğinde model seçim penceresi açılır. Her model üretimi, verimi ve emisyonu, yıllık yaşlanmayı, fiyatı ve inşaat süresini belirler. Tedarikçinin itibarı arıza sıklığını ve teslim gecikmesi riskini etkiler. Garanti süresi boyunca onarım ücretsizdir. Tedarikçi fiyat endeksleri aylık dalgalanır.
 
+Model seçildikten sonra haritada yer seçilir; yere tıklayınca **Satın Alma ve Kurulum** ekranı açılır. Üstte projenin o sahadaki özeti (beklenen kapasite faktörü, yıllık üretim, ilk yıl işletme kârı ve kapasite ödemesi, proje getirisi: NBD / yatırım; rakiplerin kullandığı hesabın aynısı), altta iki seçenek yan yana: **öz kaynakla** (bedel peşin) ya da **krediyle** (ECA veya ticari kredi; banka, taksit sıklığı, borç oranı ve vade seçilir; faiz, taksit, peşin öz kaynak ve geri ödeme gücü DSCR gösterilir, banka reddederse gerekçesi yazılır). Ekipman seçimi, satın alma ve hat bağlantısı ekranları açıkken oyun otomatik duraklar; kapanınca önceki hıza döner.
+
 | Tür | Modeller |
 |---|---|
 | Güneş | SunPeak PERC (ucuz, hızlı yaşlanır) · Helion TOPCon · Lumina çift yüzlü HJT (sıcakta az kayıp) · Kuzey Güneş tandem (yeni nesil) |
@@ -182,7 +184,7 @@ Finans penceresi (**F** tuşu veya nakit göstergesine tıklama) altı sekmeden 
   Banka ilişki puanı, vadesinde ödenen taksitlerle yükselir. Kademeli olarak masraf indirimi ve daha düşük faiz sağlar.
 - **Kredi ürünleri:**
   - **Ticari kredi:** 3–7 yıl (Crédit Agricool'da 10 yıl); sabit veya değişken faiz; aylık veya üç ayda bir taksit.
-  - **ECA ihracat kredisi:** Ekipman bedelinin %85'i; ödemesiz dönemli ve daha ucuz. Santral siparişinde, ekipman penceresinden seçilir. Santralin borç servisini karşılama oranı (DSCR) izlenir.
+  - **ECA ihracat kredisi:** Ekipman bedelinin %85'i; ödemesiz dönemli ve daha ucuz. Santral siparişinde Satın Alma ve Kurulum ekranından seçilir. Santralin borç servisini karşılama oranı (DSCR) izlenir.
   - **İşletme kredisi limiti:** Nakit eksiye düşünce otomatik kullanılır.
   - **Devralma kredisi:** Birleşme ve satın alma için.
 - **Tahsilat ve temerrüt:**

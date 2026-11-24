@@ -170,16 +170,33 @@ public final class RivalStrategy {
      * fiyat-marjinal maliyet farkindan; yenilenebilirde saha veriminden.
      */
     public static double projectIndex(GameState s, Company c, Equipment e, City city) {
+        return evaluate(s, c, e, city, -1, -1).index;
+    }
+
+    /** Proje degerlendirmesi (oyuncunun kurulum penceresi de ayni hesabi gorur). */
+    public static final class Evaluation {
+        /** NBD / yatirim. */
+        public double index;
+        /** Ilk tam yil: uretim (MWh), kapasite faktoru, isletme nakdi (enerji + kapasite - sabit gider), kapasite geliri. */
+        public double mwh1, cf1, ebitda1, capacity1, npv;
+    }
+
+    /**
+     * x,y >= 0 ise belirli saha (o karenin verimi ve yakit indirimi); aksi halde sehir cevresinde ulasilabilir en iyi saha.
+     */
+    public static Evaluation evaluate(GameState s, Company c, Equipment e, City city, int sx, int sy) {
+        Evaluation ev = new Evaluation();
         PlantType t = e.type;
+        boolean site = sx >= 0 && sy >= 0;
         Plant probe = new Plant();
-        probe.type = t; probe.equipment = e; probe.owner = c; probe.x = city.x; probe.y = city.y;
+        probe.type = t; probe.equipment = e; probe.owner = c; probe.x = site ? sx : city.x; probe.y = site ? sy : city.y;
         probe.builtAtHour = s.hour; probe.ageStartHour = s.hour;
         double pAvg = averagePrice(s), sfNow = 1 + (supplyFactor(s) - 1) * c.scarcityView, carbon0 = s.markets.carbonPrice;
         double growth = Balance.CARBON_GROWTH_YEAR * s.markets.carbonGrowthMult * c.carbonBelief;
         double co2 = probe.co2PerMWh(s.hour);
         double mcNoCarbon = s.marginalCost(probe) - carbon0 * co2;
-        double cf = t.renewable ? bestSiteCf(s, e, city) : 0;
-        if (t.renewable && cf <= 0) return Double.NEGATIVE_INFINITY;
+        double cf = t.renewable ? (site ? s.siteScore(e, sx, sy) : bestSiteCf(s, e, city)) : 0;
+        if (t.renewable && cf <= 0) { ev.index = Double.NEGATIVE_INFINITY; return ev; }
         if (t == PlantType.HYDRO) cf *= hydroSharing(s, city);
         double capture = captureRate(s, t);
         // ilk yilin model nakdi piyasadaki gercek sonuclarla olceklenir (puant fiyatlari, kisinti, ariza gibi modelin gormedikleri)
@@ -215,9 +232,14 @@ public final class RivalStrategy {
                 if (!Double.isNaN(obs) && operating > 0) calib = Math.max(0.75, Math.min(1.25, obs * e.capacityMW / operating));
                 continue;
             }
+            if (y == 1) {
+                ev.mwh1 = mwh; ev.cf1 = mwh / (e.capacityMW * Balance.HOURS_PER_YEAR);
+                ev.ebitda1 = operating * calib + capRev - fixed; ev.capacity1 = capRev;
+            }
             npv += (operating * calib + capRev - fixed) / Math.pow(1 + disc, tt);
         }
-        return npv / capex;
+        ev.npv = npv; ev.index = npv / capex;
+        return ev;
     }
 
     /** Karar puani: getiri + tarz egilimi (zamanla azalan) + ogrenilmis teknoloji gorusu. */

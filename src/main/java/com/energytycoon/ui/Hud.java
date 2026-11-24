@@ -103,6 +103,8 @@ public final class Hud {
     private final Label lcTitle, lcOwn, lcOp;
     private final TextButton lcOwnBtn, lcOpBtn;
     private final EquipmentWindow equipWin;
+    /** Satin alma ve kurulum karari (model + yer secildikten sonra). */
+    private final PurchaseWindow purchaseWin;
     private final Label gameOverLbl;
     private final FinanceCenter financeView;
     private LoanWizard wizard;
@@ -112,10 +114,6 @@ public final class Hud {
     private Label confirmText;
     private String confirmAction;
     private long financeRefreshAt;
-    /** Ekipman penceresinde ECA secimi: acik mi, banka, taksit sikligi (ay). */
-    private boolean ecaOn;
-    private Bank ecaBank = Bank.KIYI;
-    private int ecaFreq = 6;
     private final MarketView marketView;
     private final CompaniesView companiesView;
     private Window settingsWin;
@@ -418,9 +416,11 @@ public final class Hud {
 
         equipWin = new EquipmentWindow(skin);
         skins.decorateWindow(equipWin, () -> equipWin.setVisible(false));
+        purchaseWin = new PurchaseWindow(skin);
+        skins.decorateWindow(purchaseWin, purchaseWin::cancel);
 
         stage.addActor(wizardWin); stage.addActor(restructWin); stage.addActor(dealWin); stage.addActor(defenseWin); stage.addActor(confirmWin);
-        for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, lineChoice, assetsWin }) {
+        for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, purchaseWin, lineChoice, assetsWin }) {
             stage.addActor(w);
             w.setVisible(false);
         }
@@ -472,20 +472,7 @@ public final class Hud {
 
     private void openEquipment(PlantType t) {
         if (st == null) return;
-        equipWin.ecaLine = e -> {
-            String no = st.finance.ecaRefusal(st.player, e, ecaBank);
-            if (no != null) return no;
-            Finance.EcaQuote q = st.finance.ecaQuote(st.player, e, ecaBank, ecaFreq);
-            return "ECA uygun · " + e.supplier.origin + " · tahmini taksit " + Fmt.money(q.installment) + " / " + (ecaFreq == 6 ? "6 ay" : "yıl")
-                + " · peşin " + Fmt.money(st.finance.ecaCashNeed(st.player, e, ecaBank, ecaFreq)) + " · tahmini DSCR " + FinanceCenter.num(st.finance.expectedDscr(st.player, e, st.cities.get(0).x, st.cities.get(0).y, ecaBank, ecaFreq));
-        };
-        equipWin.footer.clear();
-        Table ft = equipWin.footer;
-        ft.add(l("Finansman:", "default")).padRight(8);
-        ft.add(ecaToggle("ECA kredisi ile al (bedelin %85'i)", ecaOn, () -> ecaOn = !ecaOn, t)).height(28).padRight(10);
-        for (Bank b : Bank.values()) ft.add(ecaToggle(b.label, ecaBank == b, () -> ecaBank = b, t)).height(28).padRight(3);
-        ft.add(ecaToggle("6 ayda bir", ecaFreq == 6, () -> ecaFreq = 6, t)).height(28).padLeft(10).padRight(3);
-        ft.add(ecaToggle("yılda bir", ecaFreq == 12, () -> ecaFreq = 12, t)).height(28);
+        // Finansman burada degil: model secilip yer belirlendikten sonra Satin Alma ve Kurulum penceresinde
         equipWin.show(st, t, chosen.get(t), e -> {
             chosen.put(t, e);
             cb.tool(Tool.PLANT, e);
@@ -493,17 +480,14 @@ public final class Hud {
         });
     }
 
-    private TextButton ecaToggle(String text, boolean on, Runnable r, PlantType t) {
-        TextButton b = new TextButton(text, skin, "small");
-        b.setChecked(on);
-        b.setProgrammaticChangeEvents(false);
-        b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { r.run(); openEquipment(t); } });
-        return b;
+    /** Satin alma ve kurulum penceresi (karar verilene ya da vazgecilene kadar oyun duraklar). */
+    public void showPurchase(GameState s, Equipment e, int x, int y, java.util.function.Consumer<PurchaseWindow.Choice> onDecide, Runnable onCancel) {
+        purchaseWin.show(s, e, x, y, onDecide, onCancel);
     }
+    public boolean purchaseOpen() { return purchaseWin.isVisible(); }
 
-    public boolean ecaOn() { return ecaOn; }
-    public Bank ecaBank() { return ecaBank; }
-    public int ecaFreq() { return ecaFreq; }
+    /** Oyuncunun karar verdigi pencereler: acikken oyun otomatik duraklar (acele ettirilmez). */
+    public boolean decisionOpen() { return equipWin.isVisible() || purchaseWin.isVisible() || lineChoice.isVisible(); }
 
     /** Yapilandirma teklifi penceresi (oyuncu karar verene kadar). */
     public void showRestructuring(boolean show) {
@@ -934,13 +918,13 @@ public final class Hud {
     }
 
     public boolean anyWindowOpen() {
-        return finance.isVisible() || market.isVisible() || companies.isVisible() || help.isVisible() || menu.isVisible() || equipWin.isVisible()
+        return finance.isVisible() || market.isVisible() || companies.isVisible() || help.isVisible() || menu.isVisible() || equipWin.isVisible() || purchaseWin.isVisible()
             || lineChoice.isVisible() || assetsWin.isVisible() || wizardWin.isVisible() || dealWin.isVisible() || defenseWin.isVisible() || confirmWin.isVisible()
             || (settingsWin != null && settingsWin.isVisible());
     }
     public void closeWindows() {
         finance.setVisible(false); market.setVisible(false); companies.setVisible(false); help.setVisible(false);
-        menu.setVisible(false); equipWin.setVisible(false); lineChoice.setVisible(false); assetsWin.setVisible(false); wizardWin.setVisible(false);
+        menu.setVisible(false); equipWin.setVisible(false); purchaseWin.cancel(); lineChoice.setVisible(false); assetsWin.setVisible(false); wizardWin.setVisible(false);
         dealWin.setVisible(false); defenseWin.setVisible(false); confirmWin.setVisible(false);
         if (settingsWin != null) settingsWin.setVisible(false);
     }
