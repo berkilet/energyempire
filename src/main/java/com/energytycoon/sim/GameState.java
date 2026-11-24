@@ -132,6 +132,7 @@ public final class GameState {
         for (int i = 0; i < s.settings.rivals; i++) {
             Company r = new Company(RIVALS[i][0], false, Integer.parseInt(RIVALS[i][1], 16), Balance.START_CASH * d.cashMult);
             r.aiStyle = RIVALS[i][2];
+            RivalStrategy.init(r, s.settings.seed);
             s.companies.add(r);
         }
         s.hour = 8;
@@ -1265,7 +1266,7 @@ public final class GameState {
             p.lastMonthMWh = p.monthMWh; p.lastMonthCost = p.monthCost; p.monthMWh = 0; p.monthCost = 0;
             p.lastMonthProfit = p.monthProfit; p.yearProfit += p.monthProfit; p.qProfitAcc += p.monthProfit; p.monthProfit = 0;
             if (month() % 3 == 0) { p.qProfitLast = p.qProfitAcc; p.qProfitAcc = 0; }
-            if (month() == 0) p.yearProfit = 0; // biten ay Aralik: yeni yil
+            if (month() == 0) { p.lastYearProfit = p.yearProfit; p.yearProfit = 0; } // biten ay Aralik: yeni yil
             p.cpFullMonths = p.cpFullHoursMonth > Balance.HOURS_PER_MONTH * GridBalance.CP_FULL_MONTH_SHARE ? p.cpFullMonths + 1 : 0;
             p.cpFullHoursMonth = 0;
         }

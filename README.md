@@ -237,7 +237,7 @@ Finans penceresi (**F** tuşu veya nakit göstergesine tıklama) altı sekmeden 
 
 ### Rakipler
 
-0–7 yapay zekâ rakip (64 haritada en fazla 5, 96 ve 128 haritada en fazla 7), oyuncuyla **tamamen aynı kurallara** tabidir: aynı krediler, ECA, halka arz, devralma ve rekabet kuralları. Rakiplerin tarzları farklıdır (fosil, yeşil, dengeli). Bu tarzlara göre santral kurar, trafo merkezi ve hat yatırımı yapar, ihalelere girer, zor durumda varlık satarlar. Birbirlerini ve sizi devralmaya çalışabilirler.
+0–7 yapay zekâ rakip (64 haritada en fazla 5, 96 ve 128 haritada en fazla 7), oyuncuyla **tamamen aynı kurallara** tabidir: aynı krediler, ECA, halka arz, devralma ve rekabet kuralları. Rakiplerin kökenleri farklıdır (fosil, yeşil, dengeli), ama bu yalnızca başlangıç eğilimidir: her yatırımda projenin beklenen getirisini kendi karbon fiyatı beklentisi, piyasa fiyatı, arz-talep görünümü ve saha verimiyle hesaplarlar. Her yıl piyasadaki sonuçlardan öğrenirler (fosil kökenli şirket karbonu başta hafife alır, santralleri zarar ettikçe beklentisini düzeltir), yönelim değiştirince bunu duyururlar, zarar eden santrallerini satar ya da kapatırlar ve borç yükü yüksekken yeni yatırıma girmezler. Şirketler penceresinde her rakibin güncel stratejisi görünür. Rakipler santral kurar, trafo merkezi ve hat yatırımı yapar, ihalelere girer, zor durumda varlık satarlar. Birbirlerini ve sizi devralmaya çalışabilirler.
 
 ---
 

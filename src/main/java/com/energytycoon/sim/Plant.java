@@ -42,6 +42,8 @@ public final class Plant extends GridNode {
     public double[] dailyMWh = new double[30], dailyCurtailMWh = new double[30];
     public int dayIdx, daysTracked;
     public double yearProfit;
+    /** Gecen takvim yilinin net kari (rakip stratejisi ve getiri istatistikleri). */
+    public double lastYearProfit;
     /** Ceyreklik kar (ECA DSCR): biriken ve gecen ceyrek. */
     public double qProfitAcc, qProfitLast;
 

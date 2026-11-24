@@ -71,6 +71,7 @@ public class SaveData {
         public double lastRevenue, lastFuel, lastOm, lastCarbon, lastInterest, lastFines, lastNet, lastMwh, lastCo2;
         public double[] netHistory; public double[] valHist, cashHist;
         public String aiStyle; public double rateAdd, lastRenew;
+        /** rakip stratejisi */ public double carbonBelief, learnRate, priorWeight; public double[] techView; public String orientation, pendingOrientation;
         /** v3 */ public boolean neutral; }
     public static class CityD { public int id, x, y; public String name; public double pop, sat;
         /** ihale takibi */ public int lowSatMonths; public long lastTenderHour = Long.MIN_VALUE / 4; public double lastServedRatio = 1; }
@@ -85,7 +86,7 @@ public class SaveData {
         /** v3 */ public boolean legacy; public int retireYear, retireMonth; public String customName;
         /** v3 Faz 4 */ public int preferredTm;
         /** ihale */ public int tenderId;
-        /** varliklar */ public double[] dailyMWh, dailyCurt; public int dayIdx, daysTracked; public double yearProfit;
+        /** varliklar */ public double[] dailyMWh, dailyCurt; public int dayIdx, daysTracked; public double yearProfit, lastYearProfit;
         /** rekabet: son 12 ay uretim */ public double[] gen12; public int genIdx; public double monthMWh, monthCost, lastMonthMWh, lastMonthCost, priceCap; }
     /** Trafo merkezi (v3, Faz 4). */
     public static class SubstationD {
@@ -171,6 +172,7 @@ public class SaveData {
             cd.valHist = c.valuationHistory.stream().mapToDouble(Double::doubleValue).toArray();
             cd.cashHist = c.cashHistory.stream().mapToDouble(Double::doubleValue).toArray();
             cd.aiStyle = c.aiStyle; cd.lastRenew = c.lastRenewMwh; cd.neutral = c.neutral;
+            cd.carbonBelief = c.carbonBelief; cd.learnRate = c.learnRate; cd.priorWeight = c.priorWeight; cd.techView = c.techView; cd.orientation = c.orientation; cd.pendingOrientation = c.pendingOrientation;
             d.companies.add(cd);
         }
         for (City c : s.cities) {
@@ -183,7 +185,7 @@ public class SaveData {
             pd.owner = s.companies.indexOf(p.owner); pd.buildLeft = p.buildHoursLeft; pd.outage = p.outageHoursLeft;
             pd.builtAt = p.builtAtHour; pd.lifetimeMWh = p.lifetimeMWh; pd.lastMonthProfit = p.lastMonthProfit; pd.monthProfit = p.monthProfit;
             pd.legacy = p.legacy; pd.retireYear = p.retireYear; pd.retireMonth = p.retireMonth; pd.customName = p.customName; pd.preferredTm = p.preferredTm; pd.tenderId = p.tenderId;
-            pd.dailyMWh = p.dailyMWh; pd.dailyCurt = p.dailyCurtailMWh; pd.dayIdx = p.dayIdx; pd.daysTracked = p.daysTracked; pd.yearProfit = p.yearProfit;
+            pd.dailyMWh = p.dailyMWh; pd.dailyCurt = p.dailyCurtailMWh; pd.dayIdx = p.dayIdx; pd.daysTracked = p.daysTracked; pd.yearProfit = p.yearProfit; pd.lastYearProfit = p.lastYearProfit;
             pd.gen12 = p.gen12; pd.genIdx = p.genIdx; pd.monthMWh = p.monthMWh; pd.monthCost = p.monthCost; pd.lastMonthMWh = p.lastMonthMWh; pd.lastMonthCost = p.lastMonthCost; pd.priceCap = p.priceCap;
             pd.equipment = p.equipment.id; pd.ageStart = p.ageStartHour; pd.upgradeLeft = p.upgradeHoursLeft;
             pd.pendingUpgrade = p.pendingUpgrade == null ? null : p.pendingUpgrade.name();
@@ -270,6 +272,8 @@ public class SaveData {
             if (cd.aiStyle != null) c.aiStyle = cd.aiStyle;
             else if (!c.player) c.aiStyle = c.name.startsWith("Yeşil") ? "green" : "fossil";
             c.neutral = cd.neutral;
+            if (cd.techView != null) { c.techView = cd.techView; c.carbonBelief = cd.carbonBelief; c.learnRate = cd.learnRate; c.priorWeight = cd.priorWeight; c.orientation = cd.orientation; c.pendingOrientation = cd.pendingOrientation; }
+            else if (!c.player && !c.neutral) RivalStrategy.init(c, g.seed);
             if (c.neutral) c.colorRgb = GridBalance.NEUTRAL_COLOR; // eski kayitlarda gri
             if (cd.fin != null) cd.fin.apply(c);
             legacyDebt.put(c, cd.fin == null ? cd.debt : 0.0);
@@ -298,7 +302,7 @@ public class SaveData {
             p.legacy = pd.legacy; p.retireYear = pd.retireYear; p.retireMonth = pd.retireMonth; p.customName = pd.customName; p.preferredTm = pd.preferredTm; p.tenderId = pd.tenderId;
             if (pd.dailyMWh != null && pd.dailyMWh.length == 30) p.dailyMWh = pd.dailyMWh;
             if (pd.dailyCurt != null && pd.dailyCurt.length == 30) p.dailyCurtailMWh = pd.dailyCurt;
-            p.dayIdx = pd.dayIdx; p.daysTracked = pd.daysTracked; p.yearProfit = pd.yearProfit;
+            p.dayIdx = pd.dayIdx; p.daysTracked = pd.daysTracked; p.yearProfit = pd.yearProfit; p.lastYearProfit = pd.lastYearProfit;
             if (pd.gen12 != null && pd.gen12.length == 12) p.gen12 = pd.gen12;
             p.genIdx = Math.floorMod(pd.genIdx, 12); p.monthMWh = pd.monthMWh; p.monthCost = pd.monthCost; p.lastMonthMWh = pd.lastMonthMWh; p.lastMonthCost = pd.lastMonthCost; p.priceCap = pd.priceCap;
             s.map.ensureLand(p.x, p.y);

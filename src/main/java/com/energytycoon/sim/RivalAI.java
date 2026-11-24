@@ -12,6 +12,8 @@ public final class RivalAI {
         s.capital.rivalMonthly(c);
         if (c.eq.listed && c.eq.dividendPct == 0 && c.eq.ipoHour >= 0 && s.hour - c.eq.ipoHour < Balance.HOURS_PER_MONTH * 2)
             s.capital.setDividend(c, FinanceBalance.RIVAL_DIVIDEND_AFTER_IPO);
+        siteHint = new int[] { -1, -1 };
+        if (s.month() == 0 && !c.player) RivalStrategy.yearly(s, c);
         financing = true;
         try { monthlyInner(s, c); if (!c.player) s.mna.rivalMonthly(c); } finally { financing = false; }
     }
@@ -44,7 +46,9 @@ public final class RivalAI {
 
     static boolean useEca(GameState s, Company c, Equipment e) {
         if (!financing || c.neutral || !Finance.ecaEligible(e)) return false;
-        int x = siteHint[0] >= 0 ? siteHint[0] : s.cities.get(0).x, y = siteHint[0] >= 0 ? siteHint[1] : s.cities.get(0).y;
+        // son kurulan saha ipucu yalnizca bu haritada gecerliyse (statik alan: baska oyundan/haritadan kalmis olabilir)
+        boolean hint = siteHint[0] >= 0 && s.map.inBounds(siteHint[0], siteHint[1]);
+        int x = hint ? siteHint[0] : s.cities.get(0).x, y = hint ? siteHint[1] : s.cities.get(0).y;
         return s.finance.expectedDscr(c, e, x, y, ecaBank(s, c, e), 6) >= ECA_MIN_DSCR;
     }
 
@@ -140,21 +144,15 @@ public final class RivalAI {
         GameState.Component comp = s.componentOf(target);
         double cover = comp == null || comp.peakMW <= 0 ? 0 : comp.nominalMW / comp.peakMW;
         if (cover > 1.3) return;
-        PlantType[] pool = switch (c.aiStyle) {
-            case "green" -> new PlantType[] { PlantType.SOLAR, PlantType.WIND, PlantType.WIND, PlantType.HYDRO, PlantType.GAS };
-            case "fossil" -> new PlantType[] { PlantType.COAL, PlantType.GAS, PlantType.GAS, PlantType.WIND, PlantType.NUCLEAR };
-            default -> new PlantType[] { PlantType.GAS, PlantType.SOLAR, PlantType.WIND, PlantType.GAS, PlantType.HYDRO };
-        };
-        PlantType t = pool[r.nextInt(pool.length)];
-        // Aday sirasi: tercih edilen model, tarza uygun yedek tur, en ucuz model. Her aday santral + hat + rezervle sinanir.
-        Equipment first = pick(s, c, t);
-        if (first.type == PlantType.NUCLEAR && c.cash < first.capex() * 1.4) first = pick(s, c, PlantType.GAS);
-        Equipment second = pick(s, c, c.aiStyle.equals("green") ? PlantType.WIND : PlantType.GAS);
-        Equipment third = s.catalog.cheapest(second.type, s.year());
+        // Teknoloji secimi: projenin beklenen getirisi (sirketin kendi karbon/fiyat beklentisiyle) + ogrenilmis gorus
+        // + zamanla azalan tarz egilimi. Getiri esigini gecen proje yoksa bu ay yatirim yapilmaz.
+        Equipment[] cand = RivalStrategy.candidates(s, c, target);
+        Equipment first = cand[0];
+        if (first == null) return;
         // Faiz yuksek ve beklenti dususteyse buyuk yatirimi erteleme egilimi
         if (first.capex() > 200e6 && s.macro.policyRate >= FinanceBalance.RIVAL_DEFER_RATE && s.macro.expectingCuts()
             && r.nextDouble() < FinanceBalance.RIVAL_DEFER_CHANCE) return;
-        for (Equipment e : new Equipment[] { first, second, third }) {
+        for (Equipment e : cand) {
             if (e == null) continue;
             double need = netCapex(s, c, e) + reserve(s, c) + 15e6; // + tahmini hat
             if (need > c.cash && !borrowFor(s, c, need - c.cash)) continue;
@@ -326,7 +324,8 @@ public final class RivalAI {
     }
 
     static Equipment tenderEquipment(GameState s, Company c) {
-        return pick(s, c, c.aiStyle.equals("green") ? PlantType.WIND : PlantType.GAS);
+        City any = s.cities.isEmpty() ? null : s.cities.get(0);
+        return any == null ? pick(s, c, PlantType.GAS) : RivalStrategy.tenderChoice(s, c, any);
     }
 
     /** Teklif: (yillik sermaye geri kazanimi + sabit O&M) / garantili uretim + marjinal maliyet, ustune kar marji. */

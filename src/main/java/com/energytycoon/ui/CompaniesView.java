@@ -3,6 +3,7 @@ package com.energytycoon.ui;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.utils.Align;
+import com.energytycoon.sim.RivalStrategy;
 import com.energytycoon.sim.City;
 import com.energytycoon.sim.Company;
 import com.energytycoon.sim.GameState;
@@ -18,7 +19,7 @@ public final class CompaniesView {
     private final Skin skin;
     private boolean built;
 
-    private static final String[] C_HEAD = { "Şirket", "Piyasa değeri", "Nakit", "Borç", "Santral", "Kurulu güç", "Üretim/ay", "Pay", "Kâr (geçen ay)", "" };
+    private static final String[] C_HEAD = { "Şirket", "Piyasa değeri", "Nakit", "Borç", "Santral", "Kurulu güç", "Üretim/ay", "Pay", "Kâr (geçen ay)", "Strateji" };
     private static final float[] C_W = { 170, 96, 84, 70, 60, 84, 84, 60, 104, 100 };
     private static final int PROFIT = 8, TAG = 9;
     private static final String[] T_HEAD = { "Şehir", "Nüfus", "Tepe talep", "Şu an", "Memnuniyet", "", "Hat" };
@@ -44,7 +45,7 @@ public final class CompaniesView {
         root.clear();
         root.add(UiKit.section(skin, "ŞİRKETLER")).padBottom(4).row();
         Table ct = new Table();
-        for (int i = 0; i < C_HEAD.length; i++) ct.add(head(C_HEAD[i], i == 0 ? Align.left : Align.right)).width(C_W[i]).padBottom(4);
+        for (int i = 0; i < C_HEAD.length; i++) ct.add(head(C_HEAD[i], i == 0 || i == TAG ? Align.left : Align.right)).width(C_W[i]).padBottom(4).padLeft(i == TAG ? 8 : 0);
         ct.row();
         // Ozel sirketler once; tarafsiz kamu sirketi siralamanin disinda, ayri baslik altinda.
         rowOrder.clear();
@@ -135,7 +136,9 @@ public final class CompaniesView {
             boolean anyMonth = !c.netHistory.isEmpty();
             if (anyMonth) UiKit.setMoney(skin, r[PROFIT], c.lastNet, true); else r[PROFIT].setText("—");
             // Kamu: yalnizca zarardayken "Gorev zarari" etiketi
-            r[TAG].setText(c.neutral && anyMonth && c.lastNet < 0 ? "Görev zararı" : "");
+            // rakipler: bugunku yatirim yonelimi (tarz yalnizca baslangic; piyasa ve karbon beklentisiyle degisir)
+            if (c.neutral) r[TAG].setText(anyMonth && c.lastNet < 0 ? "Görev zararı" : "");
+            else r[TAG].setText(c.player || c.orientation == null ? "" : RivalStrategy.shortLabel(c.orientation));
         }
         for (int k = 0; k < s.cities.size() && k < cityRows.size(); k++) {
             City c = s.cities.get(k);

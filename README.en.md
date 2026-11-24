@@ -237,7 +237,7 @@ The Finance window (**F** key, or click the cash indicator) has six tabs: **Summ
 
 ### Rivals
 
-0–7 AI rivals (up to 5 on a 64 map, up to 7 on 96 and 128 maps) follow **exactly the same rules** as the player: the same loans, ECA, IPOs, takeovers and competition rules. Each rival has its own style (fossil, green, balanced). In line with that style they build plants, invest in substations and lines, bid in tenders and sell assets when in distress. They can try to take each other over — and you.
+0–7 AI rivals (up to 5 on a 64 map, up to 7 on 96 and 128 maps) follow **exactly the same rules** as the player: the same loans, ECA, IPOs, takeovers and competition rules. Each rival has an origin (fossil, green, balanced), but it is only a starting bias: for every investment they compute the project's expected return from their own carbon-price expectation, market price, supply-demand outlook and site quality. Every year they learn from market results (the fossil-origin rival underestimates carbon at first and corrects as its plants lose money), announce when they change direction, sell or close loss-making plants and hold back new builds while heavily indebted. The Companies window shows each rival's current strategy. They build plants, invest in substations and lines, bid in tenders and sell assets when in distress. They can try to take each other over — and you.
 
 ---
 

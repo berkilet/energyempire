@@ -11,6 +11,13 @@ public final class Company {
     public boolean neutral;
     /** Rakip YZ tarzi: fossil, green, balanced. */
     public String aiStyle = "balanced";
+    /**
+     * Rakip stratejisi (RivalStrategy): karbon fiyati artis beklentisi (gercek hiza oran), ogrenme hizi, tarzin
+     * kalan agirligi, teknoloji basina ogrenilmis gorus ve duyurulan yonelim. Tarz yalnizca baslangic egilimidir.
+     */
+    public double carbonBelief = 1, learnRate = 0.4, priorWeight = 1;
+    public double[] techView;
+    public String orientation, pendingOrientation;
     public int colorRgb;
     public double cash;
     /** Krediler (ticari, ECA, isletme kredisi). Borc bunlarin bakiyesinden turetilir. */
