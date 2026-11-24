@@ -93,6 +93,7 @@ public final class GameScreen implements Screen, Hud.Listener {
     public void devLineTool(LineTier t) { hud.hideHelp(); lineTier = t; tool(Tool.LINE, null); }
     public void devNoHover(boolean b) { devNoHover = b; }
     public void devHideHelp() { hud.hideHelp(); }
+    public void devShowLog() { hud.devShowLog(); }
     /** Dogrulama: ornek krediler (ticari + ECA'li santral) ve finans sekmesi. */
     public void devFinance(String tab) {
         hud.hideHelp();
@@ -983,6 +984,7 @@ public final class GameScreen implements Screen, Hud.Listener {
             String act = state.messageActions.remove(m);
             if (act == null && m.startsWith("FİNANS:")) act = "openfin"; // Finans kategorisi: tiklaninca Finans merkezi
             hud.toast(m, act);
+            hud.logMessage(String.format("%02d %s %d", state.dayOfMonth(), com.energytycoon.ui.Fmt.MONTHS[state.month()], state.year()), m, act);
             // sirketinize cagri: oyun durur, savunma ekrani acilir
             if ("defense".equals(act)) { speed(0); hud.showDefense(); }
         }

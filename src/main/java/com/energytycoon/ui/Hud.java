@@ -83,6 +83,14 @@ public final class Hud {
     private final Table actions = new Table();
     private String actionsKey = "";
     private final Label scenTitle, scenBody;
+    /** Senaryo kutusu sekmeleri: hedefler / bildirim gecmisi (hizli oyunda kacan mesajlar; ileride kuresel olaylar). */
+    private final Table scenStack = new Table(), logList = new Table();
+    private ScrollPane logScroll;
+    private TextButton tabGoals, tabLog;
+    private boolean logTab;
+    private int unread;
+    private static final int LOG_MAX = 80;
+    private final java.util.ArrayDeque<String[]> log = new java.util.ArrayDeque<>();
     private final Window finance, market, companies, help, menu, gameOverWin, lineChoice, assetsWin;
     private final AssetsView assets;
     private long assetsRefreshAt;
@@ -239,7 +247,24 @@ public final class Hud {
         scenTitle = l("", "title");
         scenBody = l("", "small");
         scenBody.setWrap(true);
-        scen.add(scenBody).width(270).left();
+        tabGoals = new TextButton("Hedefler", skin, "small");
+        tabLog = new TextButton("Bildirimler", skin, "small");
+        ButtonGroup<TextButton> tabs = new ButtonGroup<>(tabGoals, tabLog);
+        tabs.setMaxCheckCount(1); tabs.setMinCheckCount(1);
+        tabGoals.setChecked(true);
+        tabGoals.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { if (tabGoals.isChecked()) showScenTab(false); } });
+        tabLog.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) { if (tabLog.isChecked()) showScenTab(true); } });
+        Table tabRow = new Table();
+        tabRow.add(tabGoals).height(24).growX().padRight(4);
+        tabRow.add(tabLog).height(24).growX();
+        scen.add(tabRow).width(270).padBottom(6).row();
+        logList.top().left();
+        logScroll = new ScrollPane(logList, skin);
+        logScroll.setFadeScrollBars(false);
+        logScroll.setOverscroll(false, false);
+        logScroll.setScrollingDisabled(true, false);
+        scen.add(scenStack).width(270).left();
+        showScenTab(false);
 
         Table rightCol = new Table();
         selScroll = new ScrollPane(right, skin);
@@ -958,6 +983,54 @@ public final class Hud {
     }
 
     public void setPlaceInfo(String s) { placeInfo.setText(s); }
+
+    /** Dogrulama: bildirim sekmesini acar. */
+    public void devShowLog() { tabLog.setChecked(true); }
+
+    private void showScenTab(boolean logs) {
+        logTab = logs;
+        scenStack.clear();
+        if (logs) {
+            unread = 0;
+            rebuildLog();
+            float h = Math.min(260, Math.max(120, stage == null ? 260 : stage.getHeight() * 0.32f));
+            scenStack.add(logScroll).width(270).height(h);
+            logScroll.setScrollY(0);
+        } else scenStack.add(scenBody).width(270).left();
+        updateTabLabels();
+    }
+
+    private void updateTabLabels() {
+        if (tabLog != null) tabLog.setText(unread > 0 && !logTab ? "Bildirimler (" + Math.min(unread, 99) + ")" : "Bildirimler");
+    }
+
+    /** Simulasyon bildirimi gecmise eklenir (en yeni ustte). action: tiklaninca calisacak eylem (yoksa null). */
+    public void logMessage(String date, String msg, String action) {
+        log.addFirst(new String[] { date, msg, action });
+        while (log.size() > LOG_MAX) log.removeLast();
+        if (logTab) rebuildLog(); else unread++;
+        updateTabLabels();
+    }
+
+    private void rebuildLog() {
+        logList.clear();
+        if (log.isEmpty()) { logList.add(l("Henüz bildirim yok.", "dim")).left(); return; }
+        for (String[] e : log) {
+            Table row = new Table(skin);
+            row.setBackground("row");
+            Label d = l(e[0], "dim");
+            Label m = l(e[1] + (e[2] != null ? "  ›" : ""), "small");
+            m.setWrap(true);
+            row.add(d).left().padLeft(6).padTop(3).row();
+            row.add(m).width(248).left().pad(0, 6, 4, 6);
+            if (e[2] != null) {
+                final String act = e[2];
+                row.setTouchable(Touchable.enabled);
+                row.addListener(new ClickListener() { @Override public void clicked(InputEvent ev, float x, float y) { cb.action(act); } });
+            }
+            logList.add(row).width(262).left().padBottom(3).row();
+        }
+    }
 
     private String contextText(Tool tool, Equipment eq, LineTier tier) {
         return switch (tool) {

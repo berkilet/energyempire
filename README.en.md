@@ -279,6 +279,8 @@ Goals are tracked in the panel at the bottom right. If the deadline passes, the 
 | Delete | Demolish tool |
 | F5 / F9 | Save / load |
 
+The scenario box at the top right has two tabs: **Goals** (scenario objectives and progress) and **Notifications** (the last 80 notifications with dates, newest first; ones with an action are clickable). If you miss the transient notifications at the bottom while playing fast, follow them here; while the tab is closed it shows the unread count.
+
 ---
 
 ## Development

@@ -49,7 +49,7 @@ public final class Skins implements Disposable {
 
     /** Arayuz fontu Manrope V5'te bulunmayan semboller; DejaVu Sans'tan yedek glif olarak eklenir. */
     static final String FALLBACK_SYMBOLS = "▲▼█░▒✓✗★☆↔⚠≤≥∞";
-    static final String TEXT_CHARS = FreeTypeFontGenerator.DEFAULT_CHARS + "çÇğĞıİöÖşŞüÜâÂîÎûÛ•–—−…·×↑↓→←₂≈";
+    static final String TEXT_CHARS = FreeTypeFontGenerator.DEFAULT_CHARS + "çÇğĞıİöÖşŞüÜâÂîÎûÛ•–—−…·×↑↓→←₂≈›‹✓";
 
     public Skins() {
         // Manrope V5 (Mikhail Sharanda): metin Regular, buton/deger Medium, baslik SemiBold, ana baslik Bold.

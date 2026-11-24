@@ -279,6 +279,8 @@ Hedefler sağ alttaki panelde izlenir. Süre dolarsa oyun biter.
 | Delete | Yıkım aracı |
 | F5 / F9 | Kaydet / yükle |
 
+Sağ üstteki senaryo kutusunda iki sekme vardır: **Hedefler** (senaryo hedefleri ve ilerleme) ve **Bildirimler** (son 80 bildirim, tarihli, en yenisi üstte; eylem bağlı olanlar tıklanabilir). Hızlı oyunda alttaki geçici bildirimleri kaçırırsanız buradan takip edebilirsiniz; sekme kapalıyken okunmamış bildirim sayısı görünür.
+
 ---
 
 ## Geliştirme

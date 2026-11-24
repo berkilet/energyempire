@@ -50,6 +50,7 @@ final class DevHook {
         if (gs != null && env.containsKey("ET_PAUSETEST")) pauseTest();
         if (gs != null && env.containsKey("ET_UITEST")) uiTest();
         if (gs != null && env.containsKey("ET_CLIPSCAN")) clipScan();
+        if (frame == Integer.parseInt(get("ET_LOGFRAME", "-1")) && gs != null) gs.devShowLog();
         if (frame == 6 && gs != null) {
             String open = get("ET_OPEN", "");
             if (open.startsWith("equip:")) gs.devOpenEquipment(PlantType.valueOf(open.substring(6)));
