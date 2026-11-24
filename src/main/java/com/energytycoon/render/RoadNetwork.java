@@ -148,7 +148,10 @@ public final class RoadNetwork {
         }
     }
 
-    public static int suburbRadius(City c) { return 2 + (c.tier() + 1) / 2; }
+    public static int suburbRadius(City c) { return 3 + c.tier() / 2; }
+
+    /** Bu Chebyshev uzakligina kadar apartman dokusu (orta katli bloklar); disinda mustakil evler. */
+    public static int apartmentRadius(City c) { return c.tier() >= 3 ? 2 + (c.tier() - 1) / 2 : 2; }
 
     private boolean tryLink(int ax, int ay, int bx, int by, int[] occ, boolean[] cityCore, boolean isUrban) {
         if (!map.inBounds(ax, ay) || !map.inBounds(bx, by)) return false;

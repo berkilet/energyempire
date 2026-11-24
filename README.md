@@ -237,7 +237,7 @@ Finans penceresi (**F** tuşu veya nakit göstergesine tıklama) altı sekmeden 
 
 ### Rakipler
 
-0–3 yapay zekâ rakip, oyuncuyla **tamamen aynı kurallara** tabidir: aynı krediler, ECA, halka arz, devralma ve rekabet kuralları. Rakiplerin tarzları farklıdır (fosil, yeşil, dengeli). Bu tarzlara göre santral kurar, trafo merkezi ve hat yatırımı yapar, ihalelere girer, zor durumda varlık satarlar. Birbirlerini ve sizi devralmaya çalışabilirler.
+0–7 yapay zekâ rakip (64 haritada en fazla 5, 96 ve 128 haritada en fazla 7), oyuncuyla **tamamen aynı kurallara** tabidir: aynı krediler, ECA, halka arz, devralma ve rekabet kuralları. Rakiplerin tarzları farklıdır (fosil, yeşil, dengeli). Bu tarzlara göre santral kurar, trafo merkezi ve hat yatırımı yapar, ihalelere girer, zor durumda varlık satarlar. Birbirlerini ve sizi devralmaya çalışabilirler.
 
 ---
 
@@ -245,7 +245,7 @@ Finans penceresi (**F** tuşu veya nakit göstergesine tıklama) altı sekmeden 
 
 **Harita tipleri:** Kıta · Ada · Takımadalar · Dağlık İç Bölge (göller, nehirler) · Nehir Vadisi · Kıyı Çölü (güçlü güneş, az su).
 
-**Ayarlar:** Harita boyutu (48 / 64 / 96), şehir sayısı, rakip sayısı (0–3), zorluk (Kolay / Normal / Zor) ve harita tohumu. Yeni oyun ekranında canlı önizleme gösterilir.
+**Ayarlar:** Harita boyutu (64 / 96 / 128), şehir sayısı (en fazla 8 / 12 / 16), rakip sayısı (0–5 / 0–7), zorluk (Kolay / Normal / Zor) ve harita tohumu. Yeni oyun ekranında canlı önizleme gösterilir.
 
 | Senaryo | Süre | Hedef |
 |---|---|---|
@@ -325,6 +325,7 @@ Simülasyon mantığı yalnızca `sim` paketindedir; arayüz ve render yalnızca
 ## Üçüncü taraf içerik ve lisanslar
 
 - **Kenney** 3D Road Tiles — [kenney.nl](https://kenney.nl), CC0. Şehir sokakları, çevre yolları, şehirlerarası yollar ve köprü tabliyeleri. Lisans: `src/main/resources/models/roads/License.txt`.
+- **Stilize doğa paketi** (kullanıcının sağladığı OBJ modeller ve dokular) — ağaçlar, çam, burgu ve kurumuş ağaçlar, çalılar, eğrelti, çiçekler, çimen, mantar, kayalar. `tools/nature/convert_nature.py` ile sadeleştirilip `src/main/resources/models/nature2/` altına dönüştürülür (yapraklar tek doku atlasında, alfa kesimli).
 - **Kenney** City Kit Commercial 2.1, City Kit Industrial 2.0 ve Nature Kit — [kenney.nl](https://kenney.nl), CC0. Şehir ve santral binaları, bacalar, soğutma kuleleri, tanklar, ağaçlar, kayalar. Lisans dosyaları: `src/main/resources/models/kenney/*/License.txt`, `assets-src/nature/`.
 - **Innerscene Low-poly Nature** karoları — [innerscene.com](https://innerscene.com), CC0. Çim ve su renk paleti, su yüzeyi.
 - **Yazı tipi:** Manrope V5 by Mikhail Sharanda (kişisel ve ticari kullanım, gömme serbest; `src/main/resources/fonts/ManropeV5-LICENSE.txt`). Yedek semboller için DejaVu Sans (`src/main/resources/fonts/DejaVu-LICENSE.txt`).

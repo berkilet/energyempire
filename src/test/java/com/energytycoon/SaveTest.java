@@ -34,7 +34,7 @@ class SaveTest {
     @Test
     void v2SettingsAndUpgradesRoundTrip() {
         GameSettings g = new GameSettings();
-        g.preset = com.energytycoon.world.MapPreset.HIGHLANDS; g.size = 48; g.cities = 4; g.rivals = 1; g.scenarioId = "green"; g.seed = 8;
+        g.preset = com.energytycoon.world.MapPreset.HIGHLANDS; g.size = 64; g.cities = 4; g.rivals = 1; g.scenarioId = "green"; g.seed = 8;
         GameState s = GameState.newGame(g);
         Plant p = s.placeLegacy(s.player, s.catalog.get("lu-hjt"), s.cities.get(0), 0);
         s.player.cash = 1e9;
@@ -42,7 +42,7 @@ class SaveTest {
         for (int i = 0; i < 24 * 50; i++) s.tick();
         GameState r = new Json().fromJson(SaveData.class, new Json().toJson(SaveData.from(s))).restore();
         assertEquals(com.energytycoon.world.MapPreset.HIGHLANDS, r.map.preset);
-        assertEquals(48, r.map.size);
+        assertEquals(64, r.map.size);
         assertEquals("green", r.scenario.id);
         assertEquals(s.companies.size(), r.companies.size());
         Plant rp = r.plants.stream().filter(x -> x.id == p.id).findFirst().orElseThrow();

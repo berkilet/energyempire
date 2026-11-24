@@ -1,5 +1,6 @@
 package com.energytycoon.render;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Mesh;
@@ -46,8 +47,8 @@ public final class TerrainRenderer implements Disposable {
     public RoadNetwork roads;
     private byte[] roadSnapshot;
     private final int chunksX;
-    private final Model[] ground, water, ripples;
-    private final ModelInstance[] groundInst, waterInst, rippleInst;
+    private final Model[] ground, water, ripples, foliage;
+    private final ModelInstance[] groundInst, waterInst, rippleInst, foliageInst;
     /** Golge ve ana geciste cizilen arazi + su ornekleri. */
     public final Array<ModelInstance> instances = new Array<>();
     private Layer layer = Layer.NORMAL;
@@ -62,14 +63,29 @@ public final class TerrainRenderer implements Disposable {
     public static int defaultDetail = 1;
     private final Material waterMat = new Material("water", ColorAttribute.createDiffuse(Color.WHITE));
     private final Material rippleMat = new Material("ripple", ColorAttribute.createDiffuse(Color.WHITE));
+    /** Alfa kesimli yaprak/cicek atlasi (doga paketi); golge gecisinde de kesilir (BlendingAttribute + doku). */
+    private final Material foliageMat;
+    private com.badlogic.gdx.graphics.Texture foliageTex;
+
+    private Material foliageMaterial() {
+        foliageTex = new com.badlogic.gdx.graphics.Texture(Gdx.files.classpath(NatureTemplate.DIR + "foliage_atlas.png"), true);
+        foliageTex.setFilter(com.badlogic.gdx.graphics.Texture.TextureFilter.MipMapLinearLinear, com.badlogic.gdx.graphics.Texture.TextureFilter.Linear);
+        return new Material("foliage", ColorAttribute.createDiffuse(Color.WHITE),
+            com.badlogic.gdx.graphics.g3d.attributes.TextureAttribute.createDiffuse(foliageTex),
+            com.badlogic.gdx.graphics.g3d.attributes.FloatAttribute.createAlphaTest(0.42f),
+            com.badlogic.gdx.graphics.g3d.attributes.IntAttribute.createCullFace(GL20.GL_NONE),
+            // harmanlama etkisiz (ONE, ZERO): ana geciste opak cizilir, derinlik gecisi ise bu ozellik sayesinde alfa keser
+            new com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute(false, GL20.GL_ONE, GL20.GL_ZERO, 1f));
+    }
 
     public TerrainRenderer(WorldMap map, int[] occ) {
         this.map = map; this.occ = occ;
         this.reserved = new boolean[map.size * map.size];
         this.chunksX = (map.size + CHUNK - 1) / CHUNK;
         int n = chunksX * chunksX;
-        ground = new Model[n]; water = new Model[n]; ripples = new Model[n];
-        groundInst = new ModelInstance[n]; waterInst = new ModelInstance[n]; rippleInst = new ModelInstance[n];
+        ground = new Model[n]; water = new Model[n]; ripples = new Model[n]; foliage = new Model[n];
+        groundInst = new ModelInstance[n]; waterInst = new ModelInstance[n]; rippleInst = new ModelInstance[n]; foliageInst = new ModelInstance[n];
+        foliageMat = foliageMaterial();
         this.occSnapshot = new int[occ.length];
         this.resSnapshot = new boolean[occ.length];
         this.forest = new Noise(map.seed + 1234);
@@ -128,6 +144,7 @@ public final class TerrainRenderer implements Disposable {
         for (ModelInstance mi : groundInst) if (mi != null) instances.add(mi);
         for (ModelInstance mi : waterInst) if (mi != null) instances.add(mi);
         for (ModelInstance mi : rippleInst) if (mi != null) instances.add(mi);
+        for (ModelInstance mi : foliageInst) if (mi != null) instances.add(mi);
     }
 
     /** Su yuzeyi hafifce parlar-soner, dalgaciklar yavasca kayar. */
@@ -143,16 +160,28 @@ public final class TerrainRenderer implements Disposable {
         final FloatArray v = new FloatArray();
         final ShortArray idx = new ShortArray();
         final List<Mesh> meshes = new ArrayList<>();
+        /** true: kose basina doku koordinati da tutulur (12 float). */
+        final boolean uv;
+        final int stride;
 
-        int base() { return v.size / 10; }
+        Accum() { this(false); }
+        Accum(boolean uv) { this.uv = uv; this.stride = uv ? 12 : 10; }
+
+        int base() { return v.size / stride; }
         void reserve(int verts) { if (base() + verts > MAX_VERTS) flush(); }
         void vert(float x, float y, float z, float nx, float ny, float nz, float r, float g, float b) {
             v.add(x); v.add(y); v.add(z); v.add(nx); v.add(ny); v.add(nz); v.add(r); v.add(g); v.add(b); v.add(1f);
+            if (uv) { v.add(0f); v.add(0f); }
+        }
+        void vertUV(float x, float y, float z, float nx, float ny, float nz, float r, float g, float b, float u, float vv) {
+            v.add(x); v.add(y); v.add(z); v.add(nx); v.add(ny); v.add(nz); v.add(r); v.add(g); v.add(b); v.add(1f); v.add(u); v.add(vv);
         }
         void flush() {
             if (v.size == 0) return;
-            VertexAttributes attrs = new VertexAttributes(VertexAttribute.Position(), VertexAttribute.Normal(), VertexAttribute.ColorUnpacked());
-            Mesh mesh = new Mesh(true, v.size / 10, idx.size, attrs);
+            VertexAttributes attrs = uv
+                ? new VertexAttributes(VertexAttribute.Position(), VertexAttribute.Normal(), VertexAttribute.ColorUnpacked(), VertexAttribute.TexCoords(0))
+                : new VertexAttributes(VertexAttribute.Position(), VertexAttribute.Normal(), VertexAttribute.ColorUnpacked());
+            Mesh mesh = new Mesh(true, v.size / stride, idx.size, attrs);
             mesh.setVertices(v.items, 0, v.size);
             mesh.setIndices(idx.items, 0, idx.size);
             meshes.add(mesh);
@@ -171,16 +200,17 @@ public final class TerrainRenderer implements Disposable {
         }
     }
 
-    private Accum g, w, rp;
+    private Accum g, w, rp, fol;
 
     private void buildChunk(int c) {
         if (ground[c] != null) ground[c].dispose();
         if (water[c] != null) water[c].dispose();
         if (ripples[c] != null) ripples[c].dispose();
-        ground[c] = water[c] = ripples[c] = null;
-        groundInst[c] = waterInst[c] = rippleInst[c] = null;
+        if (foliage[c] != null) foliage[c].dispose();
+        ground[c] = water[c] = ripples[c] = foliage[c] = null;
+        groundInst[c] = waterInst[c] = rippleInst[c] = foliageInst[c] = null;
         int cx0 = (c % chunksX) * CHUNK, cy0 = (c / chunksX) * CHUNK;
-        g = new Accum(); w = new Accum(); rp = new Accum();
+        g = new Accum(); w = new Accum(); rp = new Accum(); fol = new Accum(true);
         for (int y = cy0; y < Math.min(map.size, cy0 + CHUNK); y++) {
             for (int x = cx0; x < Math.min(map.size, cx0 + CHUNK); x++) {
                 int i = map.idx(x, y);
@@ -201,10 +231,12 @@ public final class TerrainRenderer implements Disposable {
         ground[c] = g.build(new Material(ColorAttribute.createDiffuse(Color.WHITE)));
         water[c] = w.build(waterMat);
         ripples[c] = rp.build(rippleMat);
+        foliage[c] = fol.build(foliageMat);
+        if (foliage[c] != null) foliageInst[c] = new ModelInstance(foliage[c]);
         if (ground[c] != null) groundInst[c] = new ModelInstance(ground[c]);
         if (water[c] != null) waterInst[c] = new ModelInstance(water[c]);
         if (ripples[c] != null) rippleInst[c] = new ModelInstance(ripples[c]);
-        g = w = rp = null;
+        g = w = rp = fol = null;
     }
 
     // ------------------------------------------------------------ su
@@ -406,42 +438,149 @@ public final class TerrainRenderer implements Disposable {
     // ------------------------------------------------------------ bitki ortusu (Kenney Nature Kit)
     private static final float[] DENSITY = { 0.45f, 1.0f, 1.6f };
 
+    /** Gelistirici vitrini (ET_NATSHOW): bu karelerden baslayarak her doga modeli kendi karesine konur. */
+    public static int[] showcase;
+    private static final String[] SHOW = { "CommonTree_1", "CommonTree_2", "CommonTree_3", "CommonTree_4", "CommonTree_5", "Pine_1", "Pine_2", "Pine_3", "Pine_4", "Pine_5",
+        "TwistedTree_1", "TwistedTree_3", "TwistedTree_5", "DeadTree_1", "DeadTree_2", "DeadTree_3", "Bush_Common", "Bush_Common_Flowers", "Fern_1", "Clover_1",
+        "Clover_2", "Plant_1", "Plant_1_Big", "Plant_7", "Plant_7_Big", "Flower_3_Group", "Flower_3_Single", "Flower_4_Single", "Grass_Common_Short", "Grass_Common_Tall",
+        "Grass_Wispy_Short", "Grass_Wispy_Tall", "Mushroom_Common", "Rock_Medium_1", "Rock_Medium_2", "Rock_Medium_3", "Rock_Medium_1_Desert" };
+
+    private boolean showcaseTile(int x, int y, float t) {
+        if (showcase == null) return false;
+        int dx = x - showcase[0], dy = y - showcase[1];
+        if (dx < 0 || dy < 0 || dx >= 8 || dy >= 5) return false;
+        int k = dy * 8 + dx;
+        if (k >= SHOW.length) return true;
+        String nm = SHOW[k];
+        float h = nm.contains("Tree") ? 0.45f : nm.startsWith("Pine") ? 0.46f : nm.startsWith("Rock") ? 0.2f : nm.startsWith("Bush") ? 0.16f : nm.startsWith("Grass") ? 0.1f : nm.startsWith("Mushroom") ? 0.05f : 0.08f;
+        stampNature(nm, x + 0.5f, t, y + 0.5f, 30f, h, 1f, NatureTemplate.CELL_LEAF, WHITE, 0.8f);
+        return true;
+    }
+
     private void decorate(int x, int y, int i, float t) {
+        if (showcaseTile(x, y, t)) return;
         if (map.water[i] || occ[i] >= 0 || reserved[i]) return;
         int relief = Math.max(8, map.preset.relief);
         float rl = map.level[i] / (float) relief;
         float mult = DENSITY[detail];
         double f = forest.fbm(x * 0.09, y * 0.09, 3);
-        float n = hash(x * 3 + 1, y * 7 + 2), n2 = hash(x * 11 + 5, y * 3 + 9);
+        // cicekli cayir lekeleri ve sonbahar koruluklari icin dusuk frekansli gurultu
+        double meadow = macro.fbm(x * 0.06 + 40, y * 0.06 - 17, 2);
+        float n = hash(x * 3 + 1, y * 7 + 2), n2 = hash(x * 11 + 5, y * 3 + 9), n3 = hash(x * 17 + 3, y * 5 + 11);
         if (map.preset.desert) {
-            if (nearRiver(x, y) && n < 0.6f) palm(x + 0.3f + n * 0.4f, t, y + 0.5f);
-            else if (n2 < 0.07f * mult) rock(x, y, t, n, true);
+            if (nearRiver(x, y) && n < 0.6f) { palm(x + 0.3f + n * 0.4f, t, y + 0.5f); if (n3 < 0.35f) natPlant(x, y, t, n2, n3); }
+            else if (n2 < 0.07f * mult) { if (n3 < 0.5f) natRock(x, y, t, n, true); else rock(x, y, t, n, true); }
+            else if (n2 > 1 - 0.012f * mult) deadTree(x, y, t, n, n3);
             return;
         }
         if (map.level[i] <= 1 && nearWater(x, y)) {           // kumsal: arada bir kaya
             if (n2 < 0.05f * mult) rock(x, y, t, n, false);
             return;
         }
-        if (rl > 0.82f) {                                       // dag: kayalar
-            if (n2 < 0.22f * mult && map.level[i] < WorldMap.MAX_LEVEL - 1) rock(x, y, t, n, false);
+        if (rl > 0.82f) {                                       // dag: kayalar, tek tuk kurumus agac
+            if (n2 < 0.22f * mult && map.level[i] < WorldMap.MAX_LEVEL - 1) { if (n3 < 0.5f) natRock(x, y, t, n, false); else rock(x, y, t, n, false); }
+            else if (n2 > 1 - 0.03f * mult) deadTree(x, y, t, n, n3);
             return;
         }
+        boolean riverBank = nearRiver(x, y);
         double density = (f - 0.48) * 4.0;
         if (n < density) {                                      // orman
             int count = 1 + (int) (hash(x, y * 5) * 2 * Math.min(1, density) * Math.min(1.4f, mult));
+            boolean autumnGrove = meadow > 0.66;
             for (int k = 0; k < count; k++) {
                 float ox = 0.22f + hash(x * 11 + k, y) * 0.56f, oz = 0.22f + hash(x, y * 13 + k) * 0.56f;
                 float s = 0.85f + hash(x + k * 7, y + k * 3) * 0.35f;
-                float hn = hash(k + x, y - k);
-                if (rl > 0.5f && hn < 0.65f) conifer(x + ox, t, z(y, oz), s, hn);
+                float hn = hash(k + x, y - k), pick = hash(x * 7 - k, y * 3 + k);
+                if (rl > 0.5f && hn < 0.65f) {
+                    if (pick < 0.5f) natPine(x + ox, t, y + oz, s, hn); else conifer(x + ox, t, z(y, oz), s, hn);
+                } else if (autumnGrove && pick < 0.45f) natTwisted(x + ox, t, y + oz, s, hn);
+                else if (pick < 0.45f) natTree(x + ox, t, y + oz, s, hn);
                 else kenneyTree(x + ox, t, y + oz, s, hn);
             }
-            if (n2 < 0.45f * mult) bush(x + 0.15f + n2 * 0.7f, t, y + 0.2f + n * 0.6f, n2);
-        } else {                                                // acik cayir: cim kumeleri, cali, tas
-            if (n2 < 0.32f * mult) grassTuft(x, y, t, n, n2);
-            if (n2 > 1 - 0.05f * mult) bush(x + 0.3f + n * 0.4f, t, y + 0.3f + n2 * 0.4f, n);
-            if (n > 1 - 0.025f * mult) rock(x, y, t, n2, false);
+            if (n2 < 0.45f * mult) {
+                if (n3 < 0.5f) natBush(x + 0.15f + n2 * 0.7f, t, y + 0.2f + n * 0.6f, n2, autumnGrove);
+                else bush(x + 0.15f + n2 * 0.7f, t, y + 0.2f + n * 0.6f, n2);
+            }
+            // orman tabani: egrelti, mantar
+            if (n3 < 0.22f * mult) natUnderstory(x, y, t, n, n3);
+        } else {                                                // acik cayir: cim kumeleri, cicekler, cali, tas
+            if (n2 < 0.32f * mult) { if (n3 < 0.5f) natGrass(x, y, t, n, n2); else grassTuft(x, y, t, n, n2); }
+            if (meadow > 0.58 && n3 < (meadow - 0.58) * 3.0 * mult) natFlowers(x, y, t, n, n3);
+            if (riverBank && n3 > 0.55f) natPlant(x, y, t, n2, n3);
+            if (n2 > 1 - 0.05f * mult) { if (n < 0.5f) natBush(x + 0.3f + n * 0.4f, t, y + 0.3f + n2 * 0.4f, n, false); else bush(x + 0.3f + n * 0.4f, t, y + 0.3f + n2 * 0.4f, n); }
+            if (n > 1 - 0.025f * mult) { if (n3 < 0.5f) natRock(x, y, t, n2, false); else rock(x, y, t, n2, false); }
         }
+    }
+
+    // ---- doga paketi yerlesimleri (boyutlar dunya biriminde; agaclar Kenney agaclariyla ayni boyda)
+    private static final Color WHITE = new Color(1, 1, 1, 1);
+    private final Color natTint = new Color();
+
+    private Color leafTint(float n) { return natTint.set(0.92f + 0.12f * n, 0.95f + 0.08f * n, 0.90f, 1); }
+
+    private void natTree(float x, float y, float z, float s, float n) {
+        String[] m = { "CommonTree_1", "CommonTree_2", "CommonTree_3", "CommonTree_4", "CommonTree_5" };
+        stampNature(m[(int) (n * 97) % m.length], x, y, z, n * 720f, 0.44f * s, 1f, n < 0.5f ? NatureTemplate.CELL_LEAF : NatureTemplate.CELL_LEAF_DENSE, leafTint(n), 0.8f);
+    }
+
+    private void natPine(float x, float y, float z, float s, float n) {
+        String[] m = { "Pine_1", "Pine_2", "Pine_3", "Pine_4", "Pine_5" };
+        stampNature(m[(int) (n * 89) % m.length], x, y, z, n * 640f, 0.46f * s, 0.9f, 0, leafTint(n), 0.8f);
+    }
+
+    private void natTwisted(float x, float y, float z, float s, float n) {
+        String[] m = { "TwistedTree_1", "TwistedTree_3", "TwistedTree_5" };
+        stampNature(m[(int) (n * 61) % m.length], x, y, z, n * 500f, 0.50f * s, 0.85f, n < 0.4f ? NatureTemplate.CELL_LEAF_AUTUMN : NatureTemplate.CELL_LEAF, leafTint(n), 0.8f);
+    }
+
+    private void deadTree(int x, int y, float t, float n, float n2) {
+        String[] m = { "DeadTree_1", "DeadTree_2", "DeadTree_3" };
+        stampNature(m[(int) (n2 * 31) % m.length], x + 0.3f + 0.4f * n, t, y + 0.3f + 0.4f * n2, n * 800f, 0.34f + 0.1f * n2, 0.8f, 0,
+            map.preset.desert ? natTint.set(1.15f, 1.05f, 0.95f, 1) : WHITE, 0.8f);
+    }
+
+    private void natBush(float x, float y, float z, float n, boolean autumn) {
+        boolean flowers = !autumn && n > 0.6f;
+        stampNature(flowers ? "Bush_Common_Flowers" : "Bush_Common", x, y, z, n * 900f, 0.13f + 0.06f * n, 1f,
+            autumn ? NatureTemplate.CELL_LEAF_AUTUMN : NatureTemplate.CELL_LEAF_DENSE, leafTint(n), 0.85f);
+    }
+
+    private void natGrass(int x, int y, float t, float n, float n2) {
+        String[] m = { "Grass_Common_Short", "Grass_Common_Tall", "Grass_Wispy_Short", "Grass_Wispy_Tall" };
+        // cim dokusu acik serit renkleri; arazi yesiline yaklastir
+        Color c = natTint.set(0.62f + 0.1f * n, 0.85f + 0.1f * n2, 0.50f, 1);
+        for (int k = 0; k < 1 + (n2 < 0.12f ? 1 : 0); k++) {
+            float hx = hash(x * 5 + k, y * 9 - k), hz = hash(x * 13 - k, y * 3 + k);
+            stampNature(m[(int) ((n + k * 0.37f) * 41) % m.length], x + 0.15f + 0.7f * hx, t, y + 0.15f + 0.7f * hz, hx * 700f, 0.09f + 0.05f * n2, 1f, 0, c, 0.85f);
+        }
+    }
+
+    private void natFlowers(int x, int y, float t, float n, float n2) {
+        String[] m = { "Flower_3_Group", "Flower_3_Single", "Flower_4_Single", "Clover_1", "Clover_2", "Plant_7", "Plant_7_Big" };
+        int cnt = 1 + (int) (n2 * 2.5f);
+        for (int k = 0; k < cnt; k++) {
+            float hx = hash(x * 7 + k * 3, y * 5 - k), hz = hash(x * 3 - k, y * 11 + k * 5), hm = hash(x + k * 13, y * 17 + k);
+            String name = m[(int) (hm * 7) % m.length];
+            float h = name.startsWith("Plant_7") ? 0.045f : name.startsWith("Clover") ? 0.09f : 0.11f;
+            stampNature(name, x + 0.15f + 0.7f * hx, t, y + 0.15f + 0.7f * hz, hm * 600f, h * (0.85f + 0.3f * n), 1f, 0, WHITE, 0.85f);
+        }
+    }
+
+    private void natPlant(int x, int y, float t, float n, float n2) {
+        String name = n < 0.5f ? "Plant_1_Big" : n < 0.8f ? "Plant_1" : "Fern_1";
+        stampNature(name, x + 0.25f + 0.5f * n2, t, y + 0.25f + 0.5f * n, n * 720f, name.equals("Fern_1") ? 0.12f : 0.15f, 1f, 0, WHITE, 0.85f);
+    }
+
+    private void natUnderstory(int x, int y, float t, float n, float n3) {
+        float px = x + 0.2f + 0.6f * n3, pz = y + 0.2f + 0.6f * n;
+        if (n < 0.55f) stampNature("Fern_1", px, t, pz, n * 900f, 0.10f + 0.04f * n3, 1f, 0, WHITE, 0.8f);
+        else stampNature("Mushroom_Common", px, t, pz, n * 900f, 0.06f, 1f, 0, WHITE, 0.85f);
+    }
+
+    private void natRock(int x, int y, float t, float n, boolean desert) {
+        String[] m = { "Rock_Medium_1", "Rock_Medium_2", "Rock_Medium_3" };
+        String name = m[(int) (n * 53) % m.length] + (desert ? "_Desert" : "");
+        stampNature(name, x + 0.5f, t - 0.01f, y + 0.5f, n * 360f, 0.12f + 0.12f * n, 1f, 0, WHITE, 0.8f);
     }
 
     private static float z(int y, float oz) { return y + oz; }
@@ -499,31 +638,84 @@ public final class TerrainRenderer implements Disposable {
      */
     private void stamp(Accum a, MeshTemplate t, float x, float y, float z, float yawDeg, float sx, float sy, float sz,
                        java.util.function.Function<String, Color> color, float baseShade) {
-        int tris = t.triangleCount();
-        a.reserve(tris * 3);
+        int nv = t.uMat.length;
+        a.reserve(nv);
         float cs = MathUtils.cosDeg(yawDeg), sn = MathUtils.sinDeg(yawDeg);
         float h = Math.max(0.001f, t.maxY - t.minY);
-        float[] d = t.data;
+        float[] d = t.uData;
         Color[] matColor = new Color[t.materials.size()];
         for (int m = 0; m < matColor.length; m++) {
             Color c = color.apply(t.materials.get(m));
             matColor[m] = c == null ? null : new Color(c);
         }
+        int[] remap = natRemap.length >= nv ? natRemap : (natRemap = new int[nv * 2]);
+        java.util.Arrays.fill(remap, 0, nv, -1);
+        int tris = t.triangleCount();
         for (int tri = 0; tri < tris; tri++) {
             Color c = matColor[t.triMaterial[tri]];
             if (c == null) continue;
-            int b = a.base();
             for (int k = 0; k < 3; k++) {
-                int o = (tri * 3 + k) * 6;
-                float lx = d[o] * sx, ly = d[o + 1] * sy, lz = d[o + 2] * sz;
-                float wx = lx * cs + lz * sn, wz = -lx * sn + lz * cs;
-                float nx = d[o + 3] * cs + d[o + 5] * sn, nz = -d[o + 3] * sn + d[o + 5] * cs;
-                float shade = MathUtils.lerp(baseShade, 1f, MathUtils.clamp((d[o + 1] - t.minY) / h * 2.5f, 0, 1));
-                a.vert(x + wx, y + ly, z + wz, nx, d[o + 4], nz, c.r * shade, c.g * shade, c.b * shade);
+                int vi = t.uIndex[tri * 3 + k];
+                if (remap[vi] < 0) {
+                    remap[vi] = a.base();
+                    int o = vi * 6;
+                    float lx = d[o] * sx, ly = d[o + 1] * sy, lz = d[o + 2] * sz;
+                    float wx = lx * cs + lz * sn, wz = -lx * sn + lz * cs;
+                    float nx = d[o + 3] * cs + d[o + 5] * sn, nz = -d[o + 3] * sn + d[o + 5] * cs;
+                    float shade = MathUtils.lerp(baseShade, 1f, MathUtils.clamp((d[o + 1] - t.minY) / h * 2.5f, 0, 1));
+                    a.vert(x + wx, y + ly, z + wz, nx, d[o + 4], nz, c.r * shade, c.g * shade, c.b * shade);
+                }
+                a.idx.add((short) remap[vi]);
             }
-            a.idx.add(b); a.idx.add(b + 1); a.idx.add(b + 2);
         }
     }
+
+    // ------------------------------------------------------------ doga paketi (models/nature2)
+    private static final float ATLAS_INSET_U = 3f / 2048f, ATLAS_INSET_V = 3f / 1024f;
+
+    /**
+     * Donusturulmus doga modelini damgalar: opak ucgenler arazi mesh'ine (kose rengi x tint), kesimli ucgenler
+     * yaprak atlasli mesh'e. height: modelin dunya birimindeki hedef yuksekligi. Koseler paylasilir (indeksli).
+     */
+    private void stampNature(String name, float x, float y, float z, float yawDeg, float height, float widthMul,
+                             int leafCell, Color tint, float baseShade) {
+        NatureTemplate t = NatureTemplate.get(name);
+        float s = height / t.height(), sw = s * widthMul;
+        float cs = MathUtils.cosDeg(yawDeg), sn = MathUtils.sinDeg(yawDeg);
+        float h = t.height();
+        g.reserve(t.verts);
+        fol.reserve(t.verts);
+        float[] d = t.data;
+        int[] remap = natRemap.length >= t.verts ? natRemap : (natRemap = new int[t.verts * 2]);
+        java.util.Arrays.fill(remap, 0, t.verts, -1);
+        for (int tri = 0; tri < t.tris; tri++) {
+            int kind = t.kind[tri];
+            Accum a = kind == 0 ? g : fol;
+            for (int k = 0; k < 3; k++) {
+                int vi = t.index[tri * 3 + k];
+                if (remap[vi] < 0) {
+                    remap[vi] = a.base();
+                    int o = vi * 11;
+                    float lx = d[o] * sw, ly = (d[o + 1] - t.minY) * s, lz = d[o + 2] * sw;
+                    float wx = lx * cs + lz * sn, wz = -lx * sn + lz * cs;
+                    float nx = d[o + 3] * cs + d[o + 5] * sn, nz = -d[o + 3] * sn + d[o + 5] * cs;
+                    float shade = MathUtils.lerp(baseShade, 1f, MathUtils.clamp((d[o + 1] - t.minY) / h * 2.5f, 0, 1));
+                    float r = d[o + 6] * tint.r * shade, gg = d[o + 7] * tint.g * shade, bb = d[o + 8] * tint.b * shade;
+                    if (kind == 0) a.vert(x + wx, y + ly, z + wz, nx, d[o + 4], nz, r, gg, bb);
+                    else {
+                        int cell = NatureTemplate.cellFor(kind, leafCell);
+                        float u0 = (cell % 4) * 0.25f + ATLAS_INSET_U, v0 = (cell / 4) * 0.5f + ATLAS_INSET_V;
+                        float uw = 0.25f - 2 * ATLAS_INSET_U, vh = 0.5f - 2 * ATLAS_INSET_V;
+                        a.vertUV(x + wx, y + ly, z + wz, nx, d[o + 4], nz, r, gg, bb, u0 + d[o + 9] * uw, v0 + d[o + 10] * vh);
+                    }
+                }
+                a.idx.add((short) remap[vi]);
+            }
+        }
+    }
+
+    /** Damgalarda sablon kosesi -> biriktirici kosesi eslemesi (yeniden kullanilan tampon). */
+    private int[] natRemap = new int[1024];
 
     // ------------------------------------------------------------ yollar (Kenney Road Tiles, CC0)
     private static final String RD = "models/roads/roadTile_";
@@ -696,13 +888,14 @@ public final class TerrainRenderer implements Disposable {
     /** Dogrulama: toplam kose sayisi (arazi + su + dalgacik). */
     public int vertexCount() {
         int n = 0;
-        for (Model[] arr : new Model[][] { ground, water, ripples }) for (Model m : arr) if (m != null)
+        for (Model[] arr : new Model[][] { ground, water, ripples, foliage }) for (Model m : arr) if (m != null)
             for (com.badlogic.gdx.graphics.Mesh me : m.meshes) n += me.getNumVertices();
         return n;
     }
 
     @Override public void dispose() {
-        for (Model[] arr : new Model[][] { ground, water, ripples }) for (Model m : arr) if (m != null) m.dispose();
+        for (Model[] arr : new Model[][] { ground, water, ripples, foliage }) for (Model m : arr) if (m != null) m.dispose();
+        if (foliageTex != null) foliageTex.dispose();
         instances.clear();
     }
 }

@@ -237,7 +237,7 @@ The Finance window (**F** key, or click the cash indicator) has six tabs: **Summ
 
 ### Rivals
 
-0–3 AI rivals follow **exactly the same rules** as the player: the same loans, ECA, IPOs, takeovers and competition rules. Each rival has its own style (fossil, green, balanced). In line with that style they build plants, invest in substations and lines, bid in tenders and sell assets when in distress. They can try to take each other over — and you.
+0–7 AI rivals (up to 5 on a 64 map, up to 7 on 96 and 128 maps) follow **exactly the same rules** as the player: the same loans, ECA, IPOs, takeovers and competition rules. Each rival has its own style (fossil, green, balanced). In line with that style they build plants, invest in substations and lines, bid in tenders and sell assets when in distress. They can try to take each other over — and you.
 
 ---
 
@@ -245,7 +245,7 @@ The Finance window (**F** key, or click the cash indicator) has six tabs: **Summ
 
 **Map types:** Continent · Island · Archipelago · Highlands (lakes, rivers) · River Valley · Desert Coast (strong sun, little water).
 
-**Settings:** Map size (48 / 64 / 96), number of cities, number of rivals (0–3), difficulty (Easy / Normal / Hard) and map seed. The new-game screen shows a live preview.
+**Settings:** Map size (64 / 96 / 128), number of cities (up to 8 / 12 / 16), number of rivals (0–5 / 0–7), difficulty (Easy / Normal / Hard) and map seed. The new-game screen shows a live preview.
 
 | Scenario | Deadline | Goal |
 |---|---|---|
@@ -325,6 +325,7 @@ Simulation logic lives only in the `sim` package; the UI and renderer only read 
 ## Third-party content and licences
 
 - **Kenney** 3D Road Tiles — [kenney.nl](https://kenney.nl), CC0. City streets, ring roads, intercity roads and bridge decks. Licence: `src/main/resources/models/roads/License.txt`.
+- **Stylized nature pack** (OBJ models and textures supplied by the project owner) — trees, pines, twisted and dead trees, bushes, ferns, flowers, grass, mushrooms, rocks. Simplified by `tools/nature/convert_nature.py` into `src/main/resources/models/nature2/` (leaves in one alpha-cut texture atlas).
 - **Kenney** City Kit Commercial 2.1, City Kit Industrial 2.0 and Nature Kit — [kenney.nl](https://kenney.nl), CC0. City and plant buildings, chimneys, cooling towers, tanks, trees, rocks. Licence files: `src/main/resources/models/kenney/*/License.txt`, `assets-src/nature/`.
 - **Innerscene Low-poly Nature** tiles — [innerscene.com](https://innerscene.com), CC0. Grass and water palette, water surface.
 - **Font:** Manrope V5 by Mikhail Sharanda (free for personal and commercial use and embedding; `src/main/resources/fonts/ManropeV5-LICENSE.txt`). DejaVu Sans for fallback symbols (`src/main/resources/fonts/DejaVu-LICENSE.txt`).

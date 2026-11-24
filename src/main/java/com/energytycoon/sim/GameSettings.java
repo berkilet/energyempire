@@ -4,8 +4,8 @@ import com.energytycoon.world.MapPreset;
 
 /** Yeni oyun ayarlari. */
 public final class GameSettings {
-    public static final int[] SIZES = { 48, 64, 96 };
-    public static final String[] SIZE_LABELS = { "Küçük", "Orta", "Büyük" };
+    public static final int[] SIZES = { 64, 96, 128 };
+    public static final String[] SIZE_LABELS = { "Orta", "Büyük", "Çok Büyük" };
 
     public MapPreset preset = MapPreset.CONTINENT;
     public int size = 64;
@@ -40,9 +40,12 @@ public final class GameSettings {
         Scenario s = scenario();
         if (s.forcedPreset != null) g.preset = s.forcedPreset;
         g.cities = Math.max(2, Math.min(maxCities(g.size), g.cities));
-        g.rivals = Math.max(0, Math.min(3, g.rivals));
+        g.rivals = Math.max(0, Math.min(maxRivals(g.size), g.rivals));
         return g;
     }
 
-    public static int maxCities(int size) { return size <= 48 ? 6 : size <= 64 ? 8 : 12; }
+    public static int maxCities(int size) { return size <= 48 ? 6 : size <= 64 ? 8 : size <= 96 ? 12 : 16; }
+
+    /** Harita buyudukce daha cok rakip sigar (her rakibe yeterli santral sahasi kalmasi icin). */
+    public static int maxRivals(int size) { return Math.min(GameState.RIVALS.length, size <= 64 ? 5 : 7); }
 }

@@ -16,10 +16,14 @@ public final class GameState {
         "Akköy", "Bozova", "Çınarlı", "Demirpark", "Elmalı", "Gülbahçe", "Kuzeyliman", "Yeşilırmak", "Taşkale", "Ovakent",
         "Karasu", "Mercanköy", "Sarıyurt", "Dumanlı"
     };
-    static final String[][] RIVALS = {
+    public static final String[][] RIVALS = {
         { "Anadolu Enerji", "e74c3c", "fossil" },
         { "Yeşil Vadi Güç", "3498db", "green" },
         { "Delta Elektrik", "f39c12", "balanced" },
+        { "Karadeniz Güç", "9b59b6", "fossil" },
+        { "Ege Rüzgâr Enerji", "00bcd4", "green" },
+        { "Trakya Termik", "a0522d", "fossil" },
+        { "Toros Enerji", "e84393", "balanced" },
     };
 
     public final GameSettings settings;

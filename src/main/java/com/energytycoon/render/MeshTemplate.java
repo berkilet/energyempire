@@ -29,6 +29,10 @@ public final class MeshTemplate {
     public final int[] triMaterial;
     public final List<String> materials = new ArrayList<>();
     public final float minY, maxY, radius;
+    /** Paylasilan koseler (ayni konum+normal+malzeme tek kose): x,y,z,nx,ny,nz; uMat kose malzemesi; uIndex ucgen basina 3. */
+    public final float[] uData;
+    public final int[] uMat;
+    public final short[] uIndex;
 
     private static final Map<String, MeshTemplate> CACHE = new HashMap<>();
 
@@ -50,6 +54,24 @@ public final class MeshTemplate {
         }
         minY = lo; maxY = hi; radius = r;
         m.dispose();
+        Map<String, Integer> seen = new HashMap<>();
+        FloatArray ud = new FloatArray();
+        IntArray um = new IntArray();
+        short[] ui = new short[data.length / 6];
+        for (int v = 0; v < data.length / 6; v++) {
+            int mat = triMaterial[v / 3];
+            StringBuilder k = new StringBuilder().append(mat);
+            for (int c = 0; c < 6; c++) k.append(',').append(Float.floatToIntBits(data[v * 6 + c]));
+            Integer id = seen.get(k.toString());
+            if (id == null) {
+                id = um.size;
+                seen.put(k.toString(), id);
+                for (int c = 0; c < 6; c++) ud.add(data[v * 6 + c]);
+                um.add(mat);
+            }
+            ui[v] = (short) (int) id;
+        }
+        uData = ud.toArray(); uMat = um.toArray(); uIndex = ui;
     }
 
     private void collect(Node n, FloatArray out, IntArray mats) {

@@ -212,6 +212,7 @@ final class DevHook {
         for (int i = 0; i < 24 * 40; i++) s.tick();
         s.player.cash = 900e6;
         state = s;
+        if (env.containsKey("ET_NATSHOW")) { String[] q = get("ET_NATSHOW", "10,10").split(","); com.energytycoon.render.TerrainRenderer.showcase = new int[] { Integer.parseInt(q[0]), Integer.parseInt(q[1]) }; }
         gs = new GameScreen(game, s);
         game.swap(gs);
         gs.speed(Integer.parseInt(get("ET_SPEED", "1")));

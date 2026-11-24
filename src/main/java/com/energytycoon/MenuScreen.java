@@ -196,20 +196,20 @@ public final class MenuScreen implements Screen {
             TextButton b = new TextButton(GameSettings.SIZE_LABELS[i] + " " + sz, skin, "small");
             b.setChecked(sz == settings.size);
             b.addListener(new ChangeListener() { public void changed(ChangeEvent e, Actor a) {
-                if (b.isChecked()) { settings.size = sz; settings.cities = Math.min(settings.cities, GameSettings.maxCities(sz)); refreshLabels(); dirty = true; }
+                if (b.isChecked()) { settings.size = sz; settings.cities = Math.min(settings.cities, GameSettings.maxCities(sz)); settings.rivals = Math.min(settings.rivals, GameSettings.maxRivals(sz)); refreshLabels(); dirty = true; }
             } });
-            sizeG.add(b); sizes.add(b).width(100).height(28).pad(1);
+            sizeG.add(b); sizes.add(b).width(122).height(28).pad(1);
         }
         opts.add(sizes).colspan(3).row();
         cityLbl = new Label("", skin); rivalLbl = new Label("", skin);
         opts.add(new Label("Şehir", skin, "dim")).width(70);
         opts.add(button("-", "small", () -> { settings.cities = Math.max(2, settings.cities - 1); refreshLabels(); dirty = true; })).size(28, 28);
-        opts.add(cityLbl).width(30).center();
+        opts.add(cityLbl).width(48).center();
         opts.add(button("+", "small", () -> { settings.cities = Math.min(GameSettings.maxCities(settings.size), settings.cities + 1); refreshLabels(); dirty = true; })).size(28, 28).row();
         opts.add(new Label("Rakip", skin, "dim")).width(70);
         opts.add(button("-", "small", () -> { settings.rivals = Math.max(0, settings.rivals - 1); refreshLabels(); dirty = true; })).size(28, 28);
-        opts.add(rivalLbl).width(30).center();
-        opts.add(button("+", "small", () -> { settings.rivals = Math.min(3, settings.rivals + 1); refreshLabels(); dirty = true; })).size(28, 28).row();
+        opts.add(rivalLbl).width(48).center();
+        opts.add(button("+", "small", () -> { settings.rivals = Math.min(GameSettings.maxRivals(settings.size), settings.rivals + 1); refreshLabels(); dirty = true; })).size(28, 28).row();
         opts.add();
         CheckBox fleet = new CheckBox("  Rakipler kurulu santrallerle başlasın", skin, "toggle");
         fleet.setChecked(settings.rivalsStartWithFleet);
@@ -288,8 +288,8 @@ public final class MenuScreen implements Screen {
             if (forced) b.setChecked(b.getName().equals(sc.forcedPreset.name()));
         }
         presetDesc.setText(eff.desc + (sc.forcedPreset != null ? "  (Bu senaryo haritayı belirler.)" : ""));
-        cityLbl.setText(String.valueOf(settings.cities));
-        rivalLbl.setText(String.valueOf(settings.rivals));
+        cityLbl.setText(settings.cities + "/" + GameSettings.maxCities(settings.size));
+        rivalLbl.setText(settings.rivals + "/" + GameSettings.maxRivals(settings.size));
     }
 
     private void regeneratePreview() {

@@ -510,11 +510,14 @@ public final class WorldRenderer implements Disposable {
                 }
                 if (face < 0) continue;
                 double dist = Math.hypot(dx, dy);
-                double density = 1.35 - dist / (rad + 2.0) + tier * 0.05;
+                double density = 1.45 - dist / (rad + 2.0) + tier * 0.05;
                 if (hash(x, y) > density) continue;
                 terrain.reserved[i] = true;
                 houseAt.add(i);
-                ModelInstance mi = new ModelInstance(models.houseModels[(int) (hash(y, x) * 4) % 4]);
+                int cheb = Math.max(Math.abs(dx), Math.abs(dy));
+                boolean apt = cheb <= RoadNetwork.apartmentRadius(c) && tier >= 2;
+                Model[] set = apt ? models.apartmentModels : models.houseModels;
+                ModelInstance mi = new ModelInstance(set[(int) (hash(y, x) * 4) % 4]);
                 // parsel modeli kuzeye (-z) bakar; face yonune dondur (N=0, W=90, S=180, E=270)
                 int k = new int[] { 0, 3, 2, 1 }[face];
                 mi.transform.setToTranslation(x + 0.5f, state.map.top[i], y + 0.5f).rotate(Vector3.Y, 90f * k);

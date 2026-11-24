@@ -37,6 +37,8 @@ public final class ModelFactory implements Disposable {
     private final Map<Float, Model> rotorModels = new HashMap<>();
     private final Model[] cityModels = new Model[7];
     public final Model[] houseModels = new Model[4];
+    /** Sehir merkezine yakin apartman parselleri (sokaga bakar). */
+    public final Model[] apartmentModels = new Model[4];
     public Model unitBox, centerBox, sphere, flag, glow;
     public final Texture windowTex, windowLitTex;
     private final Matrix4 tmp = new Matrix4();
@@ -51,6 +53,7 @@ public final class ModelFactory implements Disposable {
         windowLitTex = makeWindowTexture(true);
         for (int tier = 1; tier <= 6; tier++) cityModels[tier] = buildCity(tier);
         for (int i = 0; i < houseModels.length; i++) houseModels[i] = buildHouses(i);
+        for (int i = 0; i < apartmentModels.length; i++) apartmentModels[i] = buildApartments(i);
         unitBox = build(b -> { b.setColor(Color.WHITE); b.box(0.5f, 0.5f, 0.5f, 1, 1, 1); });
         centerBox = build(b -> { b.setColor(Color.WHITE); b.box(0, 0, 0, 1, 1, 1); });
         sphere = build(b -> { b.setColor(Color.WHITE); b.sphere(1, 1, 1, 8, 6); });
@@ -562,6 +565,51 @@ public final class ModelFactory implements Disposable {
             if (r.nextFloat() < 0.75f) {
                 float tx = x + (r.nextFloat() - 0.5f) * 0.14f, tz = 0.18f + r.nextFloat() * 0.18f;
                 cone(base, tx, 0.0f, tz, 0.07f, 0.13f, 0.07f, 5, c(0.22f, 0.46f, 0.22f));
+            }
+        }
+        Model m = mb.end();
+        all.add(m);
+        return m;
+    }
+
+    /**
+     * Apartman parseli: 1-2 orta katli blok, kuzeye (-z, sokak) bakan cephe, duz cati ve cati ekipmani,
+     * arkada otopark ya da kucuk avlu. Banliyo evleriyle ayni yerlesim kurallari (sokaga dondurulur).
+     */
+    private Model buildApartments(int variant) {
+        Random r = new Random(700 + variant * 53L);
+        ModelBuilder mb = new ModelBuilder();
+        mb.begin();
+        Material plain = new Material("plain", ColorAttribute.createDiffuse(Color.WHITE));
+        Material walls = new Material("walls", ColorAttribute.createDiffuse(Color.WHITE),
+            TextureAttribute.createDiffuse(windowTex), TextureAttribute.createEmissive(windowLitTex), ColorAttribute.createEmissive(0, 0, 0, 1));
+        MeshPartBuilder base = mb.part("base", GL20.GL_TRIANGLES, ATTR, plain);
+        MeshPartBuilder wb = mb.part("walls", GL20.GL_TRIANGLES, ATTR_UV, walls);
+        Color[] pal = { c(0.88f, 0.84f, 0.76f), c(0.78f, 0.80f, 0.86f), c(0.86f, 0.74f, 0.64f), c(0.90f, 0.90f, 0.88f), c(0.72f, 0.76f, 0.72f) };
+        // kaldirim seridi (sokak tarafi)
+        box(base, 0, 0, -0.42f, 1.0f, 0.006f, 0.16f, c(0.62f, 0.62f, 0.60f));
+        int n = variant % 2 == 0 ? 1 : 2;
+        for (int i = 0; i < n; i++) {
+            float w = n == 1 ? 0.62f + r.nextFloat() * 0.14f : 0.34f + r.nextFloat() * 0.06f;
+            float d = 0.26f + r.nextFloat() * 0.08f;
+            float h = 0.18f + r.nextFloat() * 0.22f + (variant >= 2 ? 0.08f : 0);
+            float x = n == 1 ? 0 : (i == 0 ? -0.22f : 0.22f);
+            float z = -0.32f + d / 2;
+            wb.setColor(pal[r.nextInt(pal.length)]);
+            wb.setUVRange(0, 0, Math.max(1, Math.round(w / 0.07f)) / 8f, Math.max(1, Math.round(h / 0.065f)) / 8f);
+            wb.box(x, h / 2, z, w, h, d);
+            box(base, x, h, z, w + 0.012f, 0.016f, d + 0.012f, c(0.38f, 0.39f, 0.42f));
+            box(base, x + w * 0.2f, h + 0.016f, z, w * 0.22f, 0.035f, d * 0.4f, c(0.55f, 0.56f, 0.58f));
+        }
+        // arka: otopark ya da avlu
+        if (r.nextFloat() < 0.55f) {
+            box(base, 0, 0, 0.26f, 0.80f, 0.006f, 0.34f, c(0.34f, 0.34f, 0.36f));
+            Color[] cars = { c(0.75f, 0.2f, 0.18f), c(0.2f, 0.35f, 0.7f), c(0.85f, 0.85f, 0.85f), c(0.15f, 0.15f, 0.17f) };
+            for (int k = 0; k < 4; k++) if (r.nextFloat() < 0.7f) box(base, -0.30f + k * 0.2f, 0.006f, 0.24f, 0.07f, 0.04f, 0.12f, cars[r.nextInt(cars.length)]);
+        } else {
+            for (int k = 0; k < 2; k++) {
+                float tx = -0.25f + k * 0.5f + (r.nextFloat() - 0.5f) * 0.1f, tz = 0.22f + r.nextFloat() * 0.1f;
+                cone(base, tx, 0.0f, tz, 0.09f, 0.16f, 0.09f, 5, c(0.22f, 0.46f, 0.22f));
             }
         }
         Model m = mb.end();

@@ -16,7 +16,7 @@ class MacroTest {
         double min = 1, max = 0; int hits = 0, forecasts = 0;
         for (long seed = 1; seed <= seeds; seed++) {
             GameSettings g = SimHarness.reference(seed);
-            g.rivals = 0; g.size = 48; g.cities = 3;
+            g.rivals = 0; g.size = 64; g.cities = 3;
             GameState s = GameState.newGame(g);
             java.util.ArrayDeque<double[]> pending = new java.util.ArrayDeque<>(); // {hedef ay, beklenen faiz}
             int months = 0;
