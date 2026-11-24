@@ -324,6 +324,7 @@ Simülasyon mantığı yalnızca `sim` paketindedir; arayüz ve render yalnızca
 
 ## Üçüncü taraf içerik ve lisanslar
 
+- **Kenney** 3D Road Tiles — [kenney.nl](https://kenney.nl), CC0. Şehir sokakları, çevre yolları, şehirlerarası yollar ve köprü tabliyeleri. Lisans: `src/main/resources/models/roads/License.txt`.
 - **Kenney** City Kit Commercial 2.1, City Kit Industrial 2.0 ve Nature Kit — [kenney.nl](https://kenney.nl), CC0. Şehir ve santral binaları, bacalar, soğutma kuleleri, tanklar, ağaçlar, kayalar. Lisans dosyaları: `src/main/resources/models/kenney/*/License.txt`, `assets-src/nature/`.
 - **Innerscene Low-poly Nature** karoları — [innerscene.com](https://innerscene.com), CC0. Çim ve su renk paleti, su yüzeyi.
 - **Yazı tipi:** Manrope V5 by Mikhail Sharanda (kişisel ve ticari kullanım, gömme serbest; `src/main/resources/fonts/ManropeV5-LICENSE.txt`). Yedek semboller için DejaVu Sans (`src/main/resources/fonts/DejaVu-LICENSE.txt`).

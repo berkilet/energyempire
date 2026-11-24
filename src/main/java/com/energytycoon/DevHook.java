@@ -191,6 +191,7 @@ final class DevHook {
         g.seed = Long.parseLong(get("ET_SEED", "42"));
         g.preset = MapPreset.valueOf(get("ET_PRESET", "CONTINENT"));
         g.scenarioId = get("ET_SIM", "free");
+        if (env.containsKey("ET_MAP")) { g.size = Integer.parseInt(get("ET_MAP", "64")); g.cities = GameSettings.maxCities(g.size); }
         g.companyName = "Test A.Ş.";
         GameState s = GameState.newGame(g);
         s.player.cash = 6e9;
@@ -221,6 +222,7 @@ final class DevHook {
         if (focusEq.startsWith("eq:")) for (Plant p : s.plants) if (p.equipment.id.equals(focusEq.substring(3))) { fp = p; break; }
         if (fp != null) gs.devFocus(fp.x, fp.y, zoom);
         else if (focusEq.equals("overview")) gs.devFocus(s.map.size / 2, s.map.size / 2, zoom);
+        else if (focusEq.startsWith("xy:")) { String[] p = focusEq.substring(3).split(","); gs.devFocus(Integer.parseInt(p[0]), Integer.parseInt(p[1]), zoom); }
         else gs.devFocus(c0.x, c0.y, zoom);
     }
 }

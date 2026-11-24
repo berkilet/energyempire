@@ -477,31 +477,54 @@ public final class WorldRenderer implements Disposable {
     }
 
     /** Sehir cevresinde nufusa gore banliyo evleri; agaclari bu karelerden kaldirir. */
+    private RoadNetwork roads;
+
     private void rebuildSuburbs() {
         suburbs.clear();
+        houseAt.clear();
         java.util.Arrays.fill(terrain.reserved, false);
+        if (roads == null) { roads = new RoadNetwork(state.map); terrain.roads = roads; }
+        long rt0 = System.nanoTime();
+        roads.build(state.occ, state.cities, state.plants);
+        if (System.getenv("ET_ROADDBG") != null) System.out.println("ROADDBG build ms=" + (System.nanoTime() - rt0) / 1e6);
+        for (int i = 0; i < roads.links.length; i++) if (roads.road(i)) terrain.reserved[i] = true;
         for (City c : state.cities) {
             int tier = c.tier();
-            int rad = 2 + (tier + 1) / 2;
+            int rad = RoadNetwork.suburbRadius(c);
             for (int dy = -rad; dy <= rad; dy++) for (int dx = -rad; dx <= rad; dx++) {
                 int x = c.x + dx, y = c.y + dy;
                 if (!state.map.inBounds(x, y)) continue;
                 int i = state.map.idx(x, y);
-                double d = Math.hypot(dx, dy);
-                if (d <= 2.2) terrain.reserved[i] = true;
-                if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1) continue;
-                if (state.map.water[i] || state.occ[i] >= 0) continue;
-                if (Math.abs(state.map.top[i] - state.map.topAt(c.x, c.y)) > 0.45f) continue;
-                float h = hash(x, y);
-                double density = 1.15 - d / (rad + 0.5) + tier * 0.05;
-                if (h > density) continue;
+                if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1) { terrain.reserved[i] = true; continue; }
+                if (state.map.water[i] || state.occ[i] >= 0 || roads.road(i) || houseAt.contains(i)) continue;
+                // ev parseli yalnizca ayni seviyedeki bir sehir sokagina cephe verir
+                // ayni seviyedeki sokak tercih edilir; yoksa bir kademe farkli sokaga da cephe verebilir (yamac evi)
+                int face = -1;
+                float bestDh = 9;
+                for (int d = 0; d < 4; d++) {
+                    int nx = x + RoadNetwork.DX[d], ny = y + RoadNetwork.DY[d];
+                    if (!state.map.inBounds(nx, ny)) continue;
+                    int j = state.map.idx(nx, ny);
+                    float dh = Math.abs(state.map.top[j] - state.map.top[i]);
+                    if (roads.road(j) && !roads.bridge[j] && dh < com.energytycoon.world.WorldMap.LEVEL_H + 0.01f && dh < bestDh - 0.01f) { face = d; bestDh = dh; }
+                }
+                if (face < 0) continue;
+                double dist = Math.hypot(dx, dy);
+                double density = 1.35 - dist / (rad + 2.0) + tier * 0.05;
+                if (hash(x, y) > density) continue;
                 terrain.reserved[i] = true;
+                houseAt.add(i);
                 ModelInstance mi = new ModelInstance(models.houseModels[(int) (hash(y, x) * 4) % 4]);
-                mi.transform.setToTranslation(x + 0.5f, state.map.top[i], y + 0.5f);
+                // parsel modeli kuzeye (-z) bakar; face yonune dondur (N=0, W=90, S=180, E=270)
+                int k = new int[] { 0, 3, 2, 1 }[face];
+                mi.transform.setToTranslation(x + 0.5f, state.map.top[i], y + 0.5f).rotate(Vector3.Y, 90f * k);
                 suburbs.add(mi);
             }
         }
+        if (System.getenv("ET_ROADDBG") != null) System.out.println("ROADDBG houses=" + suburbs.size() + " roads=" + java.util.stream.IntStream.range(0, roads.links.length).filter(roads::road).count());
     }
+
+    private final java.util.HashSet<Integer> houseAt = new java.util.HashSet<>();
 
     private static float hash(int x, int y) {
         int h = x * 73856093 ^ y * 19349663;

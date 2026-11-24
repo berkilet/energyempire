@@ -324,6 +324,7 @@ Simulation logic lives only in the `sim` package; the UI and renderer only read 
 
 ## Third-party content and licences
 
+- **Kenney** 3D Road Tiles — [kenney.nl](https://kenney.nl), CC0. City streets, ring roads, intercity roads and bridge decks. Licence: `src/main/resources/models/roads/License.txt`.
 - **Kenney** City Kit Commercial 2.1, City Kit Industrial 2.0 and Nature Kit — [kenney.nl](https://kenney.nl), CC0. City and plant buildings, chimneys, cooling towers, tanks, trees, rocks. Licence files: `src/main/resources/models/kenney/*/License.txt`, `assets-src/nature/`.
 - **Innerscene Low-poly Nature** tiles — [innerscene.com](https://innerscene.com), CC0. Grass and water palette, water surface.
 - **Font:** Manrope V5 by Mikhail Sharanda (free for personal and commercial use and embedding; `src/main/resources/fonts/ManropeV5-LICENSE.txt`). DejaVu Sans for fallback symbols (`src/main/resources/fonts/DejaVu-LICENSE.txt`).

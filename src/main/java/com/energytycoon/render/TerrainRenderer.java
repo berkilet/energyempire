@@ -42,6 +42,9 @@ public final class TerrainRenderer implements Disposable {
     private final int[] occ;
     /** Agac konmayacak kareler (sehir cevresi vb.). */
     public final boolean[] reserved;
+    /** Gorsel yol agi (WorldRenderer kurar); null ise yol cizilmez. */
+    public RoadNetwork roads;
+    private byte[] roadSnapshot;
     private final int chunksX;
     private final Model[] ground, water, ripples;
     private final ModelInstance[] groundInst, waterInst, rippleInst;
@@ -83,7 +86,19 @@ public final class TerrainRenderer implements Disposable {
         for (int c = 0; c < ground.length; c++) buildChunk(c);
         System.arraycopy(occ, 0, occSnapshot, 0, occ.length);
         System.arraycopy(reserved, 0, resSnapshot, 0, occ.length);
+        snapRoads();
         refreshInstances();
+    }
+
+    private void snapRoads() {
+        if (roads == null) return;
+        if (roadSnapshot == null) roadSnapshot = new byte[occ.length];
+        System.arraycopy(roads.links, 0, roadSnapshot, 0, occ.length);
+    }
+
+    private boolean roadChanged(int i) {
+        if (roads == null) return false;
+        return roadSnapshot == null || roads.links[i] != roadSnapshot[i];
     }
 
     /** Doluluk/rezerv degisen chunk'lari yeniden kurar. */
@@ -91,7 +106,7 @@ public final class TerrainRenderer implements Disposable {
         boolean[] dirty = new boolean[ground.length];
         boolean any = false;
         for (int i = 0; i < occ.length; i++) {
-            if ((occ[i] >= 0) != (occSnapshot[i] >= 0) || reserved[i] != resSnapshot[i]) {
+            if ((occ[i] >= 0) != (occSnapshot[i] >= 0) || reserved[i] != resSnapshot[i] || roadChanged(i)) {
                 int x = i % map.size, y = i / map.size;
                 for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
                     int cx = (x + dx) / CHUNK, cy = (y + dy) / CHUNK;
@@ -104,6 +119,7 @@ public final class TerrainRenderer implements Disposable {
         for (int c = 0; c < ground.length; c++) if (dirty[c]) buildChunk(c);
         System.arraycopy(occ, 0, occSnapshot, 0, occ.length);
         System.arraycopy(reserved, 0, resSnapshot, 0, occ.length);
+        snapRoads();
         refreshInstances();
     }
 
@@ -179,6 +195,7 @@ public final class TerrainRenderer implements Disposable {
                 }
                 wall(x, y, 1, 0, t); wall(x, y, -1, 0, t); wall(x, y, 0, 1, t); wall(x, y, 0, -1, t);
                 if (layer == Layer.NORMAL) decorate(x, y, i, t);
+                if (layer == Layer.NORMAL && roads != null && roads.road(i)) roadTile(x, y, i);
             }
         }
         ground[c] = g.build(new Material(ColorAttribute.createDiffuse(Color.WHITE)));
@@ -506,6 +523,109 @@ public final class TerrainRenderer implements Disposable {
             }
             a.idx.add(b); a.idx.add(b + 1); a.idx.add(b + 2);
         }
+    }
+
+    // ------------------------------------------------------------ yollar (Kenney Road Tiles, CC0)
+    private static final String RD = "models/roads/roadTile_";
+    /** Karo modeli 3x3 birim; cimen ust yuzeyi y=0.55, kaldirim 0.63. Dikey olcek (yol arazinin hafif ustunde). */
+    private static final float ROAD_SY = 0.3f, ROAD_GRASS = 0.55f;
+    private static final Color ASPH_URBAN = new Color(0.30f, 0.30f, 0.32f, 1), ASPH_RURAL = new Color(0.35f, 0.35f, 0.36f, 1);
+    private static final Color WALK = new Color(0.68f, 0.67f, 0.63f, 1), SHOULDER = new Color(0.60f, 0.56f, 0.46f, 1);
+    private static final Color CONCRETE = new Color(0.64f, 0.64f, 0.62f, 1), DASH = new Color(0.93f, 0.90f, 0.78f, 1);
+
+    /** Maskeyi saat yonunun tersine 90 derece dondurur (E->N, N->W, W->S, S->E). */
+    private static int rotMask(int m) { return (m >> 1) | ((m & 1) << 3); }
+
+    private void roadTile(int x, int y, int i) {
+        int m = roads.links[i] & 0xF;
+        int cnt = Integer.bitCount(m);
+        String name; int base;
+        if (cnt == 1) { name = "143"; base = RoadNetwork.E; }
+        else if (cnt == 2 && (m == (RoadNetwork.E | RoadNetwork.W) || m == (RoadNetwork.N | RoadNetwork.S))) { name = "160"; base = RoadNetwork.E | RoadNetwork.W; }
+        else if (cnt == 2) { name = "155"; base = RoadNetwork.N | RoadNetwork.E; }
+        else if (cnt == 3) { name = "033"; base = RoadNetwork.E | RoadNetwork.S | RoadNetwork.W; }
+        else { name = "166"; base = 15; }
+        int k = 0;
+        while (base != m && k < 4) { base = rotMask(base); k++; }
+        boolean straight = name.equals("160");
+        float own = roads.deck[i];
+        // bagli komsu daha yuksekse yol bu karede ona dogru rampa yapar (dolgu: kaldirim yanlari uzar)
+        float[] raise = new float[4];
+        for (int d = 0; d < 4; d++) {
+            if ((m & RoadNetwork.BIT[d]) == 0) continue;
+            int nx = x + RoadNetwork.DX[d], ny = y + RoadNetwork.DY[d];
+            if (!map.inBounds(nx, ny)) continue;
+            float nh = roads.deck[map.idx(nx, ny)];
+            if (nh > own + 0.005f && nh - own < WorldMap.LEVEL_H * 1.5f) raise[d] = nh - own;
+        }
+        boolean urb = roads.urban[i], br = roads.bridge[i];
+        Color asph = urb ? ASPH_URBAN : ASPH_RURAL, side = urb ? WALK : SHOULDER;
+        MeshTemplate t = MeshTemplate.get(RD + name + ".obj");
+        int tris = t.triangleCount();
+        g.reserve(tris * 3);
+        float cs = MathUtils.cosDeg(90f * k), sn = MathUtils.sinDeg(90f * k);
+        Color[] matColor = new Color[t.materials.size()];
+        for (int q = 0; q < matColor.length; q++) {
+            String mat = t.materials.get(q);
+            matColor[q] = mat.equals("Asphalt") ? asph : mat.equals("Stone") ? side : br ? CONCRETE : null;
+        }
+        float[] d = t.data;
+        float cx = x + 0.5f, cz = y + 0.5f;
+        for (int tri = 0; tri < tris; tri++) {
+            Color c = matColor[t.triMaterial[tri]];
+            if (c == null) continue;
+            int b = g.base();
+            for (int v = 0; v < 3; v++) {
+                int o = (tri * 3 + v) * 6;
+                float lx = (d[o] - 1.5f) / 3f, lz = (d[o + 2] + 1.5f) / 3f, oy = d[o + 1];
+                float wx = lx * cs + lz * sn, wz = -lx * sn + lz * cs;
+                float yy;
+                if (br && oy < 0.5f) yy = own - 0.07f;
+                else yy = own + (oy - ROAD_GRASS) * ROAD_SY + (oy > ROAD_GRASS + 0.01f ? roadRaise(raise, wx, wz, straight) : 0);
+                float nx = d[o + 3] * cs + d[o + 5] * sn, nz = -d[o + 3] * sn + d[o + 5] * cs;
+                float sh = oy > ROAD_GRASS + 0.01f ? 1f : 0.85f;
+                g.vert(cx + wx, yy, cz + wz, nx, d[o + 4], nz, c.r * sh, c.g * sh, c.b * sh);
+            }
+            g.idx.add(b); g.idx.add(b + 1); g.idx.add(b + 2);
+        }
+        // kirsal duz yolda kesik orta cizgi
+        if (straight && !urb) {
+            boolean ew = (m & RoadNetwork.E) != 0;
+            float top = (0.60f - ROAD_GRASS) * ROAD_SY + 0.0015f;
+            for (int s = 0; s < 2; s++) {
+                float a0 = -0.42f + s * 0.5f, a1 = a0 + 0.2f, hw = 0.006f;
+                float x0 = ew ? a0 : -hw, x1 = ew ? a1 : hw, z0 = ew ? -hw : a0, z1 = ew ? hw : a1;
+                float h00 = own + top + roadRaise(raise, x0, z0, true), h01 = own + top + roadRaise(raise, x0, z1, true);
+                float h11 = own + top + roadRaise(raise, x1, z1, true), h10 = own + top + roadRaise(raise, x1, z0, true);
+                g.reserve(4);
+                quad(g, cx + x0, h00, cz + z0, cx + x0, h01, cz + z1, cx + x1, h11, cz + z1, cx + x1, h10, cz + z0, 0, 1, 0, DASH, 1, 1, 1, 1);
+            }
+        }
+        // kopru ayagi: sudan tabliyeye beton ayak (yol yonune dik genis)
+        if (br) {
+            boolean ew = (m & RoadNetwork.E) != 0;
+            float hx = ew ? 0.06f : 0.26f, hz = ew ? 0.26f : 0.06f, y0 = map.top[i] - 0.05f, y1 = own - 0.07f;
+            g.reserve(20);
+            quad(g, cx - hx, y0, cz + hz, cx - hx, y1, cz + hz, cx + hx, y1, cz + hz, cx + hx, y0, cz + hz, 0, 0, 1, CONCRETE, 0.7f, 0.9f, 0.9f, 0.7f);
+            quad(g, cx + hx, y0, cz - hz, cx + hx, y1, cz - hz, cx - hx, y1, cz - hz, cx - hx, y0, cz - hz, 0, 0, -1, CONCRETE, 0.7f, 0.9f, 0.9f, 0.7f);
+            quad(g, cx + hx, y0, cz + hz, cx + hx, y1, cz + hz, cx + hx, y1, cz - hz, cx + hx, y0, cz - hz, 1, 0, 0, CONCRETE, 0.6f, 0.8f, 0.8f, 0.6f);
+            quad(g, cx - hx, y0, cz - hz, cx - hx, y1, cz - hz, cx - hx, y1, cz + hz, cx - hx, y0, cz + hz, -1, 0, 0, CONCRETE, 0.6f, 0.8f, 0.8f, 0.6f);
+            // tabliye alt yuzu
+            float u = 0.5f;
+            quad(g, cx - u, y1, cz - u, cx + u, y1, cz - u, cx + u, y1, cz + u, cx - u, y1, cz + u, 0, -1, 0, CONCRETE, 0.55f, 0.55f, 0.55f, 0.55f);
+        }
+    }
+
+    /** Karedeki (merkeze gore) bir noktada rampa yukseltisi: duz karede tum kare boyunca, digerlerinde yarim kare. */
+    private static float roadRaise(float[] raise, float px, float pz, boolean straight) {
+        float h = 0;
+        for (int d = 0; d < 4; d++) {
+            if (raise[d] <= 0) continue;
+            float dot = px * RoadNetwork.DX[d] + pz * RoadNetwork.DY[d];
+            float u = straight ? dot + 0.5f : dot * 2f;
+            h += raise[d] * MathUtils.clamp(u, 0, 1);
+        }
+        return h;
     }
 
     // ------------------------------------------------------------ prosedurel (dag koknarlari, palmiye)

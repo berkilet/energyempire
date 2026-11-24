@@ -533,6 +533,10 @@ public final class ModelFactory implements Disposable {
     }
 
     /** Banliyo: kucuk evler ve kisa yol parcasi (1 kare). */
+    /**
+     * Banliyo parseli: evler karenin kuzey kenarina (yerel -z) bakan tek sira halinde, on bahce + arka bahce agaci.
+     * Yerlestirirken parsel sokaga bakacak sekilde dondurulur (sokak her zaman evlerin onunde).
+     */
     private Model buildHouses(int variant) {
         Random r = new Random(100 + variant * 31L);
         ModelBuilder mb = new ModelBuilder();
@@ -541,24 +545,22 @@ public final class ModelFactory implements Disposable {
         Material walls = new Material("walls", ColorAttribute.createDiffuse(Color.WHITE),
             TextureAttribute.createDiffuse(windowTex), TextureAttribute.createEmissive(windowLitTex), ColorAttribute.createEmissive(0, 0, 0, 1));
         MeshPartBuilder base = mb.part("base", GL20.GL_TRIANGLES, ATTR, plain);
-        boolean vertical = variant % 2 == 0;
-        if (vertical) box(base, 0, 0, 0, 0.12f, 0.006f, 1.0f, c(0.30f, 0.30f, 0.32f));
-        else box(base, 0, 0, 0, 1.0f, 0.006f, 0.12f, c(0.30f, 0.30f, 0.32f));
         MeshPartBuilder wb = mb.part("walls", GL20.GL_TRIANGLES, ATTR_UV, walls);
         Color[] wallC = { c(0.92f, 0.88f, 0.78f), c(0.86f, 0.82f, 0.80f), c(0.80f, 0.86f, 0.88f), c(0.94f, 0.92f, 0.88f) };
         Color[] roofC = { c(0.62f, 0.26f, 0.20f), c(0.45f, 0.30f, 0.25f), c(0.35f, 0.38f, 0.42f) };
-        int n = 3 + variant;
+        int n = 2 + variant % 2;
         for (int i = 0; i < n; i++) {
-            float along = -0.38f + (i / (float) Math.max(1, n - 1)) * 0.76f;
-            float side = (i % 2 == 0 ? -1 : 1) * (0.20f + r.nextFloat() * 0.12f);
-            float x = vertical ? side : along, z = vertical ? along : side;
-            float w = 0.13f + r.nextFloat() * 0.05f, h = 0.08f + r.nextFloat() * 0.05f;
+            float x = -0.32f + (i + 0.5f) * (0.64f / n) + (r.nextFloat() - 0.5f) * 0.04f;
+            float w = 0.17f + r.nextFloat() * 0.06f, d = w * (0.85f + r.nextFloat() * 0.3f), h = 0.10f + r.nextFloat() * 0.06f;
+            float z = -0.32f + d / 2 + r.nextFloat() * 0.03f;
             wb.setColor(wallC[r.nextInt(wallC.length)]);
             wb.setUVRange(0, 0, 0.25f, 0.125f);
-            wb.box(x, h / 2, z, w, h, w);
-            cone(base, x, h, z, w * 1.45f, 0.08f, w * 1.45f, 4, roofC[r.nextInt(roofC.length)]);
-            if (r.nextFloat() < 0.6f) {
-                float tx = x + (r.nextFloat() - 0.5f) * 0.18f, tz = z + (r.nextFloat() - 0.5f) * 0.18f;
+            wb.box(x, h / 2, z, w, h, d);
+            cone(base, x, h, z, w * 1.40f, 0.10f, d * 1.40f, 4, roofC[r.nextInt(roofC.length)]);
+            // garaj yolu: evden sokaga
+            box(base, x + w * 0.3f, 0, -0.42f, 0.05f, 0.004f, 0.16f, c(0.58f, 0.57f, 0.54f));
+            if (r.nextFloat() < 0.75f) {
+                float tx = x + (r.nextFloat() - 0.5f) * 0.14f, tz = 0.18f + r.nextFloat() * 0.18f;
                 cone(base, tx, 0.0f, tz, 0.07f, 0.13f, 0.07f, 5, c(0.22f, 0.46f, 0.22f));
             }
         }
