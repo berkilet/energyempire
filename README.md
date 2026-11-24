@@ -275,7 +275,7 @@ Hedefler sağ alttaki panelde izlenir. Süre dolarsa oyun biter.
 | V | Varlıklarım |
 | F / M / C / H | Finans · Piyasa · Şirketler · Yardım |
 | Tab | Hat kademesi (OG / YG / ÇYG) |
-| L | Harita katmanı (rüzgar, güneş, kömür, gaz, su) |
+| L | Harita katmanı (rüzgar, güneş, kömür, gaz, su): karolar beklenen verime göre griden canlı renge boyanır, lejant ölçeği gösterir |
 | Delete | Yıkım aracı |
 | F5 / F9 | Kaydet / yükle |
 

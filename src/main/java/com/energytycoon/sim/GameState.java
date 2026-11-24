@@ -935,6 +935,29 @@ public final class GameState {
         return 1.0 - 0.28 * dep;
     }
 
+    /**
+     * Harita katmanlari icin karo verimi (oyunun yatirim hesabindaki ayni olcu): ruzgar/gunes/hidro icin referans
+     * ekipmanla beklenen kapasite faktoru (hidroda en uygun turbin; su kenari degilse 0), komur/gaz icin yataga
+     * yakinliktan gelen yakit maliyeti indirimi (0..0,28). Su karesi: NaN.
+     */
+    public double resourceValue(PlantType t, int x, int y) {
+        int i = map.idx(x, y);
+        if (map.water[i]) return Double.NaN;
+        switch (t) {
+            case WIND: return expectedWindCf(catalog.defaultFor(PlantType.WIND), map.wind[i]);
+            case SOLAR: return siteScore(catalog.defaultFor(PlantType.SOLAR), x, y);
+            case HYDRO: {
+                if (map.hydro[i] < 0.18) return 0;
+                double best = 0;
+                for (Equipment e : catalog.forType(PlantType.HYDRO)) best = Math.max(best, siteScore(e, x, y));
+                return best;
+            }
+            case COAL: return 0.28 * nearbyDeposit(map.coal, x, y);
+            case GAS: return 0.28 * nearbyDeposit(map.gas, x, y);
+            default: return 0;
+        }
+    }
+
     private double nearbyDeposit(float[] layer, int cx, int cy) {
         double best = 0;
         for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++) {

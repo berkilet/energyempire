@@ -41,6 +41,8 @@ public final class Hud {
     private final Label company, cash, debt, value, date, price, demand, info, placeInfo;
     private final Table toasts = new Table();
     private final Table dock = new Table(), layerPop = new Table(), ctxBar = new Table();
+    /** Harita katmani lejanti: gri (dusuk verim) -> canli (yuksek verim) renk cubugu ve olcek uclari. */
+    private final Table layerLegend = new Table();
     private Table right, top;
     private ScrollPane selScroll;
     private Cell<ScrollPane> selCell;
@@ -272,6 +274,10 @@ public final class Hud {
         stage.addActor(root);
         stage.addActor(dock);
         stage.addActor(layerPop);
+        layerLegend.setBackground(skin.getDrawable("card"));
+        layerLegend.pad(6, 8, 6, 8);
+        layerLegend.setVisible(false);
+        stage.addActor(layerLegend);
         stage.addActor(invest.root);
         // Bildirimler ve alt bilgi ayri katmanda: sayilari artinca ana yerlesimi (ust cubugu) itmesinler.
         Table bottom = new Table();
@@ -747,10 +753,50 @@ public final class Hud {
         if (Math.abs(selCell.getMaxHeight() - want) > 0.5f) { selCell.height(want); selScroll.invalidateHierarchy(); }
         dock.setPosition(8, 8);
         layerPop.setPosition(dock.getX() + layerBtn.getX(), dock.getY() + dock.getHeight() + 6);
+        layerLegend.setPosition(dock.getX(), dock.getY() + dock.getHeight() + 6);
+        if (layerPop.isVisible()) layerLegend.setVisible(false);
+        else layerLegend.setVisible(layerLegend.hasChildren());
         if (invest.root.isVisible() && invest.root.getActions().isEmpty()) {
             invest.root.pack();
             invest.root.setPosition(investX(), investY());
         }
+    }
+
+    /** Katman degisince: lejanti kurar (NORMAL'de gizli). range: olcek uclari (dogal birimde). */
+    public void setLayerLegend(Layer l, float[] range) {
+        layerLegend.clear();
+        if (l == Layer.NORMAL || range == null) { layerLegend.setVisible(false); return; }
+        boolean fuel = l == Layer.COAL || l == Layer.GAS;
+        String what = switch (l) {
+            case WIND -> "Rüzgar · beklenen kapasite faktörü";
+            case SUN -> "Güneş · beklenen kapasite faktörü";
+            case WATER -> "Hidro · beklenen kapasite faktörü";
+            case COAL -> "Kömür yatağı · yakıt maliyeti indirimi";
+            default -> "Doğalgaz yatağı · yakıt maliyeti indirimi";
+        };
+        layerLegend.add(l(what, "dim")).colspan(3).left().padBottom(4).row();
+        Table bar = new Table();
+        for (int k = 0; k < 16; k++) {
+            com.badlogic.gdx.scenes.scene2d.ui.Image cell = new com.badlogic.gdx.scenes.scene2d.ui.Image(skin.newDrawable("white", com.energytycoon.render.TerrainRenderer.rampColor(l, k / 15f)));
+            bar.add(cell).size(12, 10);
+        }
+        layerLegend.add(l("%" + Math.round(range[0] * 100), "small")).right().padRight(6);
+        layerLegend.add(bar);
+        layerLegend.add(l("%" + Math.round(range[1] * 100), "small")).left().padLeft(6).row();
+        layerLegend.add();
+        Table ends = new Table();
+        ends.add(l("düşük verim", "dim")).left().expandX();
+        ends.add(l("yüksek verim", "dim")).right();
+        layerLegend.add(ends).fillX();
+        layerLegend.add().row();
+        if (fuel || l == Layer.WATER) {
+            Table none = new Table();
+            none.add(new com.badlogic.gdx.scenes.scene2d.ui.Image(skin.newDrawable("white", new Color(0.27f, 0.28f, 0.29f, 1)))).size(12, 10).padRight(6);
+            none.add(l(fuel ? "yatak yok" : "su kenarı değil (hidro kurulamaz)", "dim"));
+            layerLegend.add(none).colspan(3).left().padTop(4).row();
+        }
+        layerLegend.pack();
+        layerLegend.setVisible(true);
     }
 
     private Label l(String t, String style) { return new Label(t, skin, style); }

@@ -104,6 +104,14 @@ public final class WorldRenderer implements Disposable {
     public WorldRenderer(GameState state) {
         this.state = state;
         this.terrain = new TerrainRenderer(state.map, state.occ);
+        terrain.metric = (l, x, y) -> switch (l) {
+            case WIND -> state.resourceValue(com.energytycoon.sim.PlantType.WIND, x, y);
+            case SUN -> state.resourceValue(com.energytycoon.sim.PlantType.SOLAR, x, y);
+            case WATER -> state.resourceValue(com.energytycoon.sim.PlantType.HYDRO, x, y);
+            case COAL -> state.resourceValue(com.energytycoon.sim.PlantType.COAL, x, y);
+            case GAS -> state.resourceValue(com.energytycoon.sim.PlantType.GAS, x, y);
+            default -> Double.NaN;
+        };
         this.iso = new IsoCamera(state.map.size);
         env.set(ambient);
         highlight = tinted(models.unitBox, 1, 1, 1, 0.45f);

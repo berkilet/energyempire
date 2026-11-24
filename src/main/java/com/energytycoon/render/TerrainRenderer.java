@@ -43,6 +43,18 @@ public final class TerrainRenderer implements Disposable {
     private final int[] occ;
     /** Agac konmayacak kareler (sehir cevresi vb.). */
     public final boolean[] reserved;
+    /** Katman verimi saglayicisi (WorldRenderer kurar): karo basina oyunun kendi verim olcusu; su NaN. */
+    public interface ResourceMetric { double value(Layer l, int x, int y); }
+    public ResourceMetric metric;
+    /** Etkin katmanin karo degerleri ve renk olcegi (haritanin kendi dagilimi: %5 ve %97'lik dilimler). */
+    private float[] layerVals;
+    private float layerLo, layerHi;
+    private final java.util.Map<Layer, float[]> layerCache = new java.util.EnumMap<>(Layer.class);
+    private final java.util.Map<Layer, float[]> layerRange = new java.util.EnumMap<>(Layer.class);
+    /** Kara karelerinin sirali degerleri (siralama tabanli renk icin). */
+    private final java.util.Map<Layer, float[]> layerSorted = new java.util.EnumMap<>(Layer.class);
+    private float[] layerSortedVals;
+
     /** Gorsel yol agi (WorldRenderer kurar); null ise yol cizilmez. */
     public RoadNetwork roads;
     private byte[] roadSnapshot;
@@ -95,7 +107,55 @@ public final class TerrainRenderer implements Disposable {
     }
 
     public Layer layer() { return layer; }
-    public void setLayer(Layer l) { if (l != layer) { layer = l; rebuild(); } }
+    public void setLayer(Layer l) { if (l != layer) { layer = l; prepareLayer(); rebuild(); } }
+
+    /** Katman degerlerini (bir kez) hesaplar ve haritanin dagilimina gore renk olcegini belirler. */
+    private void prepareLayer() {
+        layerVals = null;
+        if (layer == Layer.NORMAL || metric == null) return;
+        float[] v = layerCache.get(layer);
+        if (v == null) {
+            v = new float[map.size * map.size];
+            float[] land = new float[v.length]; int n = 0;
+            for (int y = 0; y < map.size; y++) for (int x = 0; x < map.size; x++) {
+                int i = map.idx(x, y);
+                double d = metric.value(layer, x, y);
+                v[i] = (float) d;
+                if (!Double.isNaN(d)) land[n++] = (float) d;
+            }
+            float[] sorted = java.util.Arrays.copyOf(land, n);
+            java.util.Arrays.sort(sorted);
+            float lo = n == 0 ? 0 : sorted[(int) (n * 0.05)], hi = n == 0 ? 1 : sorted[Math.min(n - 1, (int) (n * 0.97))];
+            if (layer == Layer.COAL || layer == Layer.GAS) lo = 0;              // yatak yok = taban
+            if (hi - lo < 1e-4f) hi = n == 0 ? lo + 1 : Math.max(lo + 1e-4f, sorted[n - 1]);
+            layerCache.put(layer, v);
+            layerRange.put(layer, new float[] { lo, hi });
+            layerSorted.put(layer, sorted);
+        }
+        layerVals = v;
+        layerSortedVals = layerSorted.get(layer);
+        float[] r = layerRange.get(layer);
+        layerLo = r[0]; layerHi = r[1];
+    }
+
+    /** Lejant icin: etkin katmanin olcek uclari (dogal birimde) ve olcunun adi; NORMAL'de null. */
+    public float[] legendRange() { return layerVals == null ? null : new float[] { layerLo, layerHi }; }
+
+    /** Katmanin renk rampasi (0 = gri/dusuk verim, 1 = canli/yuksek verim). Lejant cubugu da ayni rengi kullanir. */
+    public static Color rampColor(Layer l, float t) {
+        t = MathUtils.clamp(t, 0, 1);
+        Color vivid = switch (l) {
+            case WIND -> new Color(0.30f, 0.95f, 1.00f, 1);
+            case SUN -> new Color(1.00f, 0.86f, 0.12f, 1);
+            case COAL -> new Color(1.00f, 0.55f, 0.20f, 1);
+            case GAS -> new Color(0.85f, 0.45f, 1.00f, 1);
+            default -> new Color(0.25f, 0.65f, 1.00f, 1);
+        };
+        Color gray = new Color(0.36f, 0.37f, 0.38f, 1);
+        // dusukte gri ve koyu, yuksekte doygun ve acik
+        float k = (float) Math.pow(t, 0.85);
+        return gray.lerp(vivid, k).mul(0.90f + 0.18f * t, 0.90f + 0.18f * t, 0.90f + 0.18f * t, 1);
+    }
     public void setDetail(int d) { d = MathUtils.clamp(d, 0, 2); if (d != detail) { detail = d; rebuild(); } }
 
     public void rebuild() {
@@ -421,6 +481,19 @@ public final class TerrainRenderer implements Disposable {
     }
 
     private Color overlayColor(int i) {
+        if (layerVals != null) {
+            float v = layerVals[i];
+            if (Float.isNaN(v)) return layer == Layer.WATER ? new Color(0.14f, 0.30f, 0.55f, 1) : new Color(0.15f, 0.17f, 0.22f, 1);
+            if ((layer == Layer.COAL || layer == Layer.GAS || layer == Layer.WATER) && v <= 0) return new Color(0.27f, 0.28f, 0.29f, 1); // kaynak yok
+            float lin = MathUtils.clamp((v - layerLo) / (layerHi - layerLo), 0, 1);
+            if (layer == Layer.COAL || layer == Layer.GAS) return rampColor(layer, lin);
+            // ruzgar/gunes/hidro: deger + siralama karisimi (dar dagilimda da haritanin en iyi yerleri one cikar)
+            float[] so = layerSortedVals;
+            int pos = java.util.Arrays.binarySearch(so, v);
+            if (pos < 0) pos = -pos - 1;
+            float rank = so.length > 1 ? pos / (float) (so.length - 1) : lin;
+            return rampColor(layer, 0.5f * lin + 0.5f * rank);
+        }
         float val; float r, gg, b;
         switch (layer) {
             case WIND: val = (map.wind[i] - 0.4f) / 1.0f; r = 0.25f; gg = 0.85f; b = 0.95f; break;

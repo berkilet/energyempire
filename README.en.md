@@ -275,7 +275,7 @@ Goals are tracked in the panel at the bottom right. If the deadline passes, the 
 | V | My assets |
 | F / M / C / H | Finance · Market · Companies · Help |
 | Tab | Line tier (MV / HV / EHV) |
-| L | Map layer (wind, sun, coal, gas, water) |
+| L | Map layer (wind, sun, coal, gas, water): tiles shade from grey to vivid by expected efficiency, with a legend showing the scale |
 | Delete | Demolish tool |
 | F5 / F9 | Save / load |
 

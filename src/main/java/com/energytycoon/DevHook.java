@@ -217,6 +217,7 @@ final class DevHook {
         game.swap(gs);
         gs.speed(Integer.parseInt(get("ET_SPEED", "1")));
         if (env.containsKey("ET_HOUR")) gs.fixedHour = Float.parseFloat(get("ET_HOUR", "12"));
+        if (env.containsKey("ET_LAYER")) gs.layer(com.energytycoon.render.TerrainRenderer.Layer.valueOf(get("ET_LAYER", "NORMAL")));
         float zoom = Float.parseFloat(get("ET_ZOOM", "48"));
         String focusEq = get("ET_FOCUS", "city");
         Plant fp = null;

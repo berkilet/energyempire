@@ -285,7 +285,7 @@ public final class GameScreen implements Screen, Hud.Listener {
         if (t == Tool.PLANT && e != null) hud.setPlaceInfo("Haritada bir yere tıklayın.");
     }
     @Override public void speed(int s) { speed = s; if (s > 0) lastSpeed = s; }
-    @Override public void layer(Layer l) { wr.terrain.setLayer(l); }
+    @Override public void layer(Layer l) { wr.terrain.setLayer(l); hud.setLayerLegend(l, wr.terrain.legendRange()); }
     @Override public void action(String a) {
         if (capitalAction(a)) return;
         if (a.startsWith("upgrade:")) { upgradeSelected(Upgrade.valueOf(a.substring(8))); return; }
