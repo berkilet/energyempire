@@ -30,6 +30,10 @@ public final class Loan {
     /** Ekler: taahhut ihlali (+1 puan), DSCR (+0,5 puan), gecikme (+2 puan), yapilandirma (+2 puan). */
     public boolean covenantPenalty, dscrPenalty, restructured;
     public int dscrLowQuarters;
+    /** ECA ihlal sureci: borc servis rezervi (bankada bloke nakit), feragat bitisi, el koyma ihbarinin son gunu (0 = yok). */
+    public double dsra;
+    public long waiverUntilHour, stepInHour;
+    public boolean waiverUsed;
     /** Isletme kredisi: limit ve kullanimin basladigi saat. */
     public double limit;
     public long drawnSinceHour = -1;

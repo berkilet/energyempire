@@ -8,6 +8,7 @@ public class SaveData {
     /** Finans (kredi notu, bankalar, krediler). Yoksa (eski kayit) cd.debt Kiyibank ticari kredisine donusturulur. */
     public static class LoanD {
         public int id, linkedPlant, tenorMonths, graceMonths, frequencyMonths, covenantBreaches, daysLate, onTimePayments, dscrLowQuarters;
+        /** ECA ihlal sureci */ public double dsra; public long waiverUntilHour, stepInHour; public boolean waiverUsed;
         public String type, bank, ecaOrigin, status; public boolean fixed, everLate, covenantPenalty, dscrPenalty, restructured, acquisition;
         public double principal, outstanding, rate, spread, accrued, dueAmount, demand, pendingPrincipal, limit;
         public long startHour, nextDueHour, maturityHour, graceEndHour, lastResetHour, drawnSinceHour = -1;
@@ -32,7 +33,7 @@ public class SaveData {
             for (Loan l : c.loans) {
                 LoanD d = new LoanD();
                 d.id = l.id; d.linkedPlant = l.linkedPlant; d.tenorMonths = l.tenorMonths; d.graceMonths = l.graceMonths; d.frequencyMonths = l.frequencyMonths;
-                d.covenantBreaches = l.covenantBreaches; d.daysLate = l.daysLate; d.onTimePayments = l.onTimePayments; d.dscrLowQuarters = l.dscrLowQuarters;
+                d.covenantBreaches = l.covenantBreaches; d.daysLate = l.daysLate; d.onTimePayments = l.onTimePayments; d.dscrLowQuarters = l.dscrLowQuarters; d.dsra = l.dsra; d.waiverUntilHour = l.waiverUntilHour; d.stepInHour = l.stepInHour; d.waiverUsed = l.waiverUsed;
                 d.type = l.type.name(); d.bank = l.bank.name(); d.ecaOrigin = l.ecaOrigin; d.status = l.status.name(); d.fixed = l.fixed; d.everLate = l.everLate;
                 d.covenantPenalty = l.covenantPenalty; d.dscrPenalty = l.dscrPenalty; d.restructured = l.restructured; d.acquisition = l.acquisition;
                 d.principal = l.principal; d.outstanding = l.outstanding; d.rate = l.rate; d.spread = l.spread; d.accrued = l.accrued; d.dueAmount = l.dueAmount;
@@ -53,7 +54,7 @@ public class SaveData {
             if (loans != null) for (LoanD d : loans) {
                 Loan l = new Loan();
                 l.id = d.id; l.linkedPlant = d.linkedPlant; l.tenorMonths = d.tenorMonths; l.graceMonths = d.graceMonths; l.frequencyMonths = Math.max(1, d.frequencyMonths);
-                l.covenantBreaches = d.covenantBreaches; l.daysLate = d.daysLate; l.onTimePayments = d.onTimePayments; l.dscrLowQuarters = d.dscrLowQuarters;
+                l.covenantBreaches = d.covenantBreaches; l.daysLate = d.daysLate; l.onTimePayments = d.onTimePayments; l.dscrLowQuarters = d.dscrLowQuarters; l.dsra = d.dsra; l.waiverUntilHour = d.waiverUntilHour; l.stepInHour = d.stepInHour; l.waiverUsed = d.waiverUsed;
                 l.type = Loan.Type.valueOf(d.type); l.bank = Bank.valueOf(d.bank); l.ecaOrigin = d.ecaOrigin; l.status = Loan.Status.valueOf(d.status); l.fixed = d.fixed; l.everLate = d.everLate;
                 l.covenantPenalty = d.covenantPenalty; l.dscrPenalty = d.dscrPenalty; l.restructured = d.restructured; l.acquisition = d.acquisition;
                 l.principal = d.principal; l.outstanding = d.outstanding; l.rate = d.rate; l.spread = d.spread; l.accrued = d.accrued; l.dueAmount = d.dueAmount;

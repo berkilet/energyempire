@@ -93,7 +93,11 @@ public final class RivalAI {
      */
     static void ecaCure(GameState s, Company c) {
         for (Loan l : new ArrayList<>(c.loans)) {
-            if (!l.open() || l.type != Loan.Type.ECA || l.dscrLowQuarters < 2) continue;
+            if (!l.open() || l.type != Loan.Type.ECA || l.dscrLowQuarters < 2 && l.stepInHour == 0) continue;
+            // oyuncuyla ayni araclar: once kismi erken odeme, sonra feragat + rezerv, sonra tam kapama, sonra satis
+            double part = s.finance.cureCost(c, l);
+            if (!Double.isNaN(part) && c.cash >= part + reserve(s, c) && s.finance.curePartial(c, l) == null) continue;
+            if (!l.waiverUsed && c.cash >= s.finance.waiverFee(l) + s.finance.dsraAmount(l) + reserve(s, c) && s.finance.waiver(c, l) == null) continue;
             double cost = s.finance.prepayCost(c, l);
             if (c.cash >= cost + reserve(s, c)) { s.finance.prepay(c, l); continue; }
             if (l.dscrLowQuarters >= 3 && s.nodeById(l.linkedPlant) instanceof Plant p && p.owner == c && s.sales.openListingOf(p) == null)

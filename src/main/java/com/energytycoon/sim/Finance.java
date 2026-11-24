@@ -458,6 +458,8 @@ public final class Finance {
 
     private void close(Company c, Loan l) {
         l.status = Loan.Status.CLOSED;
+        if (l.dsra > 0) { c.cash += l.dsra; l.dsra = 0; }   // kapanista rezerv iade
+        l.stepInHour = 0;
         if (!l.everLate) rel(c, l.bank, FinanceBalance.REL_CLOSED);
     }
 
@@ -483,7 +485,63 @@ public final class Finance {
     }
 
     /** Gunluk: vade gelen taksitler, degisken faiz guncellemesi, gecikme/temerrut, eksi nakit. */
+    /** El koyma ihbar suresi doldu mu: cozulmediyse temerrut ve el koyma. */
+    void ecaStepIn(Company c) {
+        for (Loan l : new ArrayList<>(c.loans))
+            if (l.open() && l.type == Loan.Type.ECA && l.stepInHour > 0 && s.hour >= l.stepInHour) ecaDefault(c, l);
+    }
+
+    // ------------------------------------------------------------ ECA ihlal cozum araclari (oyuncu ve rakipler ayni)
+    /** Son DSCR'ye gore 1,20'yi saglamak icin gereken anapara azaltimi (borc servisi bakiyeyle orantili); NaN: kismi cozum yok. */
+    public double cureReduction(Loan l) {
+        if (Double.isNaN(l.lastDscr) || l.lastDscr <= 0) return Double.NaN;
+        double target = l.outstanding * Math.min(1, l.lastDscr / FinanceBalance.ECA_DSCR) * 0.97; // %3 guvenlik payi
+        return Math.max(0, l.outstanding - target);
+    }
+
+    /** Kismi erken odeme maliyeti (anapara + erken odeme ucreti). */
+    public double cureCost(Company c, Loan l) {
+        double red = cureReduction(l);
+        if (Double.isNaN(red)) return Double.NaN;
+        boolean free = Bank.noPrepayPenalty(c.bankScore[l.bank.ordinal()]);
+        return red * (1 + (free ? 0 : FinanceBalance.ECA_PREPAY));
+    }
+
+    /** Oz kaynak takviyesiyle kismi erken odeme: anapara azalir, borc servisi DSCR'yi 1,20'ye tasiyacak kadar duser; ihlal sayaci sifirlanir. */
+    public String curePartial(Company c, Loan l) {
+        if (!l.open() || l.type != Loan.Type.ECA) return "Kredi açık değil";
+        double red = cureReduction(l), cost = cureCost(c, l);
+        if (Double.isNaN(red)) return "Santral faaliyet zararında; kısmi ödeme yetmez (krediyi kapatın veya satın)";
+        if (c.cash < cost) return "Yetersiz nakit (" + money(cost) + ")";
+        c.cash -= cost; c.fees += cost - red;
+        l.outstanding -= red;
+        l.dscrLowQuarters = 0; l.dscrPenalty = false; l.stepInHour = 0;
+        notifyFin(c, "ECA: " + money(red) + " erken ödendi; borç servisi düştü, ihlal süreci kapandı.");
+        return null;
+    }
+
+    /** Feragat ucreti ve borc servis rezervi tutari. */
+    public double waiverFee(Loan l) { return l.outstanding * FinanceBalance.ECA_WAIVER_FEE; }
+    public double dsraAmount(Loan l) {
+        return Loan.annuity(l.outstanding, l.effectiveRate(), 12 / l.frequencyMonths, Math.max(1, l.remainingPeriods())) * FinanceBalance.ECA_DSRA_MONTHS / (double) l.frequencyMonths;
+    }
+
+    /** Feragat: ucret + borc servis rezervi (bankada bloke); 4 ceyrek dusuk DSCR sayilmaz, ihbar iptal. Kredi basina bir kez. */
+    public String waiver(Company c, Loan l) {
+        if (!l.open() || l.type != Loan.Type.ECA) return "Kredi açık değil";
+        if (l.waiverUsed) return "Bu kredide feragat bir kez kullanıldı";
+        double fee = waiverFee(l), dsra = dsraAmount(l);
+        if (c.cash < fee + dsra) return "Yetersiz nakit (" + money(fee + dsra) + ")";
+        c.cash -= fee + dsra; c.fees += fee;
+        l.dsra += dsra; l.waiverUsed = true;
+        l.waiverUntilHour = s.hour + FinanceBalance.ECA_WAIVER_QUARTERS * 3L * HPM;
+        l.dscrLowQuarters = 0; l.stepInHour = 0;
+        notifyFin(c, "ECA feragati: " + l.bank.label + " " + FinanceBalance.ECA_WAIVER_QUARTERS + " çeyrek süre verdi; " + money(dsra) + " borç servis rezervine bloke edildi.");
+        return null;
+    }
+
     void daily(Company c) {
+        ecaStepIn(c);
         if (exempt(c) || c.bankrupt) return;
         boolean protect = c.restructProtectUntil > s.hour;
         for (Loan l : new ArrayList<>(c.loans)) {
@@ -598,6 +656,8 @@ public final class Finance {
     void ecaDefault(Company c, Loan l) {
         Plant p = s.nodeById(l.linkedPlant) instanceof Plant pp ? pp : null;
         double owed = l.outstanding + l.accrued + l.dueAmount - l.pendingPrincipal + l.demand;
+        // banka bloke rezervi once alacagina mahsup eder
+        double fromDsra = Math.min(l.dsra, owed); owed -= fromDsra; c.cash += l.dsra - fromDsra; l.dsra = 0; l.stepInHour = 0;
         l.status = Loan.Status.DEFAULTED; // satis sirasinda kapatma (settleLinkedEca) bu krediyi atlar
         double proceeds = 0;
         String buyerName = "Kamu varlık fonu";
@@ -742,11 +802,26 @@ public final class Finance {
             double dscr = service <= 0 ? 99 : p.qProfitLast / service;
             l.lastDscr = dscr;
             if (dscr < FinanceBalance.ECA_DSCR) {
-                l.dscrLowQuarters++;
-                if (!l.dscrPenalty) notifyFin(c, "ECA taahhüdü: " + p.name() + " DSCR " + fmt(dscr) + " < 1,20 — faiz +0,5 puan.");
                 l.dscrPenalty = true;
-                if (l.dscrLowQuarters >= FinanceBalance.ECA_DSCR_DEFAULT_QUARTERS) ecaDefault(c, l);
-            } else { l.dscrLowQuarters = 0; l.dscrPenalty = false; }
+                if (l.waiverUntilHour > s.hour) {
+                    notifyFin(c, "ECA: " + p.name() + " DSCR " + fmt(dscr) + " < 1,20 (feragat süresinde; sayılmaz).", "eca:" + l.id);
+                    continue;
+                }
+                l.dscrLowQuarters++;
+                int left = FinanceBalance.ECA_DSCR_DEFAULT_QUARTERS - l.dscrLowQuarters;
+                if (left > 0) {
+                    notifyFin(c, "ECA taahhüt ihlali: " + p.name() + " DSCR " + fmt(dscr) + " < 1,20 (" + l.dscrLowQuarters + ". çeyrek, faiz +0,5 puan). "
+                        + left + " çeyrek daha sürerse banka el koyma ihbarı gönderir. Çözüm seçenekleri için tıklayın.", "eca:" + l.id);
+                } else if (l.stepInHour == 0) {
+                    l.stepInHour = s.hour + FinanceBalance.ECA_STEPIN_NOTICE_DAYS * 24L;
+                    notifyFin(c, "EL KOYMA İHBARI: " + l.bank.label + ", " + p.name() + " için " + FinanceBalance.ECA_STEPIN_NOTICE_DAYS
+                        + " gün süre verdi. Bu sürede DSCR düzeltilmezse santrale el konacak. Seçenekler için tıklayın.", "ecanotice:" + l.id);
+                }
+            } else {
+                l.dscrLowQuarters = 0; l.dscrPenalty = false; l.stepInHour = 0;
+                // feragat bittiyse ve DSCR toparlandiysa rezerv serbest kalir
+                if (l.dsra > 0 && l.waiverUntilHour <= s.hour) { c.cash += l.dsra; notifyFin(c, "ECA: " + p.name() + " DSCR toparlandı; borç servis rezervi " + money(l.dsra) + " serbest bırakıldı."); l.dsra = 0; }
+            }
         }
     }
 

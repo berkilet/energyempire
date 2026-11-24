@@ -184,7 +184,7 @@ Finans penceresi (**F** tuşu veya nakit göstergesine tıklama) altı sekmeden 
   Banka ilişki puanı, vadesinde ödenen taksitlerle yükselir. Kademeli olarak masraf indirimi ve daha düşük faiz sağlar.
 - **Kredi ürünleri:**
   - **Ticari kredi:** 3–7 yıl (Crédit Agricool'da 10 yıl); sabit veya değişken faiz; aylık veya üç ayda bir taksit.
-  - **ECA ihracat kredisi:** Ekipman bedelinin %85'i; ödemesiz dönemli ve daha ucuz. Santral siparişinde Satın Alma ve Kurulum ekranından seçilir. Santralin borç servisini karşılama oranı (DSCR) izlenir.
+  - **ECA ihracat kredisi:** Ekipman bedelinin %85'i; ödemesiz dönemli ve daha ucuz. Santral siparişinde Satın Alma ve Kurulum ekranından seçilir. Santralin borç servisini karşılama oranı (DSCR) her çeyrek izlenir: 1,20'nin altındaki her çeyrekte uyarı gelir (faiz +0,5 puan); 4. çeyrekte banka 45 günlük el koyma ihbarı gönderir ve oyun durur. Çözüm yolları: kısmi erken ödeme (DSCR'yi 1,20'ye taşıyacak kadar), feragat + 6 aylık borç servis rezervi (4 çeyrek süre, kredi başına bir kez), krediyi kapatma ya da santrali kendi koşullarınızla satma. İhbar süresi dolarsa banka santrale el koyar.
   - **İşletme kredisi limiti:** Nakit eksiye düşünce otomatik kullanılır.
   - **Devralma kredisi:** Birleşme ve satın alma için.
 - **Tahsilat ve temerrüt:**
@@ -277,11 +277,11 @@ Hedefler sağ alttaki panelde izlenir. Süre dolarsa oyun biter.
 | V | Varlıklarım |
 | F / M / C / H | Finans · Piyasa · Şirketler · Yardım |
 | Tab | Hat kademesi (OG / YG / ÇYG) |
-| L | Harita katmanı (rüzgar, güneş, kömür, gaz, su): karolar beklenen verime göre griden canlı renge boyanır, lejant ölçeği gösterir |
+| L | Harita katmanı (rüzgar, güneş, kömür, gaz, su): karolar o noktada en uygun modelle beklenen verime göre mutlak bantlarla boyanır (ör. rüzgârda %20 altı gri, %45 ve üzeri en parlak); lejant bant eşiklerini gösterir |
 | Delete | Yıkım aracı |
 | F5 / F9 | Kaydet / yükle |
 
-Sağ üstteki senaryo kutusunda iki sekme vardır: **Hedefler** (senaryo hedefleri ve ilerleme) ve **Bildirimler** (son 80 bildirim, tarihli, en yenisi üstte; eylem bağlı olanlar tıklanabilir). Hızlı oyunda alttaki geçici bildirimleri kaçırırsanız buradan takip edebilirsiniz; sekme kapalıyken okunmamış bildirim sayısı görünür.
+Sağ üstteki senaryo kutusunda iki sekme vardır: **Hedefler** (senaryo hedefleri ve ilerleme) ve **Bildirimler** (son 80 bildirim, tarihli, en yenisi üstte; sol tık ilgili pencereyi açar, sağ tık kaldırır). Alttaki geçici bildirimler de sağ tıkla kapanır. Hızlı oyunda alttaki geçici bildirimleri kaçırırsanız buradan takip edebilirsiniz; sekme kapalıyken okunmamış bildirim sayısı görünür.
 
 ---
 

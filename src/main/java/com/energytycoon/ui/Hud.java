@@ -105,6 +105,9 @@ public final class Hud {
     private final EquipmentWindow equipWin;
     /** Satin alma ve kurulum karari (model + yer secildikten sonra). */
     private final PurchaseWindow purchaseWin;
+    /** ECA taahhut ihlali: durum ve cozum secenekleri. */
+    private Window ecaWin;
+    private int ecaLoanId = -1;
     private final Label gameOverLbl;
     private final FinanceCenter financeView;
     private LoanWizard wizard;
@@ -418,9 +421,10 @@ public final class Hud {
         skins.decorateWindow(equipWin, () -> equipWin.setVisible(false));
         purchaseWin = new PurchaseWindow(skin);
         skins.decorateWindow(purchaseWin, purchaseWin::cancel);
+        ecaWin = window("ECA Taahhüt İhlali");
 
         stage.addActor(wizardWin); stage.addActor(restructWin); stage.addActor(dealWin); stage.addActor(defenseWin); stage.addActor(confirmWin);
-        for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, purchaseWin, lineChoice, assetsWin }) {
+        for (Window w : new Window[] { finance, market, companies, help, menu, gameOverWin, equipWin, purchaseWin, ecaWin, lineChoice, assetsWin }) {
             stage.addActor(w);
             w.setVisible(false);
         }
@@ -487,7 +491,83 @@ public final class Hud {
     public boolean purchaseOpen() { return purchaseWin.isVisible(); }
 
     /** Oyuncunun karar verdigi pencereler: acikken oyun otomatik duraklar (acele ettirilmez). */
-    public boolean decisionOpen() { return equipWin.isVisible() || purchaseWin.isVisible() || lineChoice.isVisible(); }
+    public boolean decisionOpen() { return equipWin.isVisible() || purchaseWin.isVisible() || lineChoice.isVisible() || ecaWin.isVisible(); }
+
+    /**
+     * ECA ihlal penceresi: santral, son DSCR, ihlal sayaci / feragat / ihbar son tarihi ve dort cozum yolu (maliyetleriyle).
+     * Karar verilirken oyun duraklar (decisionOpen).
+     */
+    public void showEca(int loanId) {
+        Loan l = null;
+        for (Loan x : st.player.loans) if (x.id == loanId) l = x;
+        if (l == null || !l.open()) { ecaWin.setVisible(false); toast("Bu ECA kredisi artık açık değil."); return; }
+        ecaLoanId = loanId;
+        Company p = st.player;
+        Plant pl = st.nodeById(l.linkedPlant) instanceof Plant pp ? pp : null;
+        ecaWin.clearChildren();
+        Table t = new Table(skin);
+        t.defaults().left();
+        String plant = pl != null ? pl.name() : "santral";
+        t.add(l(plant + " · " + l.name(), "title")).row();
+        String state;
+        if (l.stepInHour > 0) state = "EL KOYMA İHBARI: " + Math.max(0, (l.stepInHour - st.hour) / 24) + " gün kaldı. Bu sürede çözülmezse banka santrale el koyar ve satar.";
+        else if (l.waiverUntilHour > st.hour) state = "Feragat süresinde: " + Math.max(0, (l.waiverUntilHour - st.hour) / (24 * 30)) + " ay boyunca düşük DSCR sayılmaz.";
+        else if (l.dscrLowQuarters > 0) state = l.dscrLowQuarters + " çeyrek üst üste taahhüt altında; " + (FinanceBalance.ECA_DSCR_DEFAULT_QUARTERS - l.dscrLowQuarters)
+            + " çeyrek daha sürerse banka " + FinanceBalance.ECA_STEPIN_NOTICE_DAYS + " günlük el koyma ihbarı gönderir.";
+        else state = "Taahhüt sağlanıyor.";
+        Label st1 = l("Son çeyrek DSCR: " + (Double.isNaN(l.lastDscr) ? "—" : Fmt.f2(l.lastDscr)) + "  (taahhüt ≥ 1,20)" + (l.dscrPenalty ? " · faiz +0,5 puan" : ""), l.lastDscr < 1.2 ? "valueBad" : "value");
+        t.add(st1).padTop(4).row();
+        Label s2 = l(state, l.stepInHour > 0 ? "valueBad" : "small"); s2.setWrap(true);
+        t.add(s2).width(560).padTop(2).row();
+        Label why = l("DSCR = santralin çeyreklik faaliyet kârı / ECA borç servisi. Kâr artar (ör. yükseltme, daha iyi bağlantı) ya da borç servisi düşerse düzelir.", "dim");
+        why.setWrap(true);
+        t.add(why).width(560).padTop(4).padBottom(8).row();
+        // secenekler
+        double part = st.finance.cureCost(p, l), fee = st.finance.waiverFee(l), dsra = st.finance.dsraAmount(l), full = st.finance.prepayCost(p, l);
+        t.add(ecaOption("Kısmi erken ödeme (öz kaynak takviyesi)",
+            Double.isNaN(part) ? "Santral faaliyet zararında: kısmi ödeme DSCR'yi düzeltmez." :
+                "Anaparadan " + Fmt.money(st.finance.cureReduction(l)) + " ödenir (erken ödeme ücreti dahil " + Fmt.money(part) + "). Borç servisi düşer, ihlal süreci kapanır.",
+            "ecacure:part:" + l.id, !Double.isNaN(part) && p.cash >= part)).width(560).padBottom(4).row();
+        t.add(ecaOption("Feragat + borç servis rezervi",
+            l.waiverUsed ? "Bu kredide feragat bir kez kullanıldı." :
+                "Ücret " + Fmt.money(fee) + " + " + FinanceBalance.ECA_DSRA_MONTHS + " aylık borç servisi " + Fmt.money(dsra) + " bankada bloke (DSCR toparlanınca ya da kredi kapanınca iade). "
+                + FinanceBalance.ECA_WAIVER_QUARTERS + " çeyrek süre kazanırsınız; ihbar iptal olur.",
+            "ecacure:waiver:" + l.id, !l.waiverUsed && p.cash >= fee + dsra)).width(560).padBottom(4).row();
+        t.add(ecaOption("Krediyi tamamen kapat", "Bakiye ve faiz ile erken ödeme ücreti: " + Fmt.money(full) + ". Santral sizde kalır.",
+            "ecacure:close:" + l.id, p.cash >= full)).width(560).padBottom(4).row();
+        boolean listed = pl != null && st.sales.openListingOf(pl) != null;
+        t.add(ecaOption("Santrali satışa çıkar", listed ? "Santral zaten satışta; satılınca ECA kredisi satış bedelinden kapanır." :
+                "Kendi koşullarınızla satarsınız (el koymada banka taban fiyata satar). Satılınca ECA kredisi bedelden kapanır.",
+            "ecacure:sell:" + l.id, pl != null && !listed)).width(560).padBottom(8).row();
+        Label cash = l("Nakit: " + Fmt.money(p.cash) + " · Kısa vadeli nakit için Finans merkezinden işletme kredisi kullanabilirsiniz.", "dim");
+        cash.setWrap(true);
+        t.add(cash).width(560).row();
+        Table bt = new Table();
+        bt.add(btn("Finans merkezi", "openfin", "default")).width(180).height(30).padRight(8);
+        bt.add(btn("Kapat (karar ver)", "ecaclose", "default")).width(180).height(30);
+        t.add(bt).padTop(8).center();
+        ecaWin.add(t).pad(8);
+        ecaWin.pack(); limitHeight(ecaWin); center(ecaWin);
+        ecaWin.setVisible(true); ecaWin.toFront();
+    }
+
+    public void hideEca() { ecaWin.setVisible(false); }
+    public int ecaLoanShown() { return ecaWin.isVisible() ? ecaLoanId : -1; }
+
+    private Table ecaOption(String title, String desc, String action, boolean enabled) {
+        Table r = new Table(skin);
+        r.setBackground("card");
+        r.pad(8);
+        Label d = l(desc, "small"); d.setWrap(true);
+        Table left = new Table();
+        left.add(l(title, "default")).left().row();
+        left.add(d).width(380).left().padTop(2);
+        r.add(left).left().growX();
+        TextButton b = btn("Uygula", action, enabled ? "accent" : "default");
+        b.setDisabled(!enabled);
+        r.add(b).width(120).height(30).padLeft(10);
+        return r;
+    }
 
     /** Yapilandirma teklifi penceresi (oyuncu karar verene kadar). */
     public void showRestructuring(boolean show) {
@@ -689,9 +769,14 @@ public final class Hud {
         toast(msg);
         if (action == null) return;
         Actor last = toasts.getChildren().peek();
-        last.setTouchable(Touchable.enabled);
-        last.addListener(new ClickListener() { @Override public void clicked(InputEvent e, float x, float y) { cb.action(action); } });
+        // sol tik: ilgili pencere acilir ve bildirim kapanir
+        last.addListener(new ClickListener() { @Override public void clicked(InputEvent e, float x, float y) { cb.action(action); dismissToast(last); } });
         if (last instanceof Table t && t.getChildren().size > 0 && t.getChildren().first() instanceof Label lb) lb.setText(msg + "  ›");
+    }
+
+    private void dismissToast(Actor t) {
+        t.clearActions();
+        t.addAction(Actions.sequence(Actions.fadeOut(0.15f), Actions.removeActor()));
     }
 
     private InvestMenu.Group plantGroup(String title, PlantType... types) {
@@ -781,32 +866,33 @@ public final class Hud {
         if (l == Layer.NORMAL || range == null) { layerLegend.setVisible(false); return; }
         boolean fuel = l == Layer.COAL || l == Layer.GAS;
         String what = switch (l) {
-            case WIND -> "Rüzgar · beklenen kapasite faktörü";
-            case SUN -> "Güneş · beklenen kapasite faktörü";
-            case WATER -> "Hidro · beklenen kapasite faktörü";
+            case WIND -> "Rüzgar · en uygun türbinle beklenen kapasite faktörü";
+            case SUN -> "Güneş · en uygun panelle beklenen kapasite faktörü";
+            case WATER -> "Hidro · en uygun türbinle beklenen kapasite faktörü";
             case COAL -> "Kömür yatağı · yakıt maliyeti indirimi";
             default -> "Doğalgaz yatağı · yakıt maliyeti indirimi";
         };
-        layerLegend.add(l(what, "dim")).colspan(3).left().padBottom(4).row();
+        layerLegend.add(l(what, "dim")).left().padBottom(4).row();
+        // kademeli olcek: her bant bir renk kutusu ve alt siniri
         Table bar = new Table();
-        for (int k = 0; k < 16; k++) {
-            com.badlogic.gdx.scenes.scene2d.ui.Image cell = new com.badlogic.gdx.scenes.scene2d.ui.Image(skin.newDrawable("white", com.energytycoon.render.TerrainRenderer.rampColor(l, k / 15f)));
-            bar.add(cell).size(12, 10);
+        int n = range.length;
+        for (int k = 0; k <= n; k++) {
+            Table cell = new Table();
+            cell.add(new com.badlogic.gdx.scenes.scene2d.ui.Image(skin.newDrawable("white", com.energytycoon.render.TerrainRenderer.bandColor(l, k)))).size(34, 12).row();
+            String lab = k == 0 ? (fuel ? "yok" : "<%" + Math.round(range[0] * 100)) : "%" + Math.round(range[k - 1] * 100) + (k == n ? "+" : "");
+            cell.add(l(lab, "dim")).padTop(1);
+            bar.add(cell).padRight(2);
         }
-        layerLegend.add(l("%" + Math.round(range[0] * 100), "small")).right().padRight(6);
-        layerLegend.add(bar);
-        layerLegend.add(l("%" + Math.round(range[1] * 100), "small")).left().padLeft(6).row();
-        layerLegend.add();
+        layerLegend.add(bar).left().row();
         Table ends = new Table();
-        ends.add(l("düşük verim", "dim")).left().expandX();
-        ends.add(l("yüksek verim", "dim")).right();
-        layerLegend.add(ends).fillX();
-        layerLegend.add().row();
+        ends.add(l("verimsiz", "dim")).left().expandX();
+        ends.add(l("en iyi sahalar", "dim")).right();
+        layerLegend.add(ends).fillX().padTop(2).row();
         if (fuel || l == Layer.WATER) {
             Table none = new Table();
             none.add(new com.badlogic.gdx.scenes.scene2d.ui.Image(skin.newDrawable("white", new Color(0.27f, 0.28f, 0.29f, 1)))).size(12, 10).padRight(6);
             none.add(l(fuel ? "yatak yok" : "su kenarı değil (hidro kurulamaz)", "dim"));
-            layerLegend.add(none).colspan(3).left().padTop(4).row();
+            layerLegend.add(none).left().padTop(4).row();
         }
         layerLegend.pack();
         layerLegend.setVisible(true);
@@ -958,7 +1044,9 @@ public final class Hud {
         Label lb = new Label(msg, skin, "default");
         Table t = new Table(skin);
         t.setBackground("row");
-        t.setTouchable(Touchable.disabled);
+        // sag tik: bildirimi hemen kapat (gecmiste kalir)
+        t.setTouchable(Touchable.enabled);
+        t.addListener(new ClickListener(com.badlogic.gdx.Input.Buttons.RIGHT) { @Override public void clicked(InputEvent e, float x, float y) { dismissToast(t); } });
         // ekrandan genis metin kirpilmaz, satir kayar
         float maxW = Math.max(300, stage.getWidth() - 120);
         if (lb.getPrefWidth() > maxW) { lb.setWrap(true); t.add(lb).width(maxW).pad(4, 16, 4, 16); }
@@ -1003,7 +1091,8 @@ public final class Hud {
     private void rebuildLog() {
         logList.clear();
         if (log.isEmpty()) { logList.add(l("Henüz bildirim yok.", "dim")).left(); return; }
-        for (String[] e : log) {
+        logList.add(l("Sol tık: ilgili pencereyi aç · Sağ tık: kaldır", "dim")).left().padBottom(4).row();
+        for (String[] e : new ArrayList<>(log)) {
             Table row = new Table(skin);
             row.setBackground("row");
             Label d = l(e[0], "dim");
@@ -1011,11 +1100,13 @@ public final class Hud {
             m.setWrap(true);
             row.add(d).left().padLeft(6).padTop(3).row();
             row.add(m).width(248).left().pad(0, 6, 4, 6);
-            if (e[2] != null) {
-                final String act = e[2];
-                row.setTouchable(Touchable.enabled);
-                row.addListener(new ClickListener() { @Override public void clicked(InputEvent ev, float x, float y) { cb.action(act); } });
-            }
+            row.setTouchable(Touchable.enabled);
+            final String act = e[2];
+            if (act != null) row.addListener(new ClickListener() { @Override public void clicked(InputEvent ev, float x, float y) { cb.action(act); } });
+            // sag tik: bildirimi gecmisten kaldir
+            row.addListener(new ClickListener(com.badlogic.gdx.Input.Buttons.RIGHT) {
+                @Override public void clicked(InputEvent ev, float x, float y) { log.remove(e); rebuildLog(); }
+            });
             logList.add(row).width(262).left().padBottom(3).row();
         }
     }

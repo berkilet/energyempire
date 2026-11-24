@@ -97,6 +97,18 @@ public final class GameScreen implements Screen, Hud.Listener {
     public void devNoHover(boolean b) { devNoHover = b; }
     public void devHideHelp() { hud.hideHelp(); }
     public void devShowLog() { hud.devShowLog(); }
+    /** Dogrulama: ECA'li santral kurar, el koyma ihbari durumuna getirir ve ihlal penceresini acar. */
+    public void devEca() {
+        hud.hideHelp();
+        Equipment eq = state.catalog.get("nw-45");
+        int[] site = com.energytycoon.sim.RivalAI.findSite(state, eq, state.cities.get(0), 2, 8);
+        Plant p = state.finance.buildWithEca(state.player, eq, site[0], site[1], Bank.KIYI, 6);
+        Loan l = state.player.loans.stream().filter(x -> x.type == Loan.Type.ECA && x.linkedPlant == p.id).findFirst().orElseThrow();
+        l.lastDscr = 0.64; l.dscrLowQuarters = FinanceBalance.ECA_DSCR_DEFAULT_QUARTERS; l.dscrPenalty = true;
+        l.stepInHour = state.hour + FinanceBalance.ECA_STEPIN_NOTICE_DAYS * 24L;
+        hud.showEca(l.id);
+    }
+
     /** Dogrulama: verilen ekipman icin sehir yakininda uygun yerde satin alma ekranini acar. */
     public void devPurchase(String eqId) {
         hud.hideHelp();
@@ -299,6 +311,7 @@ public final class GameScreen implements Screen, Hud.Listener {
     @Override public void layer(Layer l) { wr.terrain.setLayer(l); hud.setLayerLegend(l, wr.terrain.legendRange()); }
     @Override public void action(String a) {
         if (capitalAction(a)) return;
+        if (ecaAction(a)) return;
         if (a.startsWith("upgrade:")) { upgradeSelected(Upgrade.valueOf(a.substring(8))); return; }
         if (a.startsWith("assets:")) {
             hud.openAssets(switch (a.substring(7)) { case "tenders" -> com.energytycoon.ui.AssetsView.Tab.TENDERS; case "lines" -> com.energytycoon.ui.AssetsView.Tab.LINES;
@@ -583,6 +596,32 @@ public final class GameScreen implements Screen, Hud.Listener {
             case SUBSTATION -> clickSubstation(x, y);
             case DEMOLISH -> clickDemolish(x, y);
         }
+    }
+
+    /** ECA ihlal penceresi eylemleri (bildirim tiklamasi ve cozum dugmeleri). */
+    private boolean ecaAction(String a) {
+        if (a.startsWith("eca:") || a.startsWith("ecanotice:")) { hud.showEca(Integer.parseInt(a.substring(a.indexOf(':') + 1))); return true; }
+        if (a.equals("ecaclose")) { hud.hideEca(); return true; }
+        if (!a.startsWith("ecacure:")) return false;
+        String[] f = a.split(":");
+        int id = Integer.parseInt(f[2]);
+        Loan l = null;
+        for (Loan x : state.player.loans) if (x.id == id) l = x;
+        if (l == null) { hud.hideEca(); return true; }
+        String err = switch (f[1]) {
+            case "part" -> state.finance.curePartial(state.player, l);
+            case "waiver" -> state.finance.waiver(state.player, l);
+            case "close" -> state.finance.prepay(state.player, l);
+            default -> {
+                Plant p = state.nodeById(l.linkedPlant) instanceof Plant pp ? pp : null;
+                yield p == null ? "Santral bulunamadı" : state.sales.list(state.player, p);
+            }
+        };
+        if (err != null) { hud.toast(err); return true; }
+        hud.toast(switch (f[1]) { case "part" -> "Kısmi erken ödeme yapıldı; ihlal süreci kapandı."; case "waiver" -> "Feragat alındı; borç servis rezervi bloke edildi.";
+            case "close" -> "ECA kredisi kapatıldı."; default -> "Santral satışa çıkarıldı; satılınca ECA kredisi kapanır."; });
+        if (l.open()) hud.showEca(id); else hud.hideEca();
+        return true;
     }
 
     /** Kurulum ekranindaki karari uygular (oyuncu ve rakipler ayni finans yollarini kullanir). */
@@ -1013,6 +1052,8 @@ public final class GameScreen implements Screen, Hud.Listener {
             hud.logMessage(String.format("%02d %s %d", state.dayOfMonth(), com.energytycoon.ui.Fmt.MONTHS[state.month()], state.year()), m, act);
             // sirketinize cagri: oyun durur, savunma ekrani acilir
             if ("defense".equals(act)) { speed(0); hud.showDefense(); }
+            // ECA el koyma ihbari: karar penceresi kendiliginden acilir (oyun duraklar)
+            if (act != null && act.startsWith("ecanotice:")) hud.showEca(Integer.parseInt(act.substring(10)));
         }
         // Yapilandirma teklifi: oyun durur, oyuncu karar verir
         if (state.player.restructOfferPending) { if (speed != 0) speed(0); hud.showRestructuring(true); } else hud.showRestructuring(false);

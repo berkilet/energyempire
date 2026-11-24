@@ -184,7 +184,7 @@ The Finance window (**F** key, or click the cash indicator) has six tabs: **Summ
   Your relationship score with each bank rises with instalments paid on time and gradually unlocks fee discounts and lower spreads.
 - **Loan products:**
   - **Commercial loan:** 3–7 years (10 years at Crédit Agricool); fixed or floating; monthly or quarterly instalments.
-  - **ECA export credit:** 85% of the equipment price; with a grace period and a lower rate. Chosen on the Purchase and Installation screen when ordering a plant. The plant's debt service coverage ratio (DSCR) is monitored.
+  - **ECA export credit:** 85% of the equipment price; with a grace period and a lower rate. Chosen on the Purchase and Installation screen when ordering a plant. The plant's DSCR is checked every quarter: each quarter below 1.20 brings a warning (rate +0.5 pt); in the 4th quarter the bank sends a 45-day step-in notice and the game pauses. Remedies: partial prepayment (enough to restore DSCR 1.20), waiver + 6-month debt service reserve (4 quarters of relief, once per loan), closing the loan, or selling the plant on your own terms. If the notice expires, the bank takes the plant.
   - **Revolving credit facility:** Drawn automatically when cash goes negative.
   - **Acquisition loan:** For mergers and acquisitions.
 - **Collection and default:**
@@ -277,11 +277,11 @@ Goals are tracked in the panel at the bottom right. If the deadline passes, the 
 | V | My assets |
 | F / M / C / H | Finance · Market · Companies · Help |
 | Tab | Line tier (MV / HV / EHV) |
-| L | Map layer (wind, sun, coal, gas, water): tiles shade from grey to vivid by expected efficiency, with a legend showing the scale |
+| L | Map layer (wind, sun, coal, gas, water): tiles are coloured in absolute bands by the expected efficiency of the best available model at that spot (e.g. wind: grey below 20%, brightest at 45%+); the legend shows the band thresholds |
 | Delete | Demolish tool |
 | F5 / F9 | Save / load |
 
-The scenario box at the top right has two tabs: **Goals** (scenario objectives and progress) and **Notifications** (the last 80 notifications with dates, newest first; ones with an action are clickable). If you miss the transient notifications at the bottom while playing fast, follow them here; while the tab is closed it shows the unread count.
+The scenario box at the top right has two tabs: **Goals** (scenario objectives and progress) and **Notifications** (the last 80 notifications with dates, newest first; left-click opens the related window, right-click removes it). Transient notifications at the bottom also close on right-click. If you miss the transient notifications at the bottom while playing fast, follow them here; while the tab is closed it shows the unread count.
 
 ---
 
