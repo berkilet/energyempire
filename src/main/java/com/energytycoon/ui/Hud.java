@@ -82,7 +82,7 @@ public final class Hud {
     private static final String[] SPEED_TEXT = { "", "1x", "4x", "20x" };
     private final Table actions = new Table();
     private String actionsKey = "";
-    private final Label scenTitle, scenBody;
+    private final Label scenTitle;
     /** Senaryo kutusu sekmeleri: hedefler / bildirim gecmisi (hizli oyunda kacan mesajlar; ileride kuresel olaylar). */
     private final Table scenStack = new Table(), logList = new Table();
     private ScrollPane logScroll;
@@ -91,6 +91,12 @@ public final class Hud {
     private int unread;
     private static final int LOG_MAX = 80;
     private final java.util.ArrayDeque<String[]> log = new java.util.ArrayDeque<>();
+    /** Hedefler sekmesi: sure satiri + hedef basina (baslik, isikli cubuk, durum). */
+    private final Table goalsTable = new Table();
+    private Label goalsDeadline;
+    private final List<Label> goalLabels = new ArrayList<>(), goalStatus = new ArrayList<>();
+    private final List<UiKit.GlowBar> goalBars = new ArrayList<>();
+    private Scenario goalsFor;
     private final Window finance, market, companies, help, menu, gameOverWin, lineChoice, assetsWin;
     private final AssetsView assets;
     private long assetsRefreshAt;
@@ -245,8 +251,6 @@ public final class Hud {
 
         Table scen = new Table(skin);
         scenTitle = l("", "title");
-        scenBody = l("", "small");
-        scenBody.setWrap(true);
         tabGoals = new TextButton("Hedefler", skin, "small");
         tabLog = new TextButton("Bildirimler", skin, "small");
         ButtonGroup<TextButton> tabs = new ButtonGroup<>(tabGoals, tabLog);
@@ -996,7 +1000,7 @@ public final class Hud {
             float h = Math.min(260, Math.max(120, stage == null ? 260 : stage.getHeight() * 0.32f));
             scenStack.add(logScroll).width(270).height(h);
             logScroll.setScrollY(0);
-        } else scenStack.add(scenBody).width(270).left();
+        } else scenStack.add(goalsTable).width(270).left();
         updateTabLabels();
     }
 
@@ -1092,9 +1096,23 @@ public final class Hud {
         return actor;
     }
 
-    private static String bar(double p) {
-        int n = (int) Math.round(Math.max(0, Math.min(1, p)) * 10);
-        return "█".repeat(n) + "░".repeat(10 - n);
+    /** Hedef satirlarini senaryoya gore bir kez kurar; degerler her karede guncellenir. */
+    private void buildGoals(Scenario sc) {
+        goalsFor = sc;
+        goalsTable.clear(); goalLabels.clear(); goalStatus.clear(); goalBars.clear();
+        goalsTable.top().left();
+        goalsDeadline = l("", "small");
+        goalsDeadline.setWrap(true);
+        if (sc.deadlineYear > 0) goalsTable.add(goalsDeadline).width(270).left().padBottom(4).row();
+        for (Objective o : sc.objectives) {
+            Label t = l("", "small"); t.setWrap(true);
+            UiKit.GlowBar b = new UiKit.GlowBar(270, 16);
+            Label st = l("", "dim"); st.setWrap(true);
+            goalsTable.add(t).width(270).left().row();
+            goalsTable.add(b).width(270).height(16).left().padTop(2).row();
+            goalsTable.add(st).width(270).left().padBottom(6).row();
+            goalLabels.add(t); goalBars.add(b); goalStatus.add(st);
+        }
     }
 
     public void update(GameState s, Tool tool, Equipment eq, int speed, Layer layer, LineTier tier) {
@@ -1137,14 +1155,15 @@ public final class Hud {
         // senaryo paneli
         Scenario sc = s.scenario;
         scenTitle.setText(sc.title + (s.won ? "  ✓" : ""));
-        StringBuilder sb = new StringBuilder();
-        if (sc.deadlineYear > 0) sb.append("Süre: ").append(sc.deadlineYear).append(" sonuna kadar (")
-            .append(Math.max(0, sc.deadlineYear - s.year() + 1)).append(" yıl)\n");
-        for (Objective o : sc.objectives) {
+        if (goalsFor != sc) buildGoals(sc);
+        goalsDeadline.setText(sc.deadlineYear > 0 ? "Süre: " + sc.deadlineYear + " sonuna kadar (" + Math.max(0, sc.deadlineYear - s.year() + 1) + " yıl)" : "");
+        for (int i = 0; i < sc.objectives.size(); i++) {
+            Objective o = sc.objectives.get(i);
             boolean met = o.met(s);
-            sb.append(met ? "✓ " : "• ").append(o.label).append("\n  ").append(bar(o.progress(s))).append("  ").append(o.status(s)).append('\n');
+            goalLabels.get(i).setText((met ? "✓ " : "• ") + o.label);
+            goalBars.get(i).set((float) o.progress(s));
+            goalStatus.get(i).setText(o.status(s));
         }
-        scenBody.setText(sb.toString().trim());
 
         refreshWindows(s);
         if (s.gameOver && !gameOverShown) {

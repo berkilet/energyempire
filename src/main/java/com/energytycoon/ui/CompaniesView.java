@@ -28,7 +28,8 @@ public final class CompaniesView {
     private final List<Label[]> compRows = new ArrayList<>();
     private final List<Company> rowOrder = new ArrayList<>();
     private final List<Label[]> cityRows = new ArrayList<>();
-    private final List<UiKit.Meter> cityMeters = new ArrayList<>();
+    private static final Color WARN_TINT = new Color(1.6f, 1.15f, 0.35f, 1), BAD_TINT = new Color(1.8f, 0.45f, 0.35f, 1);
+    private final List<UiKit.GlowBar> cityMeters = new ArrayList<>();
 
     public CompaniesView(Skins skins) {
         this.skin = skins.skin;
@@ -94,9 +95,9 @@ public final class CompaniesView {
             tt.add(cells[0]).width(T_W[0]).left();
             for (int i = 1; i < T_HEAD.length; i++) {
                 if (i == 4) {
-                    UiKit.Meter m = new UiKit.Meter(skin, T_W[4] - 30, 8);
+                    UiKit.GlowBar m = new UiKit.GlowBar(T_W[4] - 30, 14);
                     cityMeters.add(m);
-                    tt.add(m).width(T_W[4] - 30).height(8).left().padLeft(20).padRight(10);
+                    tt.add(m).width(T_W[4] - 30).height(14).left().padLeft(20).padRight(10);
                     continue;
                 }
                 cells[i] = new Label("", skin, "value");
@@ -147,7 +148,8 @@ public final class CompaniesView {
             r[2].setText(Fmt.mw(c.peakMW()));
             r[3].setText(Fmt.mw(c.servedMW) );
             float sat = (float) c.satisfaction;
-            cityMeters.get(k).set(sat, sat > 0.95f ? Skins.ACCENT : sat > 0.8f ? Skins.WARN : Skins.BAD);
+            // memnuniyet: yuksekte orijinal yesil, dustukce sariya ve kirmiziya calar
+            cityMeters.get(k).set(sat).tint(sat > 0.95f ? Color.WHITE : sat > 0.8f ? WARN_TINT : BAD_TINT);
             r[5].setText("%" + Math.round(sat * 100));
             r[6].setText(c.lines.isEmpty() ? "yok" : String.valueOf(c.lines.size()));
             r[6].setStyle(skin.get(c.lines.isEmpty() ? "valueBad" : "value", Label.LabelStyle.class));

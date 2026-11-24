@@ -82,31 +82,63 @@ public final class UiKit {
         if (l.getStyle() != s) l.setStyle(s);
     }
 
-    /** Ince dolum cubugu (ör. kredi kullanimi, memnuniyet). */
-    public static final class Meter extends Widget {
-        private final Drawable bg, fill;
-        private float value;
-        private final Color color = new Color();
+    /**
+     * Isikli ilerleme cubugu (tools/ui/make_progress_bar.py ile uretilen parcalar): metal cerceve, yesil dolgu, %100'de
+     * kivilcimli turkuaz dolgu. Dokuz-parca: her genislik ve yukseklikte uclar bozulmadan esner; ara degerler surekli.
+     * tint: dolguyu renklendirir (ör. dusuk memnuniyette kirmiziya calar), beyaz = orijinal.
+     */
+    public static final class GlowBar extends Widget {
+        /** Kaynak parcalarin yuksekligi ve olculeri (32 px): cerceve basligi, dolgu uclari, dolgunun cerceveye gore kaymasi. */
+        private static final float SRC_H = 32, TRACK_CAP = 30, FILL_CAP = 15, FILL_OFFSET = 3.3f;
+        private static com.badlogic.gdx.graphics.Texture trackTex, fillTex, fullTex;
         private final float prefW, prefH;
+        private float value;
+        private final Color tint = new Color(Color.WHITE);
+        private com.badlogic.gdx.graphics.g2d.NinePatch track, fill, full;
+        private float builtFor = -1;
 
-        public Meter(Skin skin, float w, float h) {
-            bg = skin.newDrawable("white", 0.10f, 0.15f, 0.20f, 1f);
-            fill = skin.newDrawable("white", Color.WHITE);
-            prefW = w; prefH = h;
+        public GlowBar(float w, float h) { prefW = w; prefH = h; }
+
+        private static com.badlogic.gdx.graphics.Texture tex(String name) {
+            com.badlogic.gdx.graphics.Texture t = new com.badlogic.gdx.graphics.Texture(com.badlogic.gdx.Gdx.files.classpath("ui/" + name), true);
+            t.setFilter(com.badlogic.gdx.graphics.Texture.TextureFilter.MipMapLinearLinear, com.badlogic.gdx.graphics.Texture.TextureFilter.Linear);
+            return t;
         }
 
-        public void set(float v, Color c) { value = Math.max(0, Math.min(1, v)); color.set(c); }
+        public GlowBar set(float v) { value = Math.max(0, Math.min(1, v)); return this; }
+        public GlowBar tint(Color c) { tint.set(c); return this; }
 
         @Override public float getPrefWidth() { return prefW; }
         @Override public float getPrefHeight() { return prefH; }
 
+        private void build(float h) {
+            if (trackTex == null) { trackTex = tex("bar_track.png"); fillTex = tex("bar_fill.png"); fullTex = tex("bar_fill_full.png"); }
+            float s = h / SRC_H;
+            int tc = Math.round(TRACK_CAP), fc = Math.round(FILL_CAP);
+            track = new com.badlogic.gdx.graphics.g2d.NinePatch(trackTex, tc, tc, 0, 0);
+            fill = new com.badlogic.gdx.graphics.g2d.NinePatch(fillTex, fc, fc, 0, 0);
+            full = new com.badlogic.gdx.graphics.g2d.NinePatch(fullTex, fc, fc + 10, 0, 0);
+            track.scale(s, s); fill.scale(s, s); full.scale(s, s);
+            builtFor = h;
+        }
+
         @Override public void draw(Batch batch, float parentAlpha) {
             validate();
+            float w = getWidth(), h = getHeight();
+            if (h != builtFor) build(h);
+            float s = h / SRC_H;
             Color old = batch.getColor().cpy();
             batch.setColor(1, 1, 1, parentAlpha);
-            bg.draw(batch, getX(), getY(), getWidth(), getHeight());
-            batch.setColor(color.r, color.g, color.b, parentAlpha);
-            if (value > 0) fill.draw(batch, getX(), getY(), Math.max(2, getWidth() * value), getHeight());
+            track.draw(batch, getX(), getY(), w, h);
+            if (value > 0) {
+                boolean done = value >= 0.999f;
+                com.badlogic.gdx.graphics.g2d.NinePatch np = done ? full : fill;
+                float off = FILL_OFFSET * s, maxW = w - off;
+                float minW = np.getLeftWidth() + np.getRightWidth();
+                float fw = Math.max(minW, maxW * value);
+                batch.setColor(tint.r, tint.g, tint.b, parentAlpha);
+                np.draw(batch, getX() + off, getY(), Math.min(fw, maxW), h);
+            }
             batch.setColor(old);
         }
     }
