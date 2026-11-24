@@ -239,6 +239,7 @@ public final class Finance {
     /** ECA'yi bu banka duzenler mi? Null: evet; degilse gerekce (ticari kredideki banka kurallariyla ayni). */
     public String ecaRefusal(Company c, Equipment e, Bank b) {
         if (!ecaEligible(e)) return "ECA yok (" + e.supplier.origin + " tedarikçi)";
+        // borc kapasitesi kontrolu ecaQuote'ta (sahaya gore); cok dusukse buildWithEca reddeder
         if (exempt(c)) return "Kamu kredi kullanmaz";
         if (c.bankBanUntil[b.ordinal()] > s.hour) return b.label + " temerrüt sonrası " + FinanceBalance.REL_BAN_YEARS + " yıl kredi vermez";
         if (b == Bank.YESIL && !e.type.renewable) return b.label + " fosil santrale kredi vermez";
@@ -246,23 +247,40 @@ public final class Finance {
     }
 
     public static int ecaYears(PlantType t) {
-        return switch (t) { case NUCLEAR -> FinanceBalance.ECA_NUCLEAR_YEARS; case COAL, HYDRO -> FinanceBalance.ECA_MAX_YEARS; case GAS -> 12; default -> FinanceBalance.ECA_MIN_YEARS; };
+        // OECD ihracat kredisi duzenlemesi: yenilenebilirde uzun vade (gunes/ruzgar 15, hidro 18), konvansiyonelde kisa
+        return switch (t) { case NUCLEAR, HYDRO -> FinanceBalance.ECA_NUCLEAR_YEARS; case SOLAR, WIND -> FinanceBalance.ECA_MAX_YEARS; case GAS -> 12; default -> FinanceBalance.ECA_MIN_YEARS; };
     }
 
     public static final class EcaQuote {
         public double amount, rate, premium, bankFee, installment, totalRepay;
+        /** Bankanin borc kapasitesi hesabi: beklenen ortalama isletme nakdi ve kapasiteye gore sinirlandi mi. */
+        public double cfads, debtCapacity;
+        public boolean sized;
         public int years, graceMonths, freqMonths;
         public String agency;
     }
 
-    public EcaQuote ecaQuote(Company c, Equipment e, Bank b, int freqMonths) {
+    public EcaQuote ecaQuote(Company c, Equipment e, Bank b, int freqMonths) { return ecaQuote(c, e, b, freqMonths, -1, -1); }
+
+    /**
+     * ECA teklifi; x,y verilirse o sahaya gore. Kredi tutari borc kapasitesiyle sinirlidir: bankanin tarafsiz bakisiyla
+     * ilk 15 yilin ortalama isletme nakdi, borc servisini en az ECA_SIZING_DSCR kez karsilamali (proje finansmani).
+     */
+    public EcaQuote ecaQuote(Company c, Equipment e, Bank b, int freqMonths, int x, int y) {
         if (!ecaEligible(e)) return null;
         EcaQuote q = new EcaQuote();
-        q.amount = e.capex() * FinanceBalance.ECA_SHARE;
         q.rate = s.macro.policyRate + FinanceBalance.ECA_SPREAD;
+        q.years = ecaYears(e.type);
+        City city = s.cities.get(0);
+        if (x >= 0) { double bd = Double.MAX_VALUE; for (City ct : s.cities) { double d = Math.hypot(ct.x - x, ct.y - y); if (d < bd) { bd = d; city = ct; } } }
+        q.cfads = RivalStrategy.evaluateBank(s, c, e, city, x, y).avgEbitda;
+        double perUnit = Loan.annuity(1.0, q.rate, 12 / freqMonths, q.years * 12 / freqMonths) * 12.0 / freqMonths;
+        q.debtCapacity = q.cfads > 0 ? q.cfads / FinanceBalance.ECA_SIZING_DSCR / perUnit : 0;
+        double max = e.capex() * FinanceBalance.ECA_SHARE;
+        q.sized = q.debtCapacity < max;
+        q.amount = Math.max(0, Math.min(max, q.debtCapacity));
         q.premium = q.amount * ecaPremiumRate(e.supplier.origin) * s.macro.ecaPremiumMult();
         q.bankFee = q.amount * FinanceBalance.ECA_BANK_FEE * Bank.feeMult(c.bankScore[b.ordinal()]);
-        q.years = ecaYears(e.type);
         q.graceMonths = (int) Math.ceil(e.buildDays() / 30.0) + FinanceBalance.ECA_GRACE_EXTRA_MONTHS;
         q.freqMonths = freqMonths;
         int n = q.years * 12 / freqMonths;
@@ -289,8 +307,8 @@ public final class Finance {
 
     public Loan signEca(Company c, Plant p, Bank b, int freqMonths) {
         if (ecaRefusal(c, p.equipment, b) != null) return null;
-        EcaQuote q = ecaQuote(c, p.equipment, b, freqMonths);
-        if (q == null) return null;
+        EcaQuote q = ecaQuote(c, p.equipment, b, freqMonths, p.x, p.y);
+        if (q == null || q.amount < p.equipment.capex() * FinanceBalance.ECA_MIN_SHARE) return null;
         Loan l = new Loan();
         l.id = s.nextId++; l.type = Loan.Type.ECA; l.bank = b; l.fixed = true; l.ecaOrigin = p.equipment.supplier.origin; l.linkedPlant = p.id;
         l.rate = q.rate; l.spread = FinanceBalance.ECA_SPREAD;
@@ -310,8 +328,8 @@ public final class Finance {
      * Null: kurulamadi (yer, nakit veya ECA uygun degil).
      */
     public Plant buildWithEca(Company c, Equipment e, int x, int y, Bank b, int freqMonths) {
-        EcaQuote q = ecaQuote(c, e, b, freqMonths);
-        if (q == null || ecaRefusal(c, e, b) != null) return null;
+        EcaQuote q = ecaQuote(c, e, b, freqMonths, x, y);
+        if (q == null || ecaRefusal(c, e, b) != null || q.amount < e.capex() * FinanceBalance.ECA_MIN_SHARE) return null;
         if (c.cash + q.amount - q.premium - q.bankFee < e.capex()) return null;
         c.cash += q.amount;
         Plant p = s.buildPlant(c, e, x, y);
@@ -337,8 +355,10 @@ public final class Finance {
     }
 
     /** Santral icin pesin gereken nakit (ECA ile): bedel - kredi + prim + masraf. */
-    public double ecaCashNeed(Company c, Equipment e, Bank b, int freqMonths) {
-        EcaQuote q = ecaQuote(c, e, b, freqMonths);
+    public double ecaCashNeed(Company c, Equipment e, Bank b, int freqMonths) { return ecaCashNeed(c, e, b, freqMonths, -1, -1); }
+
+    public double ecaCashNeed(Company c, Equipment e, Bank b, int freqMonths, int x, int y) {
+        EcaQuote q = ecaQuote(c, e, b, freqMonths, x, y);
         return q == null ? e.capex() : e.capex() - q.amount + q.premium + q.bankFee;
     }
 

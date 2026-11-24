@@ -124,9 +124,11 @@ public final class RivalStrategy {
      * Beklenen kapasite fiyati ($/MW-yil), t yil sonra: bugunku fiyattan uzun donem dengesine (sistem hedef yedege doner;
      * fiyat referans degerin ~%80'i) gecici farkin sonumlenmesiyle. Kitliga duyarli sirket bugunku fiyata daha cok guvenir.
      */
-    static double expectedCapacityPrice(GameState s, Company c, double t) {
+    static double expectedCapacityPrice(GameState s, Company c, double t) { return expectedCapacityPrice(s, c.scarcityView, t); }
+
+    static double expectedCapacityPrice(GameState s, double scarcityView, double t) {
         double longRun = GridBalance.CAPACITY_CONE * 0.8;
-        double decay = Math.exp(-t / (SUPPLY_DECAY_YEARS * Math.max(0.5, c.scarcityView)));
+        double decay = Math.exp(-t / (SUPPLY_DECAY_YEARS * Math.max(0.5, scarcityView)));
         return longRun + (s.capacityPrice - longRun) * decay;
     }
 
@@ -179,20 +181,34 @@ public final class RivalStrategy {
         public double index;
         /** Ilk tam yil: uretim (MWh), kapasite faktoru, isletme nakdi (enerji + kapasite - sabit gider), kapasite geliri. */
         public double mwh1, cf1, ebitda1, capacity1, npv;
+        /** Ilk 15 yilin ortalama isletme nakdi (banka borc kapasitesi bununla olculur). */
+        public double avgEbitda;
     }
 
     /**
      * x,y >= 0 ise belirli saha (o karenin verimi ve yakit indirimi); aksi halde sehir cevresinde ulasilabilir en iyi saha.
      */
     public static Evaluation evaluate(GameState s, Company c, Equipment e, City city, int sx, int sy) {
+        return evaluate(s, c, e, city, sx, sy, c.carbonBelief, c.scarcityView);
+    }
+
+    /**
+     * Bankanin tarafsiz bakisiyla degerlendirme (kredi boyutlandirmasi): karbon fiyat yolu ilan edildigi gibi,
+     * arz durumuna ortalama duyarlilik. Sirketin kendi iyimserligi ya da kotumserligi krediyi etkilemez.
+     */
+    public static Evaluation evaluateBank(GameState s, Company c, Equipment e, City city, int sx, int sy) {
+        return evaluate(s, c, e, city, sx, sy, 1.0, 1.0);
+    }
+
+    private static Evaluation evaluate(GameState s, Company c, Equipment e, City city, int sx, int sy, double belief, double scarcity) {
         Evaluation ev = new Evaluation();
         PlantType t = e.type;
         boolean site = sx >= 0 && sy >= 0;
         Plant probe = new Plant();
         probe.type = t; probe.equipment = e; probe.owner = c; probe.x = site ? sx : city.x; probe.y = site ? sy : city.y;
         probe.builtAtHour = s.hour; probe.ageStartHour = s.hour;
-        double pAvg = averagePrice(s), sfNow = 1 + (supplyFactor(s) - 1) * c.scarcityView, carbon0 = s.markets.carbonPrice;
-        double growth = Balance.CARBON_GROWTH_YEAR * s.markets.carbonGrowthMult * c.carbonBelief;
+        double pAvg = averagePrice(s), sfNow = 1 + (supplyFactor(s) - 1) * scarcity, carbon0 = s.markets.carbonPrice;
+        double growth = Balance.CARBON_GROWTH_YEAR * s.markets.carbonGrowthMult * belief;
         double co2 = probe.co2PerMWh(s.hour);
         double mcNoCarbon = s.marginalCost(probe) - carbon0 * co2;
         double cf = t.renewable ? (site ? s.siteScore(e, sx, sy) : bestSiteCf(s, e, city)) : 0;
@@ -205,11 +221,12 @@ public final class RivalStrategy {
         double capex = e.capex(), fixed = e.fixedOmPerHour() * Balance.HOURS_PER_YEAR, npv = -capex;
         double disc = costOfCapital(s, c);
         double build = e.buildDays() / 365.0;
+        double sum15 = 0; int n15 = 0;
         for (int y = 0; y <= years; y++) {
             double tt = y + build;
             double carbon = carbon0 + growth * tt;
             double p0 = pAvg * (1 + (sfNow - 1) * Math.exp(-tt / SUPPLY_DECAY_YEARS));
-            double price = p0 + CARBON_PASS_THROUGH * (carbon - carbon0) * Math.min(1, c.carbonBelief + 0.3);
+            double price = p0 + CARBON_PASS_THROUGH * (carbon - carbon0) * Math.min(1, belief + 0.3);
             double mwh, margin;
             if (t.renewable) {
                 mwh = e.capacityMW * cf * Balance.HOURS_PER_YEAR;
@@ -226,7 +243,7 @@ public final class RivalStrategy {
             double operating = mwh * margin;
             // kapasite mekanizmasi: guvenilir kapasite x beklenen birim fiyat (bugunku fiyatla uzun donem referansin karisimi;
             // sirketin kitlik duyarliligi agirligi belirler)
-            double capRev = e.capacityMW * GridBalance.derate(t) * expectedCapacityPrice(s, c, tt);
+            double capRev = e.capacityMW * GridBalance.derate(t) * expectedCapacityPrice(s, scarcity, tt);
             if (y == 0) {
                 // y=0: yalnizca kalibrasyon (bugunku kosullarda bir yil)
                 if (!Double.isNaN(obs) && operating > 0) calib = Math.max(0.75, Math.min(1.25, obs * e.capacityMW / operating));
@@ -237,7 +254,9 @@ public final class RivalStrategy {
                 ev.ebitda1 = operating * calib + capRev - fixed; ev.capacity1 = capRev;
             }
             npv += (operating * calib + capRev - fixed) / Math.pow(1 + disc, tt);
+            if (y <= 15) { sum15 += operating * calib + capRev - fixed; n15++; }
         }
+        ev.avgEbitda = n15 > 0 ? sum15 / n15 : 0;
         ev.npv = npv; ev.index = npv / capex;
         return ev;
     }

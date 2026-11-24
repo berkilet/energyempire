@@ -58,6 +58,8 @@ public final class FinanceBalance {
      */
     public static final int ECA_STEPIN_NOTICE_DAYS = 45, ECA_DSRA_MONTHS = 6, ECA_WAIVER_QUARTERS = 4;
     public static final double ECA_WAIVER_FEE = 0.01;
+    /** Kredi boyutlandirma: beklenen ortalama nakit / borc servisi en az bu kadar; bundan az borc kapasitesi bedelin bu payindan azsa ECA verilmez. */
+    public static final double ECA_SIZING_DSCR = 1.35, ECA_MIN_SHARE = 0.15;
     public static final int ECA_MIN_YEARS = 10, ECA_MAX_YEARS = 15, ECA_NUCLEAR_YEARS = 18, ECA_GRACE_EXTRA_MONTHS = 6, ECA_DSCR_DEFAULT_QUARTERS = 4;
     /** Isletme kredisi limiti (nota gore A..CCC), marj, taahhut komisyonu, kapatma suresi (ay). */
     public static final double[] REVOLVER_LIMIT = { 150e6, 125e6, 100e6, 75e6, 50e6 };

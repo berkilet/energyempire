@@ -103,7 +103,7 @@ public final class PurchaseWindow extends Window {
         Table loan = card("KREDİ İLE", "fin_loans");
         Table typeRow = new Table();
         boolean ecaOk = Finance.ecaEligible(e);
-        typeRow.add(toggle("ECA (bedelin %" + Math.round(FinanceBalance.ECA_SHARE * 100) + "'i)", useEca, ecaOk, () -> useEca = true)).height(26).padRight(4);
+        typeRow.add(toggle("ECA (bedelin %" + Math.round(FinanceBalance.ECA_SHARE * 100) + "'ine kadar)", useEca, ecaOk, () -> useEca = true)).height(26).padRight(4);
         typeRow.add(toggle("Ticari kredi", !useEca, true, () -> useEca = false)).height(26);
         loan.add(typeRow).left().padTop(4).row();
         if (!ecaOk) loan.add(l("ECA yok: " + e.supplier.origin + " tedarikçisi ihracat kredisi sunmuyor", "dim")).left().padTop(2).row();
@@ -130,11 +130,15 @@ public final class PurchaseWindow extends Window {
         double cashNeed, amount = 0, annualService;
         if (useEca && ecaOk) {
             refusal = s.finance.ecaRefusal(p, e, bank);
-            Finance.EcaQuote q = s.finance.ecaQuote(p, e, bank, freq);
+            Finance.EcaQuote q = s.finance.ecaQuote(p, e, bank, freq, x, y);
             amount = q.amount;
-            cashNeed = s.finance.ecaCashNeed(p, e, bank, freq);
+            cashNeed = s.finance.ecaCashNeed(p, e, bank, freq, x, y);
+            if (refusal == null && q.amount < capex * FinanceBalance.ECA_MIN_SHARE)
+                refusal = "Banka borç kapasitesi çok düşük: santralin beklenen nakdi krediyi taşımıyor";
             annualService = q.installment * 12.0 / freq;
-            detail = "Kredi " + Fmt.money(q.amount) + " · faiz " + Macro.pct(q.rate) + " (sabit) · " + q.years + " yıl\n"
+            detail = (q.sized ? "Borç kapasitesi: banka, beklenen ortalama nakit (" + Fmt.money(q.cfads) + "/yıl) borç servisini en az "
+                    + Fmt.f2(FinanceBalance.ECA_SIZING_DSCR) + " kez karşılayacak kadar verir → bedelin %" + Math.round(q.amount / capex * 100) + "'i\n" : "")
+                + "Kredi " + Fmt.money(q.amount) + " · faiz " + Macro.pct(q.rate) + " (sabit) · " + q.years + " yıl\n"
                 + "Ödemesiz dönem " + q.graceMonths + " ay · taksit " + Fmt.money(q.installment) + " / " + (freq == 6 ? "6 ay" : "yıl") + "\n"
                 + "Sigorta primi + banka masrafı " + Fmt.money(q.premium + q.bankFee) + "\n"
                 + "Peşin öz kaynak: " + Fmt.money(cashNeed);
